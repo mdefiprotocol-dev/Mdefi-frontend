@@ -1,0 +1,6 @@
+{
+  "name": "MDefi",
+  "description": "Premium Web3 and DeFi Hub & MBTTC (Magnet Bitcoin Token) User Dashboard prototype.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

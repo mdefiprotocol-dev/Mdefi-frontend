@@ -1,0 +1,574 @@
+[
+  {
+    "key": "nav_more",
+    "fallback": "More"
+  },
+  {
+    "key": "mdefi_menu",
+    "fallback": "MDefi Menu"
+  },
+  {
+    "key": "status_active",
+    "fallback": "Active"
+  },
+  {
+    "key": "burn_badge",
+    "fallback": "Deflationary Economic Architecture"
+  },
+  {
+    "key": "burn_title",
+    "fallback": "Burn & Deflationary Utility"
+  },
+  {
+    "key": "burn_desc",
+    "fallback": "Why MBTTC does not inflate forever: Programmatic burn triggers continuously reduce the circulating token supply with every reward claim and transaction."
+  },
+  {
+    "key": "burn_loop_label",
+    "fallback": "Continuous Scarcity Loop"
+  },
+  {
+    "key": "burn_engine_title",
+    "fallback": "Automated Token Combustion Engine"
+  },
+  {
+    "key": "burn_step1_title",
+    "fallback": "TOKEN CONSUMPTION"
+  },
+  {
+    "key": "burn_step1_desc",
+    "fallback": "Users execute Matrix actions, Weekly Reward claims, and Salary withdrawals."
+  },
+  {
+    "key": "burn_step2_title",
+    "fallback": "AUTOMATIC BURN"
+  },
+  {
+    "key": "burn_step2_desc",
+    "fallback": "Smart contract routes consumed MBTTC directly into unrecoverable dead address."
+  },
+  {
+    "key": "burn_step3_title",
+    "fallback": "REDUCED SUPPLY"
+  },
+  {
+    "key": "burn_step3_desc",
+    "fallback": "Active circulating market float permanently decreases on-chain."
+  },
+  {
+    "key": "burn_step4_title",
+    "fallback": "VALUE SCARCITY"
+  },
+  {
+    "key": "burn_step4_desc",
+    "fallback": "Fixed hard cap meets shrinking liquid supply, strengthening network tokenomics."
+  },
+  {
+    "key": "burn_dead_addr_title",
+    "fallback": "Verified Dead Address Incineration"
+  },
+  {
+    "key": "burn_zero_extract",
+    "fallback": "Zero Private Extraction"
+  },
+  {
+    "key": "activity_pulse_label",
+    "fallback": "GLOBAL ECOSYSTEM PULSE"
+  },
+  {
+    "key": "activity_heading",
+    "fallback": "MDeFi Ecosystem Activities"
+  },
+  {
+    "key": "activity_subheading",
+    "fallback": "Real-time activity across the MDeFi ecosystem"
+  },
+  {
+    "key": "activity_live_badge",
+    "fallback": "● LIVE ACTIVITY"
+  },
+  {
+    "key": "activity_verified_events",
+    "fallback": "VERIFIED ECOSYSTEM EVENTS"
+  },
+  {
+    "key": "activity_demo_badge",
+    "fallback": "● DEMO ACTIVITY"
+  },
+  {
+    "key": "activity_simulated_preview",
+    "fallback": "SIMULATED PREVIEW DATA"
+  },
+  {
+    "key": "activity_loading",
+    "fallback": "Querying verified on-chain telemetry..."
+  },
+  {
+    "key": "activity_empty_title",
+    "fallback": "No live ecosystem activity recorded yet."
+  },
+  {
+    "key": "activity_empty_desc",
+    "fallback": "Waiting for verified on-chain transactions. Real protocol events will automatically stream here."
+  },
+  {
+    "key": "status_airdrop_live_p4",
+    "fallback": "AIRDROP 🟢 LIVE • TRADING 🔒 P4"
+  },
+  {
+    "key": "status_unlocks_phase",
+    "fallback": "UNLOCKS IN PHASE ${mod.minPhase}"
+  },
+  {
+    "key": "unlocks_in_phase",
+    "fallback": "Unlocks in Phase ${mod.minPhase}"
+  },
+  {
+    "key": "ready_join_network",
+    "fallback": "Ready to Join the MDeFi Network?"
+  },
+  {
+    "key": "ready_join_desc",
+    "fallback": "Registration is live! Connect your Web3 wallet to claim 4-hour MBTTC airdrops and anchor your network placement."
+  },
+  {
+    "key": "exchange_badge",
+    "fallback": "Post-Minting Global Liquidity • Phase 4 Gate"
+  },
+  {
+    "key": "exchange_title",
+    "fallback": "Exchange Launch Roadmap"
+  },
+  {
+    "key": "exchange_desc",
+    "fallback": "Target exchange rollout engineered to provide decentralized and centralized liquidity once the 2,000,000 MBTTC minting program reaches Phase 4 launch criteria."
+  },
+  {
+    "key": "exchange_s1_step",
+    "fallback": "Step 1 • Phase 1"
+  },
+  {
+    "key": "exchange_s1_title",
+    "fallback": "MBTTC Genesis"
+  },
+  {
+    "key": "exchange_s2_step",
+    "fallback": "Step 2 • Phase 2-3"
+  },
+  {
+    "key": "exchange_s2_title",
+    "fallback": "Minting & Halving"
+  },
+  {
+    "key": "exchange_s3_step",
+    "fallback": "Step 3 • Pre-Trading"
+  },
+  {
+    "key": "exchange_s3_title",
+    "fallback": "Liquidity Bond Lock"
+  },
+  {
+    "key": "status_live",
+    "fallback": "LIVE"
+  },
+  {
+    "key": "exchange_s4_step",
+    "fallback": "Step 4 • Phase 4 Gate"
+  },
+  {
+    "key": "exchange_s4_title",
+    "fallback": "Exchange Trading"
+  },
+  {
+    "key": "status_live_trading",
+    "fallback": "🟢 TRADING LIVE"
+  },
+  {
+    "key": "trading_in_phase4",
+    "fallback": "🔒 TRADING IN PHASE 4"
+  },
+  {
+    "key": "exchange_target_pair",
+    "fallback": "Target Pair:"
+  },
+  {
+    "key": "exchange_phase3_roadmap",
+    "fallback": "Phase 3 Roadmap"
+  },
+  {
+    "key": "exchange_planned_launch",
+    "fallback": "Planned Launch"
+  },
+  {
+    "key": "faq_badge",
+    "fallback": "Community Knowledge Base"
+  },
+  {
+    "key": "faq_desc",
+    "fallback": "Everything you need to know about MDeFi matrix mechanics, MBTTC tokenomics, and registration."
+  },
+  {
+    "key": "final_cta_badge",
+    "fallback": "Decentralized Web3 Gateway"
+  },
+  {
+    "key": "final_cta_title",
+    "fallback": "START YOUR MDEFI JOURNEY"
+  },
+  {
+    "key": "final_cta_desc",
+    "fallback": "Connect your Web3 wallet and enter the MDeFi ecosystem. Activate the S4 node, claim 4-hour MBTTC airdrops, and build your decentralized matrix today."
+  },
+  {
+    "key": "final_cta_non_custodial",
+    "fallback": "100% Non-Custodial"
+  },
+  {
+    "key": "final_cta_instant",
+    "fallback": "Instant On-Chain Approvals"
+  },
+  {
+    "key": "final_cta_audited",
+    "fallback": "Audited Smart Contracts"
+  },
+  {
+    "key": "hero_heading_accent",
+    "fallback": "Decentralized Matrix"
+  },
+  {
+    "key": "hero_heading_sub",
+    "fallback": "& Reward Ecosystem"
+  },
+  {
+    "key": "hero_explore_ecosystem",
+    "fallback": "EXPLORE ECOSYSTEM"
+  },
+  {
+    "key": "hero_non_custodial",
+    "fallback": "Non-Custodial"
+  },
+  {
+    "key": "hero_airdrop_cycle",
+    "fallback": "Airdrop Cycle"
+  },
+  {
+    "key": "hero_max_mint",
+    "fallback": "Max MBTTC Mint"
+  },
+  {
+    "key": "hero_coin_rotation_tag",
+    "fallback": "3D Continuous Physical Milled Rotation"
+  },
+  {
+    "key": "hiw_badge",
+    "fallback": "Seamless Web3 Onboarding"
+  },
+  {
+    "key": "hiw_title",
+    "fallback": "How It Works"
+  },
+  {
+    "key": "hiw_desc",
+    "fallback": "Four streamlined steps to activate your non-custodial decentralized matrix account and join the MDeFi global network."
+  },
+  {
+    "key": "hiw_automated",
+    "fallback": "Automated On-Chain"
+  },
+  {
+    "key": "btn_get_started",
+    "fallback": "GET STARTED NOW"
+  },
+  {
+    "key": "landing_footer_desc",
+    "fallback": "MDeFi is a premier decentralized matrix smart contract ecosystem powered by the BEP-20 Magnet Bitcoin Token (MBTTC). Engineered for algorithmic transparency and non-custodial asset custody."
+  },
+  {
+    "key": "landing_footer_nav",
+    "fallback": "Navigation"
+  },
+  {
+    "key": "nav_tokenomics",
+    "fallback": "MBTTC Tokenomics"
+  },
+  {
+    "key": "nav_activity",
+    "fallback": "Ecosystem Activities"
+  },
+  {
+    "key": "nav_rating",
+    "fallback": "Community Rating"
+  },
+  {
+    "key": "landing_footer_account",
+    "fallback": "Account Access"
+  },
+  {
+    "key": "landing_footer_create",
+    "fallback": "Create Account (Register)"
+  },
+  {
+    "key": "landing_footer_login",
+    "fallback": "Login to Dashboard"
+  },
+  {
+    "key": "landing_footer_legal",
+    "fallback": "Legal & Policy"
+  },
+  {
+    "key": "landing_footer_risk",
+    "fallback": "Risk Management"
+  },
+  {
+    "key": "landing_footer_privacy",
+    "fallback": "Privacy Policy"
+  },
+  {
+    "key": "landing_footer_disclaimer",
+    "fallback": "Protocol Disclaimer"
+  },
+  {
+    "key": "landing_footer_copyright",
+    "fallback": "MDeFi Protocol. All smart contracts immutable."
+  },
+  {
+    "key": "landing_footer_non_custodial",
+    "fallback": "Non-Custodial Architecture"
+  },
+  {
+    "key": "airdrop_window",
+    "fallback": "Community Distribution Window"
+  },
+  {
+    "key": "airdrop_next_window",
+    "fallback": "NEXT CLAIM WINDOW"
+  },
+  {
+    "key": "airdrop_sync",
+    "fallback": "Synchronized with BNB Smart Chain block time"
+  },
+  {
+    "key": "airdrop_eligible",
+    "fallback": "Registered Accounts Eligible"
+  },
+  {
+    "key": "airdrop_rate_limit",
+    "fallback": "Anti-Bot Cryptographic Rate Limit"
+  },
+  {
+    "key": "airdrop_zero_lock",
+    "fallback": "Zero Protocol Lockups"
+  },
+  {
+    "key": "mbttc_badge",
+    "fallback": "Native Protocol Currency"
+  },
+  {
+    "key": "mbttc_title",
+    "fallback": "MBTTC — Magnet Bitcoin Token"
+  },
+  {
+    "key": "mbttc_desc",
+    "fallback": "MBTTC is the native token of the MDeFi Ecosystem. Engineered on the BNB Smart Chain (BEP-20) with mathematically capped minting and utility-driven tokenomics."
+  },
+  {
+    "key": "mbttc_treasury_status",
+    "fallback": "Treasury Valuation Status:"
+  },
+  {
+    "key": "mbttc_phase_active",
+    "fallback": "Phase 2+ Active"
+  },
+  {
+    "key": "mbttc_unlocks_p2",
+    "fallback": "🔒 Unlocks in Phase 2"
+  },
+  {
+    "key": "treasury_calculated_rate",
+    "fallback": "Treasury Calculated Rate"
+  },
+  {
+    "key": "mbttc_rate_desc",
+    "fallback": "Rate indexing activates when S4 Node connects to Treasury IPO in Phase 2."
+  },
+  {
+    "key": "mbttc_trading_status",
+    "fallback": "Trading Status:"
+  },
+  {
+    "key": "mbttc_trading_active",
+    "fallback": "DEX Trading Active"
+  },
+  {
+    "key": "mbttc_trading_p4",
+    "fallback": "Trading Starts in Phase 4"
+  },
+  {
+    "key": "mbttc_bep20",
+    "fallback": "BEP-20 Standard"
+  },
+  {
+    "key": "decimals_bsc",
+    "fallback": "Decimals • Binance Smart Chain"
+  },
+  {
+    "key": "minting_badge",
+    "fallback": "MDeFi Hub Smart Contract Lifecycle"
+  },
+  {
+    "key": "minting_title",
+    "fallback": "MBTTC Minting Phases"
+  },
+  {
+    "key": "minting_desc",
+    "fallback": "The smart contract mints MBTTC according to strict algorithmic tiers. As total registered user milestones are reached, reward issuance is systematically halved."
+  },
+  {
+    "key": "minting_telemetry_label",
+    "fallback": "LIVE HUB TELEMETRY"
+  },
+  {
+    "key": "minting_current_users",
+    "fallback": "Current Users"
+  },
+  {
+    "key": "minting_active_phase",
+    "fallback": "Active Phase"
+  },
+  {
+    "key": "minting_next_reduction",
+    "fallback": "Next Phase Reduction At"
+  },
+  {
+    "key": "minting_users_suffix",
+    "fallback": "Users"
+  },
+  {
+    "key": "minting_rewards_label",
+    "fallback": "Current Mint Rewards"
+  },
+  {
+    "key": "minting_reg_reward",
+    "fallback": "Registration:"
+  },
+  {
+    "key": "minting_ref_reward",
+    "fallback": "Referral:"
+  },
+  {
+    "key": "minting_quantum_reward",
+    "fallback": "Quantum S4:"
+  },
+  {
+    "key": "minting_max_cap",
+    "fallback": "Max Cap Threshold:"
+  },
+  {
+    "key": "minting_accounts_suffix",
+    "fallback": "Accounts"
+  },
+  {
+    "key": "minting_bep20_dist",
+    "fallback": "On-chain BEP-20 automated distribution"
+  },
+  {
+    "key": "minting_contract_state",
+    "fallback": "Smart Contract State:"
+  },
+  {
+    "key": "minting_active_live",
+    "fallback": "Active Live Emission"
+  },
+  {
+    "key": "minting_scheduled",
+    "fallback": "Scheduled Milestone"
+  },
+  {
+    "key": "minting_after_p3_badge",
+    "fallback": "AFTER PHASE 3 COMPLETION"
+  },
+  {
+    "key": "minting_hard_cap_title",
+    "fallback": "No More Minting • 2,000,000 MBTTC Hard Cap Reached"
+  },
+  {
+    "key": "minting_hard_cap_desc",
+    "fallback": "Upon reaching the 2,000,000 MBTTC hard ceiling, the smart contract minting functions permanently self-terminate. The protocol transitions directly into Exchange Launch Preparation across PancakeSwap, Uniswap, and Bitget."
+  },
+  {
+    "key": "minting_stage_p3_followup",
+    "fallback": "Stage: Phase 3 Follow-Up"
+  },
+  {
+    "key": "roadmap_badge",
+    "fallback": "Strategic Ecosystem Trajectory"
+  },
+  {
+    "key": "roadmap_desc",
+    "fallback": "From cryptographic contract foundation to global multi-exchange liquidity. Every phase is governed mathematically on-chain."
+  },
+  {
+    "key": "phase_milestone",
+    "fallback": "Phase Milestone"
+  },
+  {
+    "key": "tok_badge",
+    "fallback": "Tokenomics & Allocation Model"
+  },
+  {
+    "key": "tok_title",
+    "fallback": "2,000,000 Maximum Mint Supply"
+  },
+  {
+    "key": "tok_desc",
+    "fallback": "Strictly mathematically hard-capped. Zero un-governed inflation, no hidden founder pools, and immutable on-chain allocation rules."
+  },
+  {
+    "key": "max_mint",
+    "fallback": "MAX MINT"
+  },
+  {
+    "key": "tok_ring_label",
+    "fallback": "Interactive Holographic Allocation Ring"
+  },
+  {
+    "key": "weekly_unlocks_in_phase",
+    "fallback": "UNLOCKS IN PHASE"
+  },
+  {
+    "key": "weekly_cycle_ledger",
+    "fallback": "7-Day Cycle Ledger"
+  },
+  {
+    "key": "weekly_phase_active",
+    "fallback": "Phase Active"
+  },
+  {
+    "key": "why_mbttc_badge",
+    "fallback": "Token Value Mechanics"
+  },
+  {
+    "key": "why_mbttc_title",
+    "fallback": "Why MBTTC?"
+  },
+  {
+    "key": "why_mbttc_desc",
+    "fallback": "Built from genesis with actual on-chain utilities rather than speculative hype. Five core design pillars anchor the Magnet Bitcoin Token architecture."
+  },
+  {
+    "key": "why_mbttc_pillar_label",
+    "fallback": "Pillar"
+  },
+  {
+    "key": "why_mbttc_verified_rule",
+    "fallback": "Verified Protocol Rule"
+  },
+  {
+    "key": "mbttc_supply",
+    "fallback": "TOTAL SUPPLY"
+  },
+  {
+    "key": "overview_claimable",
+    "fallback": "Claimable"
+  }
+]
