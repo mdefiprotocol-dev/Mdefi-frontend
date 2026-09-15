@@ -136,7 +136,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <span>Magnet Bitcoin Token (MBTTC)</span>
                 </span>
                 <span className="text-[10px] text-zinc-400 block font-mono">
-                  {t('hero_coin_rotation_tag', '3D Continuous Physical Milled Rotation')}
+                  {t('hero_coin_rotation_tag', 'The Native Token')}
                 </span>
               </div>
             </div>

@@ -585,7 +585,7 @@ export const nl: Record<string, string> = {
   "hero_non_custodial": "Non-Custodial",
   "hero_airdrop_cycle": "Airdrop Cycle",
   "hero_max_mint": "Max MBTTC Mint",
-  "hero_coin_rotation_tag": "3D Continuous Physical Milled Rotation",
+  "hero_coin_rotation_tag": "The Native Token",
   "hiw_badge": "Seamless Web3 Onboarding",
   "hiw_title": "How It Works",
   "hiw_desc": "Four streamlined steps to activate your non-custodial decentralized matrix account and join the MDeFi global network.",
