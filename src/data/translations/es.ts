@@ -653,7 +653,7 @@ export const es: Record<string, string> = {
   "tok_title": "2,000,000 Suministro Máximo de Minado",
   "tok_desc": "Strictly mathematically hard-capped. Zero un-governed inflation, no hidden founder pools, and immutable on-chain allocation rules.",
   "max_mint": "MAX MINT",
-  "tok_ring_label": "Interactive Holographic Allocation Ring",
+  "tok_ring_label": "100% decentralized protocol ",
   "weekly_unlocks_in_phase": "UNLOCKS IN PHASE",
   "weekly_cycle_ledger": "7-Day Cycle Ledger",
   "weekly_phase_active": "Phase Active",

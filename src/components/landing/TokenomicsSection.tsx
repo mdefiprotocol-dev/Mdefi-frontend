@@ -179,7 +179,7 @@ export const TokenomicsSection: React.FC = () => {
               </div>
 
               <span className="text-xs font-mono text-zinc-400 mt-4 text-center">
-                {t('tok_ring_label', 'Interactive Holographic Allocation Ring')}
+                {t('tok_ring_label', '100% decentralized protocol ')}
               </span>
             </div>
 
