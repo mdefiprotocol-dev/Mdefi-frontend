@@ -13,7 +13,12 @@
  * - Where ABI/function is unknown: leave clear TODO integration placeholder.
  */
 
-import { CONTRACT_ADDRESSES, isContractDeployed } from '../config/contractConfig';
+import {
+  CONTRACT_ADDRESSES,
+  isContractDeployed,
+  HUB_ABI,
+  MBTTC_ABI,
+} from '../config/contractConfig';
 import { ethers } from 'ethers';
 export type TransactionLifecycleState =
   | 'READY'
