@@ -14,7 +14,7 @@
  */
 
 import { CONTRACT_ADDRESSES, isContractDeployed } from '../config/contractConfig';
-
+import { ethers } from 'ethers';
 export type TransactionLifecycleState =
   | 'READY'
   | 'PREPARING'
