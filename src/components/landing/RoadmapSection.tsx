@@ -45,7 +45,7 @@ export const RoadmapSection: React.FC = () => {
       items: [
         'Public launch of S4 Junior ($10) & Senior ($25) Matrix Nodes',
         'Activation of 4-hour community MBTTC airdrop system',
-        'Registration rewards (100 MBTTC per verified account)',
+        'Unlock your phase allocation + recurring 4-hour Community Airdrop Claims.',
         'Direct referral tree tracking and instant matrix settlement'
       ],
       border: 'border-emerald-400 shadow-[0_0_35px_rgba(16,185,129,0.25)]',
