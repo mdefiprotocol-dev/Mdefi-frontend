@@ -18,19 +18,19 @@ export interface ContractDeploymentConfig {
 }
 
 export const NETWORK_CONFIG: ContractDeploymentConfig = {
-  isDeployed: false, // Pre-deployment: set to true ONLY when smart contracts are deployed
-  networkName: 'BNB Smart Chain (BEP-20)',
-  chainId: 56, // BSC Mainnet
-  rpcUrl: 'https://bsc-dataseed1.binance.org/',
-  explorerUrl: 'https://bscscan.com',
+  isDeployed: true, // Pre-deployment: set to true ONLY when smart contracts are deployed
+  networkName: 'BNB Smart Chain testnet(BEP-20)',
+  chainId: 97, // BSC Mainnet testnet
+  rpcUrl: 'https://data-seed-prebsc-1-s1.bnbchain.org/',
+  explorerUrl: 'https://testnet.bscscan.com',
 };
 
 // Contract addresses - Left empty until official BSC Testnet / Mainnet contract deployment
 // DIRECTIVE: Smart contracts are NOT deployed yet. Do NOT invent fake addresses.
 export const CONTRACT_ADDRESSES = {
   // Phase 1: Core Protocol & Native Token
-  mdefiHub: '',
-  mbttcToken: '',
+  mdefiHub: '0xdCE567cd83ED6A6bC4c4F411671Bc2fe20d49FE9',
+  mbttcToken: '0x7116BAFaDCBEe81b562Db083d2b08b462B761186',
   // Phase 2: S4 Matrix, Starter Pool & Liquidity
   s4Matrix: '',
   starterReward: '',
