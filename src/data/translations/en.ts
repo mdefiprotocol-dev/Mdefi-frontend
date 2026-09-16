@@ -110,7 +110,7 @@ export const en: Record<string, string> = {
   // MBTTC Airdrop Section
   airdrop_badge: 'LIVE AIRDROP PROTOCOL',
   airdrop_title: 'Claim Free MBTTC Airdrop Every 4 Hours',
-  airdrop_desc: 'All registered Web3 wallets receive a guaranteed 100 MBTTC Genesis bonus, plus recurring 4-hour community airdrop claims during Phase 1 Minting.',
+  airdrop_desc: 'Register during an active Minting Phase to unlock the phase-specific Genesis Reward, with recurring Community Airdrop Claims available every 4 hours.',
   airdrop_claim_btn: 'Claim Airdrop Now',
   airdrop_next_claim: 'Next Claim Window',
   airdrop_hours: 'Hours',
