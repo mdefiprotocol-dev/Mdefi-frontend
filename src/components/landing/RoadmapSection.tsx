@@ -63,7 +63,7 @@ export const RoadmapSection: React.FC = () => {
       items: [
         'Quantum Node ($70) 30-position radial matrix rollout',
         'Nexus Prime ($120) global revenue priority deployment',
-        'Weekly Reward Starter & Premium 10% pool distributions',
+        'Weekly Reward Starter & Premium pool distributions Every 7 days',
         'Weekly Passive Salary staking smart contract activation'
       ],
       border: 'border-cyan-500/30',
