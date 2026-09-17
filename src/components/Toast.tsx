@@ -61,7 +61,7 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: (id: string) => void
 
 export interface ToastProps {
   message: string;
-  type?: 'success' | 'warning' | 'info';
+type?: 'success' | 'warning' | 'info' | 'error';
   onClose: () => void;
 }
 

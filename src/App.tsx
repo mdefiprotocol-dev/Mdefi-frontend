@@ -226,10 +226,17 @@ function MainApp() {
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
 
   // Notifications state
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'warning'; id: string } | null>(null);
+  const [toast, setToast] = useState<{
+  message: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+  id: string;
+} | null>(null);
   const [rewardPopup, setRewardPopup] = useState<{ amount: number; type: string; id: string } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+  const showToast = (
+  message: string,
+  type: 'success' | 'info' | 'warning' | 'error' = 'success'
+) => {
     setToast({ message, type, id: `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` });
   };
 

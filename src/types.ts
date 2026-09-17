@@ -180,7 +180,7 @@ export interface EcosystemActivity {
 
 export interface ToastMessage {
   id: string;
-  type: 'success' | 'info' | 'warning';
+type: 'success' | 'info' | 'warning' | 'error';
   title: string;
   description: string;
 }
