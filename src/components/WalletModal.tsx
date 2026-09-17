@@ -161,27 +161,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     setStatusMessage(`Requesting connection to ${wallet.name}...`);
 
     try {
-      let resolvedAddress = '0x71C839Fa24e93C298B321f8a84620a3b221B389';
+    const anyWindow = typeof window !== 'undefined'
+  ? (window as unknown as {
+      ethereum?: {
+        request?: (args: {
+          method: string;
+          params?: unknown[];
+        }) => Promise<unknown>;
+      };
+    })
+  : null;
 
-      // 1. Check if real window.ethereum is injected and available
-      const anyWindow = typeof window !== 'undefined' ? (window as unknown as { ethereum?: { request?: (args: { method: string }) => Promise<string[]> } }) : null;
-      if (anyWindow?.ethereum?.request && (wallet.id === 'metamask' || wallet.id === 'binance')) {
-        try {
-          setStatusMessage(`Please approve the connection in your ${wallet.name} popup...`);
-          const accounts = await anyWindow.ethereum.request({ method: 'eth_requestAccounts' });
-          if (accounts && accounts[0]) {
-            resolvedAddress = accounts[0];
-          }
-        } catch {
-          // If user rejects in extension or inside sandboxed frame, fallback to protocol address smoothly
-          resolvedAddress = '0x71C839Fa24e93C298B321f8a84620a3b221B389';
-        }
-      } else {
-        // 2. Modern Web3 dApp simulated handshake delay with live status updates
-        await new Promise((r) => setTimeout(r, 600));
-        setStatusMessage('Connecting to BNB Smart Chain network (Chain ID: 56)...');
-        await new Promise((r) => setTimeout(r, 700));
-      }
+if (!anyWindow?.ethereum?.request) {
+  throw new Error(
+    `${wallet.name} wallet provider is not available in this browser.`
+  );
+}
+
+setStatusMessage(
+  `Please approve the connection in your ${wallet.name} popup...`
+);
+
+const accounts = await anyWindow.ethereum.request({
+  method: 'eth_requestAccounts',
+}) as string[];
+
+if (!accounts || !accounts[0]) {
+  throw new Error('No wallet account was returned.');
+}
+
+const resolvedAddress = accounts[0];
 
       setConnectedAddress(resolvedAddress);
       setConnectionStatus('connected');
