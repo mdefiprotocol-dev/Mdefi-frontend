@@ -98,30 +98,65 @@ export class RealContractProvider implements IContractProvider {
     return true;
   }
 
-  public async read<T = any>(contractKey: keyof typeof CONTRACT_ADDRESSES, methodName: string, _args?: any[]): Promise<T> {
+    public async read<T = any>(
+    contractKey: keyof typeof CONTRACT_ADDRESSES,
+    methodName: string,
+    args?: any[]
+  ): Promise<T> {
     const isDeployed = isContractDeployed(contractKey);
     const contractAddress = CONTRACT_ADDRESSES[contractKey];
 
     if (!isDeployed || !contractAddress) {
-      throw new Error(`[RealContractProvider] Contract "${contractKey}" is not deployed yet.`);
+      throw new Error(
+        `[RealContractProvider] Contract "${contractKey}" is not deployed yet.`
+      );
     }
 
     if (typeof window === 'undefined' || !(window as any).ethereum) {
-      throw new Error('[RealContractProvider] No Web3 provider detected in environment.');
+      throw new Error(
+        '[RealContractProvider] No Web3 provider detected in environment.'
+      );
     }
 
-    // TODO: Connect after verified ABI is supplied.
-    // Example:
-    // const provider = new ethers.BrowserProvider((window as any).ethereum);
-    // const contract = new ethers.Contract(contractAddress, VERIFIED_ABI, provider);
-    // return await contract[methodName](...(args || []));
+    let abi: readonly any[];
 
-    console.warn(
-      `[RealContractProvider] READ call to "${methodName}" on "${contractKey}" pending verified ABI deployment.`
-    );
-    throw new Error(`Method "${methodName}" on contract "${contractKey}" is pending verified ABI deployment.`);
+    if (contractKey === 'mdefiHub') {
+      abi = HUB_ABI;
+    } else if (contractKey === 'mbttcToken') {
+      abi = MBTTC_ABI;
+    } else {
+      throw new Error(
+        `[RealContractProvider] Verified ABI is not configured for "${contractKey}".`
+      );
+    }
+
+    try {
+      const provider = new ethers.BrowserProvider(
+        (window as any).ethereum
+      );
+
+      const contract = new ethers.Contract(
+        contractAddress,
+        abi,
+        provider
+      );
+
+      if (typeof contract[methodName] !== 'function') {
+        throw new Error(
+          `Method "${methodName}" was not found in the verified ABI for "${contractKey}".`
+        );
+      }
+
+      const result = await contract[methodName](...(args || []));
+
+      return result as T;
+    } catch (err: any) {
+      throw new Error(
+        err?.message ||
+          `[RealContractProvider] READ call failed for "${methodName}" on "${contractKey}".`
+      );
+    }
   }
-
   public async write(
     contractKey: keyof typeof CONTRACT_ADDRESSES,
     methodName: string,
