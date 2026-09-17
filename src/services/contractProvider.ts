@@ -273,10 +273,37 @@ export class RealContractProvider implements IContractProvider {
     }
   }
 
-  public async waitForConfirmation(txHash: string): Promise<boolean> {
-    if (!txHash || !txHash.startsWith('0x')) return false;
-    // TODO: Connect after verified ABI is supplied.
-    return true;
+    public async waitForConfirmation(txHash: string): Promise<boolean> {
+    if (!txHash || !txHash.startsWith('0x')) {
+      return false;
+    }
+
+    if (
+      typeof window === 'undefined' ||
+      !(window as any).ethereum
+    ) {
+      return false;
+    }
+
+    try {
+      const provider = new ethers.BrowserProvider(
+        (window as any).ethereum
+      );
+
+      const receipt = await provider.waitForTransaction(
+        txHash,
+        1
+      );
+
+      return receipt?.status === 1;
+    } catch (err: any) {
+      console.error(
+        '[RealContractProvider] Transaction confirmation check failed:',
+        err
+      );
+
+      return false;
+    }
   }
 }
 
