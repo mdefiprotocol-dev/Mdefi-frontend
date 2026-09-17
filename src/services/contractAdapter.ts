@@ -312,10 +312,27 @@ export class ContractAdapter {
         }
 
         this.setTxLifecycleState('PENDING');
-        await provider.waitForConfirmation(txResult.txHash);
-        this.setTxLifecycleState('CONFIRMED');
 
-        this.triggerDataRefresh();
+const confirmed = await provider.waitForConfirmation(txResult.txHash);
+
+if (!confirmed) {
+  this.setTxLifecycleState('FAILED');
+
+  return {
+    success: false,
+    txHash: txResult.txHash,
+    userFacingId: '',
+    numericId: 0,
+    sponsorId: uplineHumanFacingId,
+    walletAddress,
+    timestamp: Date.now(),
+    isRealBlockchainData: true,
+    status: 'failed',
+    message: 'Transaction was submitted but confirmation could not be verified on-chain.',
+  };
+}
+
+this.setTxLifecycleState('CONFIRMED');
 
         return {
           success: true,
