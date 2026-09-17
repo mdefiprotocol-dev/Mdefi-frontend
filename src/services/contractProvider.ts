@@ -157,11 +157,11 @@ export class RealContractProvider implements IContractProvider {
       );
     }
   }
-  public async write(
+   public async write(
     contractKey: keyof typeof CONTRACT_ADDRESSES,
     methodName: string,
-    _args?: any[],
-    _valueWei?: string
+    args?: any[],
+    valueWei?: string
   ): Promise<IProviderTxResult> {
     const isDeployed = isContractDeployed(contractKey);
     const contractAddress = CONTRACT_ADDRESSES[contractKey];
@@ -182,32 +182,74 @@ export class RealContractProvider implements IContractProvider {
         txHash: '',
         status: 'FAILED',
         isRealBlockchainData: true,
-        message: 'No Web3 wallet provider detected. Please connect a compatible BEP-20 wallet.',
+        message:
+          'No Web3 wallet provider detected. Please connect a compatible BEP-20 wallet.',
       };
     }
 
-    try {
-      // TODO: Connect after verified ABI is supplied.
-      // Example:
-      // const provider = new ethers.BrowserProvider((window as any).ethereum);
-      // const signer = await provider.getSigner();
-      // const contract = new ethers.Contract(contractAddress, VERIFIED_ABI, signer);
-      // const tx = await contract[methodName](...(args || []), { value: valueWei || 0 });
-      // const receipt = await tx.wait();
-      // return { success: true, txHash: receipt.hash, status: 'CONFIRMED', isRealBlockchainData: true, receipt };
+    let abi: readonly any[];
 
-      console.warn(
-        `[RealContractProvider] WRITE call to "${methodName}" on "${contractKey}" pending verified ABI deployment.`
-      );
+    if (contractKey === 'mdefiHub') {
+      abi = HUB_ABI;
+    } else if (contractKey === 'mbttcToken') {
+      abi = MBTTC_ABI;
+    } else {
       return {
         success: false,
         txHash: '',
         status: 'FAILED',
         isRealBlockchainData: true,
-        message: `Write method "${methodName}" on contract "${contractKey}" is pending verified ABI deployment.`,
+        message:
+          `[RealContractProvider] Verified ABI is not configured for "${contractKey}".`,
+      };
+    }
+
+    try {
+      const provider = new ethers.BrowserProvider(
+        (window as any).ethereum
+      );
+
+      const signer = await provider.getSigner();
+
+      const contract = new ethers.Contract(
+        contractAddress,
+        abi,
+        signer
+      );
+
+      if (typeof contract[methodName] !== 'function') {
+        return {
+          success: false,
+          txHash: '',
+          status: 'FAILED',
+          isRealBlockchainData: true,
+          message:
+            `Method "${methodName}" was not found in the verified ABI for "${contractKey}".`,
+        };
+      }
+
+      const overrides =
+        valueWei !== undefined && valueWei !== ''
+          ? { value: valueWei }
+          : {};
+
+      const tx = await contract[methodName](
+        ...(args || []),
+        overrides
+      );
+
+      return {
+        success: true,
+        txHash: tx.hash,
+        status: 'PENDING',
+        isRealBlockchainData: true,
+        message: 'Transaction submitted successfully and is pending confirmation.',
       };
     } catch (err: any) {
-      if (err?.code === 4001) {
+      if (
+        err?.code === 4001 ||
+        err?.code === 'ACTION_REJECTED'
+      ) {
         return {
           success: false,
           txHash: '',
@@ -216,12 +258,17 @@ export class RealContractProvider implements IContractProvider {
           message: 'Transaction rejected by user in wallet.',
         };
       }
+
       return {
         success: false,
         txHash: '',
         status: 'FAILED',
         isRealBlockchainData: true,
-        message: err?.message || 'Transaction execution failed on-chain.',
+        message:
+          err?.shortMessage ||
+          err?.reason ||
+          err?.message ||
+          'Transaction execution failed on-chain.',
       };
     }
   }
