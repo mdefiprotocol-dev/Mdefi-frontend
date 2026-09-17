@@ -105,7 +105,7 @@ export const PremiumLiveStats: React.FC<PremiumLiveStatsProps> = ({ onOpenLiveDa
             {/* Direct Quantum Partners */}
             <div className="p-4 rounded-2xl bg-black/60 border border-zinc-800 space-y-1">
               <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Direct Quantum Team</span>
-              <span className="text-lg font-bold text-purple-300 block">{data.directQuantumPartners} Directs</span>
+              <span className="text-lg font-bold text-purple-300 block">{data.directPartners} Directs</span>
               <span className="text-[10px] text-zinc-400">Req: 3 to qualify</span>
             </div>
 

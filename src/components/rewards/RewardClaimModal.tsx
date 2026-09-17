@@ -133,6 +133,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+const isCollectSuccess = collectState === 'Success';
 
   const handleCopy = async (hash: string) => {
     const ok = await copyFullAddress(hash);
@@ -308,7 +309,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
   // - Premium success animation & sounds
   // - "RETURN TO DASHBOARD" button (manual click required to return)
   // =========================================================================
-  if (collectState === 'Success') {
+  if (isCollectSuccess) {
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
@@ -670,7 +671,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
           {/* Animated Downward Connector 2 */}
           <div className="flex items-center justify-center py-0.5">
             <ArrowDown className={`w-3.5 h-3.5 transition-colors ${
-              collectState === 'Success' 
+              isCollectSuccess
                 ? 'text-emerald-400' 
                 : approvalState === 'Approved' 
                 ? 'text-emerald-400 animate-pulse' 
@@ -680,7 +681,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
 
           {/* STEP 3: COLLECT TO WALLET */}
           <div className={`p-3.5 rounded-2xl transition-all ${
-            collectState === 'Success'
+           isCollectSuccess
               ? 'bg-emerald-950/30 border-2 border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.25)]'
               : collectState === 'Processing'
               ? 'bg-emerald-950/30 border border-emerald-500/60 ring-1 ring-emerald-500/30'
@@ -691,13 +692,13 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
-                  collectState === 'Success'
+                  isCollectSuccess
                     ? 'bg-emerald-500 text-zinc-950 font-black'
                     : approvalState === 'Approved'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                     : 'bg-zinc-900 text-zinc-500 border border-zinc-800'
                 }`}>
-                  {collectState === 'Success' ? <Check className="w-4 h-4 stroke-[3]" /> : '③'}
+                  {isCollectSuccess ? <Check className="w-4 h-4 stroke-[3]" /> : '③'}
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-bold text-white block">Collect to Wallet</span>
@@ -707,7 +708,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
 
               {/* State Badge */}
               <div className="shrink-0">
-                {collectState === 'Success' && (
+                {isCollectSuccess && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300">
                     <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                     <span>Success</span>
@@ -741,8 +742,8 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
             </div>
 
             {/* Collect Action Button / Success details */}
-            {collectState === 'Success' && collectTxHash ? (
-              <div className="space-y-2 pt-1">
+            {collectTxHash ? (
+  <div className="space-y-2 pt-1">
                 <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs font-mono space-y-1.5">
                   <div className="flex items-center justify-between text-emerald-300 font-bold">
                     <span>Reward Transferred:</span>
@@ -807,7 +808,7 @@ export const RewardClaimModal: React.FC<RewardClaimModalProps> = ({
 
         {/* Bottom Action / Close */}
         <div className="flex items-center gap-3 pt-2 relative z-10">
-          {collectState === 'Success' ? (
+         {isCollectSuccess ? (
             <button
               type="button"
               onClick={handleFinish}

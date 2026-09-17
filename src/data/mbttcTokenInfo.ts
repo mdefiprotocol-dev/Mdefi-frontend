@@ -37,6 +37,7 @@ export const MBTTC_TOKEN_INFO = {
     pendingRewards: '2,150,000 MBTTC',
     circulatingSupply: '13,200,000 MBTTC',
     priceOracleNote: 'Live AMM price oracle activation scheduled for Phase 7 liquidity rollout.',
+  livePriceNote: 'Live price will be sourced from the configured on-chain liquidity/oracle.',
   },
 
   // Distribution Channels

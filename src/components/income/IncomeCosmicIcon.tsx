@@ -270,7 +270,7 @@ export const IncomeCosmicIcon: React.FC<IncomeCosmicIconProps> = ({
           </div>
         );
 
-      case 'ecosystem_solar_core':
+    
       default:
         return (
           <div className="relative flex items-center justify-center w-full h-full">
