@@ -2,6 +2,7 @@
  * MDeFi Master Contract Interaction Adapter
  * 
  * Master Contract & Single Source of Truth: MDEFIEnterpriseHubUnified
+ * Token Contract: IMBTTC
  * 100% Real On-Chain Blockchain Integration (Ethers v6 Pure)
  * Zero Mock / Zero Random / Zero Hardcoded Values
  */
@@ -48,7 +49,8 @@ export interface IClaimParams {
 export interface IClaimResult {
   success: boolean;
   txHash: string;
-  claimedAmount: number; // strictly number for mdefiService compatibility
+  claimedAmount: number; // strictly number for UI/mdefiService history
+  claimedAmountFormatted?: string;
   rewardType: 'Referral' | 'Package' | 'Registration';
   isRealBlockchainData: boolean;
   status: 'confirmed' | 'rejected' | 'failed';
@@ -99,7 +101,6 @@ export interface IHubPackageInfo {
   totalRecycles: number;
 }
 
-// User-facing Ecosystem Stats
 export interface IEcosystemStatsData {
   totalRegisteredUsers: number;
   totalActiveUsers: number;
@@ -440,6 +441,12 @@ export class ContractAdapter {
   // 4. REWARDS CLAIM (HUB: claimReferralReward & claimPackageReward)
   // =========================================================================
 
+  /**
+   * ABI Methods:
+   * - claimReferralReward() payable
+   * - claimPackageReward() payable
+   * Tokens are minted directly into user's wallet via mbttcToken.mintReward()
+   */
   public async executeClaim(params: IClaimParams): Promise<IClaimResult> {
     const { rewardType, walletAddress } = params;
     this.setTxLifecycleState('PREPARING');
@@ -449,6 +456,7 @@ export class ContractAdapter {
         success: false,
         txHash: '',
         claimedAmount: 0,
+        claimedAmountFormatted: '0.00',
         rewardType,
         isRealBlockchainData: true,
         status: 'failed',
@@ -457,6 +465,7 @@ export class ContractAdapter {
     }
 
     try {
+      // Step A: Calculate exact claimable amount before transaction
       const claimableStr = await this.getClaimableAmount(walletAddress, rewardType);
       const currentClaimableNumber = parseFloat(claimableStr) || 0;
 
@@ -479,6 +488,7 @@ export class ContractAdapter {
           success: false,
           txHash: '',
           claimedAmount: 0,
+          claimedAmountFormatted: '0.00',
           rewardType,
           isRealBlockchainData: true,
           status: txResult.status === 'REJECTED' ? 'rejected' : 'failed',
@@ -494,6 +504,7 @@ export class ContractAdapter {
           success: false,
           txHash: txResult.txHash,
           claimedAmount: 0,
+          claimedAmountFormatted: '0.00',
           rewardType,
           isRealBlockchainData: true,
           status: 'failed',
@@ -508,10 +519,11 @@ export class ContractAdapter {
         success: true,
         txHash: txResult.txHash,
         claimedAmount: currentClaimableNumber,
+        claimedAmountFormatted: `${currentClaimableNumber.toFixed(4)} MBTTC`,
         rewardType,
         isRealBlockchainData: true,
         status: 'confirmed',
-        message: `${rewardType} rewards claimed successfully from MDeFi Hub.`,
+        message: `${rewardType} reward claimed! ${currentClaimableNumber.toFixed(4)} MBTTC transferred to your wallet.`,
       };
     } catch (err: any) {
       const isReject = err?.code === 4001 || err?.message?.includes('rejected');
@@ -520,6 +532,7 @@ export class ContractAdapter {
         success: false,
         txHash: '',
         claimedAmount: 0,
+        claimedAmountFormatted: '0.00',
         rewardType,
         isRealBlockchainData: true,
         status: isReject ? 'rejected' : 'failed',
@@ -548,7 +561,29 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 6. VESTING & 4-HOUR CLAIM COOLDOWN (HUB TIMING VERIFICATION)
+  // 6. MBTTC TOKEN LIVE WALLET BALANCE (mbttcToken.balanceOf)
+  // =========================================================================
+
+  /**
+   * Directly reads user's MBTTC token balance from MBTTC contract
+   * ABI Method: balanceOf(address account) view returns (uint256)
+   */
+  public async getMbttcWalletBalance(walletAddress: string): Promise<string> {
+    if (!walletAddress || !ethers.isAddress(walletAddress)) return '0.00';
+
+    try {
+      const provider = getContractProvider(true);
+      const balRaw = await provider.read<any>('mbttcToken', 'balanceOf', [walletAddress]);
+      if (balRaw === null || balRaw === undefined) return '0.00';
+      return ethers.formatUnits(balRaw.toString(), 18);
+    } catch (err) {
+      console.error('[ContractAdapter] getMbttcWalletBalance failed:', err);
+      return '0.00';
+    }
+  }
+
+  // =========================================================================
+  // 7. VESTING & 4-HOUR CLAIM COOLDOWN (HUB TIMING VERIFICATION)
   // =========================================================================
 
   public async getHubClaimCooldown(
@@ -581,7 +616,7 @@ export class ContractAdapter {
       const totalEarned = vestingData.totalEarned ? ethers.formatUnits(vestingData.totalEarned.toString(), 18) : '0.00';
       const totalClaimed = vestingData.totalClaimed ? ethers.formatUnits(vestingData.totalClaimed.toString(), 18) : '0.00';
 
-      const FOUR_HOURS_SECONDS = 4 * 60 * 60; // 14400 seconds
+      const FOUR_HOURS_SECONDS = 4 * 60 * 60; // 14400 seconds (Solidity: schedule.lastClaimTimestamp + 4 hours)
       const nextEligibleTimestamp = lastClaimTimestamp > 0 ? (lastClaimTimestamp + FOUR_HOURS_SECONDS) * 1000 : 0;
       const nowSec = Math.floor(Date.now() / 1000);
       const elapsed = nowSec - lastClaimTimestamp;
@@ -628,7 +663,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 7. PACKAGE CONFIGURATION & REGISTRY (HUB READS)
+  // 8. PACKAGE CONFIGURATION & REGISTRY (HUB READS)
   // =========================================================================
 
   public async getConfiguredPackageIds(): Promise<number[]> {
@@ -688,7 +723,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 8. BUY PACKAGE (HUB: buyPackage(uint256 _pkgId, uint256 _humanAmt))
+  // 9. BUY PACKAGE (HUB: buyPackage(uint256 _pkgId, uint256 _humanAmt))
   // =========================================================================
 
   public async buyPackageOnHub(packageId: number, humanAmt?: number): Promise<IProviderTxResult> {
@@ -745,7 +780,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 9. S4 & QUANTUM PACKAGES DELEGATION
+  // 10. S4 & QUANTUM PACKAGES DELEGATION
   // =========================================================================
 
   public async executeS4Activation(packageKey: 'junior' | 'senior'): Promise<IProviderTxResult> {
@@ -881,7 +916,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 10. MBTTC GLOBAL TOKEN TELEMETRY (HUB: getGlobalTokenStats)
+  // 11. MBTTC GLOBAL TOKEN TELEMETRY (HUB: getGlobalTokenStats)
   // =========================================================================
 
   public async getMbttcTokenTelemetry(): Promise<ITokenTelemetryData> {
@@ -945,7 +980,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 11. ECOSYSTEM STATS (USER-FACING: totalDAORevenue REMOVED)
+  // 12. ECOSYSTEM STATS (USER-FACING: totalDAORevenue REMOVED)
   // =========================================================================
 
   public async getEcosystemStats(): Promise<IEcosystemStatsData | null> {
