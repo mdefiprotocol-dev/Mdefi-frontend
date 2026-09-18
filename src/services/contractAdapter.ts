@@ -232,36 +232,66 @@ export class ContractAdapter {
    * In Demo Mode: returns dynamic simulation benchmark (~0.0015 BNB).
    */
   public async getRegistrationFee(): Promise<IRegistrationFeeInfo> {
-    if (this.isLiveMode() && typeof window !== 'undefined' && (window as any).ethereum) {
-      try {
-        // When deployed: queries Hub.registrationFee()
-        console.log('[ContractAdapter] Querying live Hub registration fee at:', HUB_ADDRESS);
-      } catch (err) {
-        console.warn('[ContractAdapter] Live fee query fallback:', err);
-      }
-    }
+  // ============================================================
+  // LIVE MODE — Hub contract is the single source of truth
+  // ============================================================
+  if (this.isLiveMode()) {
+    try {
+      const provider = getContractProvider(true);
 
-    if (this.isDemoMode) {
-      // Dynamic benchmark execution fee simulation
+      const feeRaw = await provider.read<any>(
+        'mdefiHub',
+        'fixedRegistrationFeeInBNB'
+      );
+
+      if (feeRaw === null || feeRaw === undefined) {
+        throw new Error(
+          'Hub contract returned no registration fee.'
+        );
+      }
+
+      const feeWei = feeRaw.toString();
+
       return {
-        feeWei: '1500000000000000', // ~0.0015 BNB
-        feeFormatted: 'Dynamic Network Fee (~0.0015 BNB)',
+        feeWei,
+        feeFormatted: `${ethers.formatEther(feeWei)} BNB`,
         isDynamic: true,
         currency: 'BNB',
-        description: 'Dynamic execution gas & protocol node registration fee (Demo Benchmark)',
+        description:
+          'Current registration fee configured by the MDeFi Hub contract.',
+        isFromContract: true,
+      };
+    } catch (err: any) {
+      console.error(
+        '[ContractAdapter] Failed to read Hub registration fee:',
+        err
+      );
+
+      return {
+        feeWei: '0',
+        feeFormatted: 'Unable to read on-chain fee',
+        isDynamic: true,
+        currency: 'BNB',
+        description:
+          'Registration fee could not be read from the MDeFi Hub contract.',
         isFromContract: false,
       };
     }
-
-    return {
-      feeWei: '0',
-      feeFormatted: 'Querying On-Chain Contract...',
-      isDynamic: true,
-      currency: 'BNB',
-      description: 'On-chain dynamic registration fee',
-      isFromContract: true,
-    };
   }
+
+  // ============================================================
+  // DEMO MODE — benchmark only
+  // ============================================================
+  return {
+    feeWei: '1500000000000000',
+    feeFormatted: 'Dynamic Network Fee (~0.0015 BNB)',
+    isDynamic: true,
+    currency: 'BNB',
+    description:
+      'Demo benchmark registration fee. Not blockchain data.',
+    isFromContract: false,
+  };
+}
 
   /**
    * Executes user registration through the adapter.
