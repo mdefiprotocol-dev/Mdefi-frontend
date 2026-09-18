@@ -18,6 +18,7 @@ import {
 import { UserProfile } from '../types';
 import { playClaimSuccessSound } from '../utils/successSound';
 import { formatCompactAddress } from '../utils/formatAddress';
+import { connectWalletConnect } from '../services/walletConnectService';
 
 interface WalletOption {
   id: string;
@@ -153,73 +154,97 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   ];
 
   // Handle User Clicking a Wallet
-  const handleConnect = async (wallet: WalletOption) => {
-    setConnectingWalletId(wallet.id);
-    setSelectedWalletName(wallet.name);
-    setConnectionStatus('connecting');
-    setErrorMessage(null);
-    setStatusMessage(`Requesting connection to ${wallet.name}...`);
+ // Handle User Clicking a Wallet
+const handleConnect = async (wallet: WalletOption) => {
+  setConnectingWalletId(wallet.id);
+  setSelectedWalletName(wallet.name);
+  setConnectionStatus('connecting');
+  setErrorMessage(null);
 
-    try {
-    const anyWindow = typeof window !== 'undefined'
-  ? (window as unknown as {
-      ethereum?: {
-        request?: (args: {
-          method: string;
-          params?: unknown[];
-        }) => Promise<unknown>;
-      };
-    })
-  : null;
+  try {
+    let resolvedAddress: string;
+    let connectedWalletName: string;
 
-if (!anyWindow?.ethereum?.request) {
-  throw new Error(
-    `${wallet.name} wallet provider is not available in this browser.`
-  );
-}
+    // MetaMask keeps the existing direct browser-extension flow
+    if (wallet.id === 'metamask') {
+      connectedWalletName = 'MetaMask';
 
-setStatusMessage(
-  `Please approve the connection in your ${wallet.name} popup...`
-);
+      setStatusMessage(
+        'Please approve the connection in your MetaMask popup...'
+      );
 
-const accounts = await anyWindow.ethereum.request({
-  method: 'eth_requestAccounts',
-}) as string[];
+      const anyWindow =
+        typeof window !== 'undefined'
+          ? (window as unknown as {
+              ethereum?: {
+                request?: (args: {
+                  method: string;
+                  params?: unknown[];
+                }) => Promise<unknown>;
+              };
+            })
+          : null;
 
-if (!accounts || !accounts[0]) {
-  throw new Error('No wallet account was returned.');
-}
-
-const resolvedAddress = accounts[0];
-
-      setConnectedAddress(resolvedAddress);
-      setConnectionStatus('connected');
-      setStatusMessage(`Connected via ${wallet.name}`);
-
-      try {
-        playClaimSuccessSound();
-      } catch {
-        // audio fallback
+      if (!anyWindow?.ethereum?.request) {
+        throw new Error(
+          'MetaMask wallet provider is not available in this browser.'
+        );
       }
 
-      // Automatically transition to next step after brief success feedback
-      setTimeout(() => {
-        if (onWalletConnected) {
-          onWalletConnected(resolvedAddress, wallet.name);
-        }
-        if (onSwitchAddress) {
-          onSwitchAddress(resolvedAddress);
-        }
-        onClose();
-      }, 700);
+      const accounts = (await anyWindow.ethereum.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
 
-    } catch (err: unknown) {
-      const errorText = err instanceof Error ? err.message : 'User rejected the request or connection timed out.';
-      setConnectionStatus('error');
-      setErrorMessage(errorText);
-      setConnectingWalletId(null);
+      if (!accounts || !accounts[0]) {
+        throw new Error('No MetaMask account was returned.');
+      }
+
+      resolvedAddress = accounts[0];
+    } else {
+      // Trust Wallet, Binance Wallet, WalletConnect and Coinbase Wallet
+      // all open the same WalletConnect multi-wallet selection flow.
+      connectedWalletName = 'WalletConnect';
+
+      setStatusMessage(
+        'Opening WalletConnect. Select your wallet from the available wallets...'
+      );
+
+      resolvedAddress = await connectWalletConnect();
     }
-  };
+
+    setConnectedAddress(resolvedAddress);
+    setConnectionStatus('connected');
+    setStatusMessage(`Connected via ${connectedWalletName}`);
+
+    try {
+      playClaimSuccessSound();
+    } catch {
+      // Audio fallback
+    }
+
+    // Continue to the next step after successful connection
+    setTimeout(() => {
+      if (onWalletConnected) {
+        onWalletConnected(resolvedAddress, connectedWalletName);
+      }
+
+      if (onSwitchAddress) {
+        onSwitchAddress(resolvedAddress);
+      }
+
+      onClose();
+    }, 700);
+  } catch (err: unknown) {
+    const errorText =
+      err instanceof Error
+        ? err.message
+        : 'User rejected the request or connection timed out.';
+
+    setConnectionStatus('error');
+    setErrorMessage(errorText);
+    setConnectingWalletId(null);
+  }
+};
 
   const shorten = (addr: string) => {
     return formatCompactAddress(addr);
