@@ -594,22 +594,56 @@ this.setTxLifecycleState('CONFIRMED');
   /**
    * Query user on-chain data from Hub contract
    */
-  public async getHubUserData(walletAddress: string): Promise<Partial<UserProfile> | null> {
-    if (!this.isLiveMode()) {
-      return null;
+/**
+ * Reads complete user dashboard directly from MDeFi Hub
+ * Hub contract = single source of truth.
+ */
+public async getHubUserData(
+  walletAddress: string
+): Promise<Partial<UserProfile> | null> {
+  if (!this.isLiveMode()) {
+    return null;
+  }
+
+  try {
+    const provider = getContractProvider(true);
+
+    const dashboard = await provider.read<any>(
+      'mdefiHub',
+      'getUserDashboard',
+      [walletAddress]
+    );
+
+    if (dashboard === null || dashboard === undefined) {
+      throw new Error(
+        'Hub contract returned no dashboard data.'
+      );
     }
 
-    try {
-      console.log('[ContractAdapter] Querying live Hub user data for:', walletAddress);
-      return {
-        walletAddress,
-        isRealBlockchainData: true,
-      };
-    } catch (err) {
-      console.warn('[ContractAdapter] Error querying on-chain user data:', err);
-      return null;
-    }
+    console.log(
+      '[ContractAdapter] Live Hub dashboard:',
+      dashboard
+    );
+
+    /*
+     * Keep the raw contract result available while we verify
+     * the exact ABI return structure.
+     */
+    return {
+      walletAddress,
+      isRealBlockchainData: true,
+      ...dashboard,
+    } as Partial<UserProfile>;
+
+  } catch (err: any) {
+    console.error(
+      '[ContractAdapter] Failed to read Hub user dashboard:',
+      err
+    );
+
+    return null;
   }
+}
 
   // =========================================================================
   // PHASE 2: S4 MATRIX, STARTER REWARD & LIQUIDITY POOL
