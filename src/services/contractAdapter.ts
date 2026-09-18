@@ -30,6 +30,8 @@ import {
   TRADING_ROUTER_ADDRESS,
   TRADING_PAIR_ADDRESS,
 } from '../config/contractConfig';
+
+import { ethers } from 'ethers';
 import { sponsorIdResolver } from './sponsorIdResolver';
 import { getContractProvider, IProviderTxResult, TransactionLifecycleState } from './contractProvider';
 import { UserProfile } from '../types';
