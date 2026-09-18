@@ -1,9 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ethers } from 'ethers';
 import { 
   UserProfile, 
   RewardBalances, 
@@ -26,13 +22,12 @@ import { nexusContractService } from './services/nexusContractService';
 import { packageActivationService } from './services/packageActivationService';
 import { normalizeAndDeduplicateActivities, isDuplicateActivity } from './utils/notificationDeduplication';
 import { formatCompactAddress } from './utils/formatAddress';
+import { toHumanFacingId } from './utils/idConverter';
 
-// Layout Components
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 
-// Modals & Feedback
 import { ClaimModal } from './components/ClaimModal';
 import { WalletModal } from './components/WalletModal';
 import { MatrixModal } from './components/MatrixModal';
@@ -41,7 +36,6 @@ import { Toast } from './components/Toast';
 import { RewardPopup } from './components/RewardPopup';
 import { playClaimSuccessSound } from './utils/successSound';
 
-// Views
 import { OverviewView } from './views/OverviewView';
 import { MbttcView } from './views/MbttcView';
 import { TeamView } from './views/TeamView';
@@ -63,14 +57,11 @@ import { PhaseLockedView } from './components/common/PhaseLockedView';
 import { programPhaseService } from './services/programPhaseService';
 
 function MainApp() {
-  // Application Mode: 'landing' (public front website) or 'dashboard' (main MDeFi dashboard)
   const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
 
-  // Navigation state
   const [currentPage, setCurrentPage] = useState<NavPage>('overview');
   const [s4PackageFocus, setS4PackageFocus] = useState<'junior' | 'senior'>('junior');
 
-  // Application Data State
   const [user, setUser] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem('mdefi_user_profile');
@@ -81,7 +72,6 @@ function MainApp() {
   const [rewards, setRewards] = useState<RewardBalances>(mockRewardBalances);
   const [packages, setPackages] = useState<PackageItem[]>(mockPackages);
 
-  // Helper to load wallet-scoped notifications/activities from localStorage
   const loadActivitiesForWallet = (walletAddress: string): ActivityItem[] => {
     try {
       const key = `mdefi_notifications_${walletAddress.toLowerCase()}`;
@@ -94,7 +84,6 @@ function MainApp() {
       }
     } catch {}
 
-    // Initial seed for primary default wallet
     if (walletAddress.toLowerCase() === mockUserProfile.walletAddress.toLowerCase()) {
       const seeded = mockActivities.map((act) => ({
         ...act,
@@ -112,13 +101,10 @@ function MainApp() {
   });
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(mockTeamMembers);
 
-  // Master reactive subscription to Central Event Sync (Single Source of Truth)
   useEffect(() => {
-    // Initial sync
     setActivities(loadActivitiesForWallet(user.walletAddress));
 
     const unsubscribe = centralEventSyncService.subscribe((syncState) => {
-      // Synchronize activities for the connected wallet
       const walletActs = normalizeAndDeduplicateActivities(syncState.activities, user.walletAddress);
       if (walletActs.length > 0) {
         setActivities((prev) => {
@@ -133,10 +119,8 @@ function MainApp() {
         });
       }
 
-      // Synchronize team members
       setTeamMembers(syncState.teamMembers);
 
-      // Synchronize direct & total team counts
       setUser((prev) => {
         if (
           prev.directTeamCount !== syncState.directTeamCount ||
@@ -166,7 +150,6 @@ function MainApp() {
     } catch {}
   };
 
-  // Add new activity with multi-tier deterministic duplicate prevention
   const addActivity = (item: ActivityItem) => {
     setActivities((prev) => {
       const itemWithWallet: ActivityItem = {
@@ -216,7 +199,6 @@ function MainApp() {
     setRewards((prev) => ({ ...prev, ...newRewards }));
   };
 
-  // Modals state
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [claimModalType, setClaimModalType] = useState<'Registration' | 'Referral' | 'Package'>('Referral');
   
@@ -225,25 +207,23 @@ function MainApp() {
   const [packageModalOpen, setPackageModalOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<PackageItem | null>(null);
 
-  // Notifications state
   const [toast, setToast] = useState<{
-  message: string;
-  type: 'success' | 'info' | 'warning' | 'error';
-  id: string;
-} | null>(null);
+    message: string;
+    type: 'success' | 'info' | 'warning' | 'error';
+    id: string;
+  } | null>(null);
   const [rewardPopup, setRewardPopup] = useState<{ amount: number; type: string; id: string } | null>(null);
 
   const showToast = (
-  message: string,
-  type: 'success' | 'info' | 'warning' | 'error' = 'success'
-) => {
+    message: string,
+    type: 'success' | 'info' | 'warning' | 'error' = 'success'
+  ) => {
     setToast({ message, type, id: `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` });
   };
 
   const showRewardPopup = (amount: number, type: string, options?: { skipActivityLog?: boolean }) => {
     setRewardPopup({ amount, type, id: `reward-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` });
     
-    // Only add separate activity if not already logged (e.g., from claim transaction)
     if (!options?.skipActivityLog) {
       const isTeam = type.toLowerCase().includes('referral') || type.toLowerCase().includes('team') || type.toLowerCase().includes('matrix');
       const activityType: ActivityItem['type'] = isTeam ? 'Team Income' : 'Package Reward';
@@ -255,7 +235,7 @@ function MainApp() {
         amount: `+${amount.toFixed(2)} MBTTC`,
         date: 'Just now',
         status: 'Confirmed',
-        txHash: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+        txHash: '',
         details: `${type} distribution of ${amount.toFixed(2)} MBTTC credited to vault`,
         walletAddress: user.walletAddress,
         read: false,
@@ -264,7 +244,59 @@ function MainApp() {
     }
   };
 
-  // Listen to Community Rating submissions across the app
+  const verifyWalletRegistration = useCallback(async (walletAddress: string): Promise<{
+    registered: boolean;
+    node: any | null;
+  }> => {
+    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+      return { registered: false, node: null };
+    }
+
+    try {
+      const node = await contractAdapter.getHubUserNode(walletAddress);
+      if (!node) {
+        return { registered: false, node: null };
+      }
+
+      const isRegistered = Boolean(node.isRegistered);
+      const hasValidId = Number(node.id) > 0;
+
+      if (isRegistered && hasValidId) {
+        return { registered: true, node };
+      }
+
+      return { registered: false, node };
+    } catch (error) {
+      console.error('[App] On-chain registration verification failed:', error);
+      return { registered: false, node: null };
+    }
+  }, []);
+
+  const syncLiveOnChainUser = useCallback(async (walletAddress: string, verifiedNode?: any) => {
+    try {
+      const node = verifiedNode || (await contractAdapter.getHubUserNode(walletAddress));
+      if (!node || !node.isRegistered) return;
+
+      const dashboard = await contractAdapter.getHubUserData(walletAddress);
+      const rawNumericId = Number(node.id || 0);
+      const userFacingId = rawNumericId > 0 ? toHumanFacingId(rawNumericId) : `MDF-${rawNumericId}`;
+      const sponsorAddress = node.upline || dashboard?.sponsorId || '';
+
+      setUser((prev) => ({
+        ...prev,
+        walletAddress: node.wallet || walletAddress,
+        userId: userFacingId,
+        sponsorId: sponsorAddress || prev.sponsorId,
+        isBlocked: Boolean(node.isBlocked),
+        isRegistered: true,
+        directTeamCount: Number(node.directTeam?.length ?? dashboard?.directTeamCount ?? prev.directTeamCount),
+        totalTeamCount: Number(node.totalTeam ?? dashboard?.totalTeamCount ?? prev.totalTeamCount),
+      }));
+    } catch (error) {
+      console.error('[App] Failed to sync live on-chain profile:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const handleRatingEvent = (event: Event) => {
       const customEvent = event as CustomEvent<{ rating: number; newAverage: number; totalRatings: number }>;
@@ -272,7 +304,6 @@ function MainApp() {
       const newAverage = customEvent.detail?.newAverage || 4.8;
       showToast(`⭐ Community Rating: You submitted a ${rating}-star rating! Current Index: ${newAverage} / 5.0`, 'success');
 
-      // Central Event Sync: Single Source of Truth
       centralEventSyncService.dispatchAction({
         actionType: 'RATING_SUBMISSION',
         txHash: `rating-${Date.now()}`,
@@ -288,7 +319,6 @@ function MainApp() {
     };
   }, [user.walletAddress]);
 
-  // Listen to on-chain state refresh events (post-transaction synchronization)
   useEffect(() => {
     const unsubscribe = contractAdapter.onDataRefresh(async () => {
       try {
@@ -305,27 +335,22 @@ function MainApp() {
     };
   }, [user.walletAddress]);
 
-  // Handler: Open Claim Modal
   const handleOpenClaimModal = (type: 'Registration' | 'Referral' | 'Package') => {
     setClaimModalType(type);
     setClaimModalOpen(true);
   };
 
-  // Handler: Execute Claim
   const handleExecuteClaim = async (type: 'Registration' | 'Referral' | 'Package') => {
     try {
-      // Step 4 & 5: Execute actual blockchain wallet transaction and wait for confirmation
       const res = await mdefiService.claimReward(type, user.walletAddress);
 
       if (res.success) {
-        // Step 9: Refresh claimable amount, claimed amount and wallet-related UI from actual contract state
         const freshBalances = await mdefiService.getRewardBalances(user.walletAddress);
         setRewards(freshBalances);
 
         const safeClaimed = typeof res?.claimedAmount === 'number' ? res.claimedAmount : 0;
-        const tx = res?.txHash || '0x0';
+        const tx = res?.txHash || '';
 
-        // Central Event Sync: Single Source of Truth for claim events
         centralEventSyncService.dispatchAction({
           actionType: type === 'Registration' ? 'REGISTRATION_REWARD' : type === 'Referral' ? 'REFERRAL_REWARD' : 'PACKAGE_REWARD',
           txHash: tx,
@@ -335,26 +360,22 @@ function MainApp() {
           details: `${type} reward pool claim of ${safeClaimed.toFixed(2)} MBTTC confirmed on BSC`,
         });
 
-        // Step 6 & 7: ONLY AFTER SUCCESSFUL BLOCKCHAIN CONFIRMATION:
         playClaimSuccessSound();
         showToast(`Successfully claimed ${safeClaimed.toFixed(2)} MBTTC!`, 'success');
         showRewardPopup(safeClaimed, `${type} Reward`, { skipActivityLog: true });
 
         return res;
       } else {
-        // Step failure: No success animation and no success sound
         showToast(res.message || 'Claim operation failed', 'warning');
         return res;
       }
     } catch (err: any) {
-      // User rejected or wallet error: No success sound
       const errMsg = err?.message || 'Claim transaction rejected or failed';
       showToast(errMsg, 'warning');
       return { success: false, txHash: '', claimedAmount: 0, message: errMsg };
     }
   };
 
-  // Handler: Open Package Activation Modal
   const handleOpenPackageModal = (pkg: PackageItem) => {
     setSelectedPackage(pkg);
     setPackageModalOpen(true);
@@ -367,11 +388,9 @@ function MainApp() {
     }
   };
 
-  // Handler: Confirm Package Activation
   const handleConfirmPackage = async (pkg: PackageItem) => {
     const res = await mdefiService.activatePackage(pkg.id);
     if (res.success) {
-      // Update package list status
       setPackages((prev) =>
         prev.map((p) =>
           p.id === pkg.id
@@ -380,12 +399,11 @@ function MainApp() {
         )
       );
 
-      // Central Event Sync: Single Source of Truth for package activation & matrix sync
       if (pkg.id === 'pkg-quantum' || pkg.name.toLowerCase().includes('quantum')) {
         await nexusContractService.activatePackage(1);
         centralEventSyncService.dispatchAction({
           actionType: 'QUANTUM_ACTIVATION',
-          txHash: res.txHash || '0x0',
+          txHash: res.txHash || '',
           walletAddress: user.walletAddress,
           userId: user.userId,
           amountUsdt: 70,
@@ -395,7 +413,7 @@ function MainApp() {
         await nexusContractService.activatePackage(2);
         centralEventSyncService.dispatchAction({
           actionType: 'NEXUS_PRIME_ACTIVATION',
-          txHash: res.txHash || '0x0',
+          txHash: res.txHash || '',
           walletAddress: user.walletAddress,
           userId: user.userId,
           amountUsdt: 120,
@@ -404,7 +422,7 @@ function MainApp() {
       } else {
         centralEventSyncService.dispatchAction({
           actionType: 'S4_ACTIVATION',
-          txHash: res.txHash || '0x0',
+          txHash: res.txHash || '',
           walletAddress: user.walletAddress,
           userId: user.userId,
           amountUsdt: pkg.priceUSD,
@@ -420,7 +438,6 @@ function MainApp() {
     return res;
   };
 
-  // Handler: Execute Token Swap (MBTTC <-> USDT)
   const handleExecuteSwap = async (params: {
     fromToken: 'MBTTC' | 'USDT';
     toToken: 'MBTTC' | 'USDT';
@@ -430,7 +447,6 @@ function MainApp() {
   }) => {
     const res = await mdefiService.executeSwap(params);
     if (res.success) {
-      // Update balances
       setRewards((prev) => {
         const next = { ...prev };
         if (params.fromToken === 'MBTTC') {
@@ -443,10 +459,9 @@ function MainApp() {
         return next;
       });
 
-      // Central Event Sync: Single Source of Truth for DEX Swaps
       centralEventSyncService.dispatchAction({
         actionType: 'TOKEN_SWAP',
-        txHash: res.txHash || '0x0',
+        txHash: res.txHash || '',
         walletAddress: user.walletAddress,
         title: `${params.fromAmount} ${params.fromToken} → ${params.toAmount.toFixed(2)} ${params.toToken}`,
         details: `Swapped ${params.fromAmount} ${params.fromToken} for ${params.toAmount.toFixed(2)} ${params.toToken}`,
@@ -457,16 +472,32 @@ function MainApp() {
     return res;
   };
 
-  // Handler: Switch Connected Wallet
   const handleSwitchWallet = async (address: string) => {
+    if (!address || !ethers.isAddress(address)) {
+      showToast('Invalid wallet address.', 'error');
+      return;
+    }
+
+    showToast('Verifying wallet registration status...', 'info');
+    const { registered, node } = await verifyWalletRegistration(address);
+
+    if (!registered || !node) {
+      showToast('This wallet is not registered. Please complete registration first.', 'error');
+      return;
+    }
+
+    if (node.isBlocked) {
+      showToast('This wallet is blocked. Switch rejected.', 'error');
+      return;
+    }
+
     const res = await mdefiService.switchWallet(address);
     if (res.success) {
-      handleUpdateUser({ walletAddress: address });
+      await syncLiveOnChainUser(address, node);
       showToast(`Connected wallet: ${formatCompactAddress(address)}`, 'info');
     }
   };
 
-  // Handler: Dedicated S4 Navigation (Guarded by Phase & Package Activation State)
   const handleNavigateS4 = (pkg: 'junior' | 'senior' = 'junior') => {
     const s4Access = programPhaseService.canAccessRoute('s4-matrix');
     if (!s4Access.allowed) {
@@ -492,7 +523,6 @@ function MainApp() {
     } catch {}
   };
 
-  // Handler: Dedicated Quantum Nexus Navigation ($70, Package 1) (Guarded by Phase & Package Activation State)
   const handleNavigateQuantum = () => {
     const quantumAccess = programPhaseService.canAccessRoute('quantum-nexus');
     if (!quantumAccess.allowed) {
@@ -516,7 +546,6 @@ function MainApp() {
     } catch {}
   };
 
-  // Handler: Dedicated Nexus Prime Navigation ($120, Package 2) (Guarded by Phase & Package Activation State)
   const handleNavigateNexusPrime = () => {
     const primeAccess = programPhaseService.canAccessRoute('nexus-prime');
     if (!primeAccess.allowed) {
@@ -540,7 +569,6 @@ function MainApp() {
     } catch {}
   };
 
-  // Handler: Backward-compatible Nexus Navigation
   const handleNavigateNexus = (pkgId: 1 | 2 = 1) => {
     if (pkgId === 2) {
       handleNavigateNexusPrime();
@@ -558,60 +586,69 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleEnterDashboardFromLanding = (registeredUser?: {
+  const handleEnterDashboardFromLanding = async (registeredUser?: {
     userId: string;
     sponsorId: string;
     walletAddress: string;
     isNewRegistration?: boolean;
+    txHash?: string;
   }) => {
-    if (registeredUser) {
-      handleUpdateUser({
-        userId: registeredUser.userId,
-        sponsorId: registeredUser.sponsorId,
-        walletAddress: registeredUser.walletAddress,
+    const targetAddress = registeredUser?.walletAddress || user.walletAddress;
+
+    if (!targetAddress || !ethers.isAddress(targetAddress)) {
+      showToast('Please connect wallet first to access the dashboard.', 'warning');
+      return;
+    }
+
+    showToast('Verifying registration status on blockchain...', 'info');
+
+    const { registered, node } = await verifyWalletRegistration(targetAddress);
+
+    if (!registered || !node) {
+      showToast('Please complete registration first to access the dashboard.', 'warning');
+      setAppMode('landing');
+      return;
+    }
+
+    if (node.isBlocked) {
+      showToast('This account is blocked by the contract. Dashboard access restricted.', 'error');
+      setAppMode('landing');
+      return;
+    }
+
+    await syncLiveOnChainUser(targetAddress, node);
+
+    if (registeredUser?.isNewRegistration) {
+      centralEventSyncService.dispatchAction({
+        actionType: 'REGISTRATION',
+        txHash: registeredUser.txHash || '',
+        walletAddress: targetAddress,
+        userId: toHumanFacingId(node.id),
+        sponsorId: node.upline,
       });
 
-      if (registeredUser.isNewRegistration) {
-        const wallet = registeredUser.walletAddress;
-        const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-        const regTx = `0x${randomHex}`;
-
-        // Event Normalizer & Correlation: Correlate multi-events into 1 clean, comprehensive record
-        centralEventSyncService.dispatchAction({
-          actionType: 'REGISTRATION',
-          txHash: regTx,
-          walletAddress: wallet,
-          userId: registeredUser.userId,
-          sponsorId: registeredUser.sponsorId,
-        });
-
-        // Set activities from central synchronized state
-        const synced = centralEventSyncService.getState().activities;
-        setActivities(synced);
-        try {
-          localStorage.setItem(
-            `mdefi_notifications_${wallet.toLowerCase()}`,
-            JSON.stringify(synced)
-          );
-        } catch {}
-      }
+      const synced = centralEventSyncService.getState().activities;
+      setActivities(synced);
+      try {
+        localStorage.setItem(
+          `mdefi_notifications_${targetAddress.toLowerCase()}`,
+          JSON.stringify(synced)
+        );
+      } catch {}
     }
+
     setAppMode('dashboard');
-    showToast('Welcome to MDeFi Dashboard', 'success');
+    showToast('Registration verified! Welcome to MDeFi Dashboard.', 'success');
   };
 
-  // 1. If currently in Public Website mode, display the Public Front Website
   if (appMode === 'landing') {
     return <LandingPage onEnterDashboard={handleEnterDashboardFromLanding} />;
   }
 
-  // Route access status via centralized programPhaseService
   const routeAccess = programPhaseService.canAccessRoute(currentPage);
 
-  // 2. Otherwise display the exact, 100% unchanged MDeFi Main Dashboard
   return (
     <div className="min-h-screen app-dashboard-root bg-[#080c09] text-zinc-100 flex flex-col antialiased selection:bg-emerald-500/25 selection:text-emerald-300">
-      {/* Top Application Header */}
       <Header
         currentPage={currentPage}
         user={user}
@@ -626,9 +663,7 @@ function MainApp() {
         onMarkAsRead={handleMarkNotificationRead}
       />
 
-      {/* Main Workspace Layout */}
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 gap-6">
-        {/* Desktop Structural Sidebar Navigation */}
         <Sidebar
           currentPage={currentPage}
           onNavigate={handleNavigate}
@@ -636,7 +671,6 @@ function MainApp() {
           user={user}
         />
 
-        {/* Dynamic Page Views Container */}
         <main className="flex-1 min-w-0 pb-24 lg:pb-0">
           {!routeAccess.allowed ? (
             <PhaseLockedView
@@ -660,148 +694,147 @@ function MainApp() {
                 />
               )}
 
-          {currentPage === 'mbttc' && (
-            <MbttcView
-              user={user}
-              rewards={rewards}
-              tokenStats={MBTTC_TOKEN_INFO.telemetry}
-              onOpenClaimModal={handleOpenClaimModal}
-              onExecuteSwap={handleExecuteSwap}
-              onOpenWalletModal={() => setWalletModalOpen(true)}
-            />
-          )}
+              {currentPage === 'mbttc' && (
+                <MbttcView
+                  user={user}
+                  rewards={rewards}
+                  tokenStats={MBTTC_TOKEN_INFO.telemetry}
+                  onOpenClaimModal={handleOpenClaimModal}
+                  onExecuteSwap={handleExecuteSwap}
+                  onOpenWalletModal={() => setWalletModalOpen(true)}
+                />
+              )}
 
-          {currentPage === 'team' && (
-            <TeamView
-              user={user}
-              members={teamMembers}
-              onOpenMatrixModal={() => setMatrixModalOpen(true)}
-            />
-          )}
+              {currentPage === 'team' && (
+                <TeamView
+                  user={user}
+                  members={teamMembers}
+                  onOpenMatrixModal={() => setMatrixModalOpen(true)}
+                />
+              )}
 
-          {currentPage === 'packages' && (
-            <PackagesView
-              packages={packages}
-              userWalletAddress={user.walletAddress}
-              onOpenPackageModal={handleOpenPackageModal}
-              onNavigateS4={handleNavigateS4}
-              onNavigateNexus={handleNavigateNexus}
-              onNavigateQuantum={handleNavigateQuantum}
-              onNavigateNexusPrime={handleNavigateNexusPrime}
-              onResetPackages={() => {
-                setPackages(mockPackages.map((p) => ({ ...p, status: 'Available' })));
-                packageActivationService.resetAllowances();
-                showToast('Reset packages to Available state for testing', 'info');
-              }}
-              onShowToast={showToast}
-            />
-          )}
+              {currentPage === 'packages' && (
+                <PackagesView
+                  packages={packages}
+                  userWalletAddress={user.walletAddress}
+                  onOpenPackageModal={handleOpenPackageModal}
+                  onNavigateS4={handleNavigateS4}
+                  onNavigateNexus={handleNavigateNexus}
+                  onNavigateQuantum={handleNavigateQuantum}
+                  onNavigateNexusPrime={handleNavigateNexusPrime}
+                  onResetPackages={() => {
+                    setPackages(mockPackages.map((p) => ({ ...p, status: 'Available' })));
+                    packageActivationService.resetAllowances();
+                    showToast('Reset packages to Available state for testing', 'info');
+                  }}
+                  onShowToast={showToast}
+                />
+              )}
 
-          {currentPage === 'quantum-nexus' && (
-            <QuantumNexusView
-              onBackToPackages={() => handleNavigate('packages')}
-              onBackToDashboard={() => handleNavigate('overview')}
-              onNavigateToNexusPrime={handleNavigateNexusPrime}
-              isUserPackageActive={packages.find((p) => p.id === 'pkg-quantum')?.status === 'Active'}
-              onOpenPackageModal={() => handleOpenPackageModalById('pkg-quantum')}
-            />
-          )}
+              {currentPage === 'quantum-nexus' && (
+                <QuantumNexusView
+                  onBackToPackages={() => handleNavigate('packages')}
+                  onBackToDashboard={() => handleNavigate('overview')}
+                  onNavigateToNexusPrime={handleNavigateNexusPrime}
+                  isUserPackageActive={packages.find((p) => p.id === 'pkg-quantum')?.status === 'Active'}
+                  onOpenPackageModal={() => handleOpenPackageModalById('pkg-quantum')}
+                />
+              )}
 
-          {currentPage === 'nexus-prime' && (
-            <NexusPrimeView
-              onBackToPackages={() => handleNavigate('packages')}
-              onBackToDashboard={() => handleNavigate('overview')}
-              onNavigateToQuantum={handleNavigateQuantum}
-              isUserPackageActive={packages.find((p) => p.id === 'pkg-nexus-prime')?.status === 'Active'}
-              onOpenPackageModal={() => handleOpenPackageModalById('pkg-nexus-prime')}
-            />
-          )}
+              {currentPage === 'nexus-prime' && (
+                <NexusPrimeView
+                  onBackToPackages={() => handleNavigate('packages')}
+                  onBackToDashboard={() => handleNavigate('overview')}
+                  onNavigateToQuantum={handleNavigateQuantum}
+                  isUserPackageActive={packages.find((p) => p.id === 'pkg-nexus-prime')?.status === 'Active'}
+                  onOpenPackageModal={() => handleOpenPackageModalById('pkg-nexus-prime')}
+                />
+              )}
 
-          {currentPage === 'weekly_reward_starter' && (
-            <WeeklyRewardStarterView
-              user={user}
-              rewards={rewards}
-              onUpdateRewards={handleUpdateRewards}
-              onShowToast={showToast}
-              onAddActivity={addActivity}
-            />
-          )}
+              {currentPage === 'weekly_reward_starter' && (
+                <WeeklyRewardStarterView
+                  user={user}
+                  rewards={rewards}
+                  onUpdateRewards={handleUpdateRewards}
+                  onShowToast={showToast}
+                  onAddActivity={addActivity}
+                />
+              )}
 
-          {currentPage === 'weekly_reward_premium' && (
-            <WeeklyRewardPremiumView
-              user={user}
-              rewards={rewards}
-              onUpdateRewards={handleUpdateRewards}
-              onShowToast={showToast}
-              onAddActivity={addActivity}
-            />
-          )}
+              {currentPage === 'weekly_reward_premium' && (
+                <WeeklyRewardPremiumView
+                  user={user}
+                  rewards={rewards}
+                  onUpdateRewards={handleUpdateRewards}
+                  onShowToast={showToast}
+                  onAddActivity={addActivity}
+                />
+              )}
 
-          {currentPage === 'weekly_passive_salary' && (
-            <WeeklyPassiveSalaryView
-              user={user}
-              rewards={rewards}
-              onUpdateRewards={handleUpdateRewards}
-              onShowToast={showToast}
-              onAddActivity={addActivity}
-            />
-          )}
+              {currentPage === 'weekly_passive_salary' && (
+                <WeeklyPassiveSalaryView
+                  user={user}
+                  rewards={rewards}
+                  onUpdateRewards={handleUpdateRewards}
+                  onShowToast={showToast}
+                  onAddActivity={addActivity}
+                />
+              )}
 
-          {currentPage === 'income' && (
-            <IncomeView
-              user={user}
-              rewards={rewards}
-              onOpenClaimModal={handleOpenClaimModal}
-              onNavigate={handleNavigate}
-              onNavigateS4={handleNavigateS4}
-              onNavigateQuantum={handleNavigateQuantum}
-              onNavigateNexusPrime={handleNavigateNexusPrime}
-            />
-          )}
+              {currentPage === 'income' && (
+                <IncomeView
+                  user={user}
+                  rewards={rewards}
+                  onOpenClaimModal={handleOpenClaimModal}
+                  onNavigate={handleNavigate}
+                  onNavigateS4={handleNavigateS4}
+                  onNavigateQuantum={handleNavigateQuantum}
+                  onNavigateNexusPrime={handleNavigateNexusPrime}
+                />
+              )}
 
-          {currentPage === 'transactions' && (
-            <TransactionsView
-              activities={activities}
-            />
-          )}
+              {currentPage === 'transactions' && (
+                <TransactionsView
+                  activities={activities}
+                />
+              )}
 
-          {currentPage === 'profile' && (
-            <ProfileView
-              user={user}
-              rewards={rewards}
-              packages={packages}
-              onUpdateUser={handleUpdateUser}
-              onOpenWalletModal={() => setWalletModalOpen(true)}
-              onShowToast={showToast}
-            />
-          )}
+              {currentPage === 'profile' && (
+                <ProfileView
+                  user={user}
+                  rewards={rewards}
+                  packages={packages}
+                  onUpdateUser={handleUpdateUser}
+                  onOpenWalletModal={() => setWalletModalOpen(true)}
+                  onShowToast={showToast}
+                />
+              )}
 
-          {currentPage === 'hub' && (
-            <HubView
-              user={user}
-              rewards={rewards}
-              onNavigate={handleNavigate}
-              onNavigateS4={handleNavigateS4}
-              onNavigateQuantum={handleNavigateQuantum}
-              onNavigateNexusPrime={handleNavigateNexusPrime}
-            />
-          )}
+              {currentPage === 'hub' && (
+                <HubView
+                  user={user}
+                  rewards={rewards}
+                  onNavigate={handleNavigate}
+                  onNavigateS4={handleNavigateS4}
+                  onNavigateQuantum={handleNavigateQuantum}
+                  onNavigateNexusPrime={handleNavigateNexusPrime}
+                />
+              )}
 
-          {currentPage === 's4-matrix' && (
-            <S4MatrixView
-              initialPackage={s4PackageFocus}
-              onBackToDashboard={() => handleNavigate('overview')}
-              isJuniorActive={packages.find((p) => p.id === 'pkg-junior')?.status === 'Active'}
-              isSeniorActive={packages.find((p) => p.id === 'pkg-senior')?.status === 'Active'}
-              onOpenPackageModal={(pkg) => handleOpenPackageModalById(pkg === 'senior' ? 'pkg-senior' : 'pkg-junior')}
-            />
-          )}
+              {currentPage === 's4-matrix' && (
+                <S4MatrixView
+                  initialPackage={s4PackageFocus}
+                  onBackToDashboard={() => handleNavigate('overview')}
+                  isJuniorActive={packages.find((p) => p.id === 'pkg-junior')?.status === 'Active'}
+                  isSeniorActive={packages.find((p) => p.id === 'pkg-senior')?.status === 'Active'}
+                  onOpenPackageModal={(pkg) => handleOpenPackageModalById(pkg === 'senior' ? 'pkg-senior' : 'pkg-junior')}
+                />
+              )}
             </>
           )}
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar */}
       <MobileNav
         currentPage={currentPage}
         onNavigate={handleNavigate}
@@ -809,7 +842,6 @@ function MainApp() {
         onOpenClaimModal={() => handleOpenClaimModal('Referral')}
       />
 
-      {/* Modals Container */}
       <ClaimModal
         isOpen={claimModalOpen}
         onClose={() => setClaimModalOpen(false)}
@@ -865,7 +897,6 @@ function MainApp() {
         onOpenWalletModal={() => setWalletModalOpen(true)}
       />
 
-      {/* Interactive Toast Notifications */}
       {toast && (
         <Toast
           key={toast.id}
@@ -875,7 +906,6 @@ function MainApp() {
         />
       )}
 
-      {/* Reward Claim Celebration Confetti & Popup */}
       {rewardPopup && (
         <RewardPopup
           key={rewardPopup.id}
@@ -895,4 +925,3 @@ export default function App() {
     </LanguageProvider>
   );
 }
-
