@@ -44,7 +44,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     return formatCompactAddress(addr);
   };
 
-  // 1. Web3 Wallet Login Guard (On-chain check)
+// 1. Web3 Wallet Login Guard (On-chain check)
   const handleWalletLogin = async () => {
     setErrorMsg('');
     setIsNotRegistered(false);
@@ -60,15 +60,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       // Query Hub.getUserNode(walletAddress) directly on-chain
       const node = await contractAdapter.getHubUserNode(connectedWalletAddress);
 
-      // Node registered verification
-      if (!node || !node.isRegistered || node.id === 0) {
+      if (!node) {
         setIsNotRegistered(true);
         setErrorMsg('Account not registered on-chain. Please complete registration first.');
         setIsVerifying(false);
         return;
       }
 
-      if (node.isBlocked) {
+      // Robust check: Chahe BigInt ho ya number, ya node.isRegistered flag ho
+      const rawNode = node as any;
+      const numericId = Number(rawNode.id ?? rawNode[0] ?? 0);
+      const isReg = Boolean(rawNode.isRegistered ?? rawNode[4]);
+      // Agar ID 1 (Root Admin) hai ya registered hai (numericId > 0)
+      if (numericId === 0 && !isReg) {
+        setIsNotRegistered(true);
+        setErrorMsg('Account not registered on-chain. Please complete registration first.');
+        setIsVerifying(false);
+        return;
+      }
+
+const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5]);
+      if (isBlocked) {
         setErrorMsg('This wallet node has been blocked by the protocol administration.');
         setIsVerifying(false);
         return;
