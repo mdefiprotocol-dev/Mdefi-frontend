@@ -429,7 +429,7 @@ export class ContractAdapter {
     }
   }
 
-  public async getHubUserNode(walletAddress: string): Promise<{
+ public async getHubUserNode(walletAddress: string): Promise<{
     id: number;
     registrationTime: number;
     isBlocked: boolean;
@@ -446,15 +446,21 @@ export class ContractAdapter {
       const node = await provider.read<any>('mdefiHub', 'getUserNode', [walletAddress]);
       if (!node) return null;
 
+      const raw = node as any;
+      const parsedId = Number(raw.id ?? raw[0] ?? 0);
+      const parsedRegTime = Number(raw.registrationTime ?? raw[1] ?? 0);
+      const parsedIsBlocked = Boolean(raw.isBlocked ?? raw[2] ?? false);
+      const parsedIsRegistered = Boolean(raw.isRegistered ?? raw[3] ?? (parsedId > 0));
+
       return {
-        id: node.id ? Number(node.id.toString()) : 0,
-        registrationTime: node.registrationTime ? Number(node.registrationTime.toString()) : 0,
-        isBlocked: Boolean(node.isBlocked),
-        isRegistered: Boolean(node.isRegistered),
-        wallet: node.wallet,
-        upline: node.upline,
-        directTeam: node.directTeam || [],
-        totalTeam: node.totalTeam ? Number(node.totalTeam.toString()) : 0,
+        id: parsedId,
+        registrationTime: parsedRegTime,
+        isBlocked: parsedIsBlocked,
+        isRegistered: parsedIsRegistered || parsedId > 0,
+        wallet: String(raw.wallet ?? raw[4] ?? walletAddress),
+        upline: String(raw.upline ?? raw[5] ?? ''),
+        directTeam: Array.isArray(raw.directTeam ?? raw[6]) ? (raw.directTeam ?? raw[6]) : [],
+        totalTeam: Number(raw.totalTeam ?? raw[7] ?? 0),
       };
     } catch (err) {
       console.error('[ContractAdapter] getUserNode failed:', err);
