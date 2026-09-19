@@ -15,25 +15,30 @@ export type NavPage =
   | 'profile';
 
 export interface UserProfile {
-  userId: string; // User-facing identifier (e.g. "MDF-25861")
-  blockchainNumericId?: number; // Official on-chain uint256 / uint64 numeric ID
+  userId: string; // Dynamic user facing ID (jaise: MDF-00002)
+  blockchainNumericId?: number; // On-chain uint64 numeric ID
+  numericId?: number;
   walletAddress: string;
-  sponsorAddress: string;
-  sponsorId?: string; // User-facing sponsor identifier (e.g. "MDF-00109")
-  sponsorNumericId?: number; // Official on-chain uint256 / uint64 numeric sponsor ID
+  sponsorAddress?: string;
+  sponsorId?: string; // On-chain upline sponsor ID
+  sponsorNumericId?: number;
   memberSince: string;
-  registrationTimestamp?: number; // On-chain block timestamp
-  registrationStatus: 'Active' | 'Pending' | 'Inactive';
-  registrationReward: number; // Phase 1 MBTTC Welcome Bonus
-  referralCode: string;
+  registrationTimestamp?: number; // Block timestamp
+  registrationStatus?: 'Active' | 'Pending' | 'Inactive';
+  registrationReward?: number; // On-chain phase reward (Phase 1 = 30 MBTTC)
+  referralCode?: string;
   directTeamCount: number;
   totalTeamCount: number;
   displayName?: string;
   avatarUrl?: string;
   referralLink?: string;
-  isRealBlockchainData?: boolean; // Distinguishes real on-chain user from demo simulation
+  isRegistered?: boolean;
+  isBlocked?: boolean;
+  currentRank?: string;
+  totalEarnedUsdt?: number;
+  totalEarnedMbttc?: number;
+  isRealBlockchainData?: boolean;
 }
-
 export interface RewardBalances {
   // Referral rewards
   referralEarned: number;
@@ -52,21 +57,21 @@ export interface RewardBalances {
   // MBTTC general
   mbttcBalance: number;
   usdtBalance?: number;
-  demoUsdRate: number; // For demo USD approximations
-  isRealBlockchainData?: boolean; // Distinguishes real on-chain balance from demo
+  isRealBlockchainData?: boolean;
 }
 
 export interface PackageItem {
   id: string;
+  numericId?: number;
   name: string;
   priceUSD: number;
   status: 'Active' | 'Available' | 'Pending';
-  activationDate: string;
-  version: string;
-  rewardStatus: string;
-  dailyRewardEstimate: string;
-  maxReturn: string;
-  features: string[];
+  activationDate?: string;
+  version?: string;
+  rewardStatus?: string;
+  dailyRewardEstimate?: string;
+  maxReturn?: string;
+  features?: string[];
   isPopular?: boolean;
 }
 
@@ -111,7 +116,7 @@ export interface ActivityItem {
     | (string & {});
   amount: string;
   date: string;
-  status: 'Confirmed' | 'Pending' | 'Failed' | 'Simulated';
+  status: 'Confirmed' | 'Pending' | 'Failed';
   txHash: string;
   details?: string;
   title?: string;
@@ -150,7 +155,7 @@ export interface TransactionRecord {
   amount: string;
   status: 'Confirmed' | 'Pending';
   txHash: string;
-  feeDemo: string;
+  gasFeeBnb?: string;
 }
 
 export type EcosystemActivityType = 
@@ -173,14 +178,13 @@ export interface EcosystemActivity {
   asset?: string;
   member: string;
   timestamp: string;
-  source?: 'contract' | 'simulated';
-  status: 'Simulated' | 'Confirmed';
-  isDemo: boolean;
+  source?: 'contract';
+  status: 'Confirmed' | 'Pending';
 }
 
 export interface ToastMessage {
   id: string;
-type: 'success' | 'info' | 'warning' | 'error';
+  type: 'success' | 'info' | 'warning' | 'error';
   title: string;
   description: string;
 }
@@ -194,7 +198,7 @@ export interface TeamTransactionRecord {
   packageAmount?: string;
   packageDetails?: string;
   amount: string;
-  status: 'Confirmed' | 'Pending' | 'Failed' | 'Simulated';
+  status: 'Confirmed' | 'Pending' | 'Failed';
   txHash?: string;
   date: string;
   timestamp?: string;

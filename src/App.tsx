@@ -8,18 +8,10 @@ import {
   TeamMember, 
   NavPage 
 } from './types';
-import { 
-  mockUserProfile, 
-  mockRewardBalances, 
-  mockPackages, 
-  mockActivities, 
-  mockTeamMembers 
-} from './data/mockData';
 import { mdefiService } from './services/mdefiService';
 import { centralEventSyncService } from './services/centralEventSyncService';
 import { contractAdapter } from './services/contractAdapter';
 import { nexusContractService } from './services/nexusContractService';
-import { packageActivationService } from './services/packageActivationService';
 import { normalizeAndDeduplicateActivities, isDuplicateActivity } from './utils/notificationDeduplication';
 import { formatCompactAddress } from './utils/formatAddress';
 import { toHumanFacingId } from './utils/idConverter';
@@ -56,8 +48,44 @@ import { MBTTC_TOKEN_INFO } from './data/mbttcTokenInfo';
 import { PhaseLockedView } from './components/common/PhaseLockedView';
 import { programPhaseService } from './services/programPhaseService';
 
+// Zero Mock Initial States
+const emptyUserProfile: UserProfile = {
+  walletAddress: '',
+  userId: '',
+  sponsorId: '',
+  memberSince: '',
+  directTeamCount: 0,
+  totalTeamCount: 0,
+  currentRank: 'Node Explorer',
+  totalEarnedUsdt: 0,
+  totalEarnedMbttc: 0,
+};
+
+const emptyRewardBalances: RewardBalances = {
+  mbttcBalance: 0,
+  usdtBalance: 0,
+  referralEarned: 0,
+  referralClaimed: 0,
+  referralClaimable: 0,
+  packageEarned: 0,
+  packageClaimed: 0,
+  packageClaimable: 0,
+  lastReferralClaim: 'Never',
+  lastPackageClaim: 'Never',
+  nextReferralClaimSec: 0,
+  nextPackageClaimSec: 0,
+
+};
+
 function MainApp() {
-  const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
+  const [appMode, setAppMode] = useState<'landing' | 'dashboard'>(() => {
+    try {
+      const savedMode = localStorage.getItem('mdefi_app_mode');
+      return savedMode === 'dashboard' ? 'dashboard' : 'landing';
+    } catch {
+      return 'landing';
+    }
+  });
 
   const [currentPage, setCurrentPage] = useState<NavPage>('overview');
   const [s4PackageFocus, setS4PackageFocus] = useState<'junior' | 'senior'>('junior');
@@ -65,14 +93,17 @@ function MainApp() {
   const [user, setUser] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem('mdefi_user_profile');
-      if (saved) return { ...mockUserProfile, ...JSON.parse(saved) };
+      if (saved) return JSON.parse(saved);
     } catch {}
-    return mockUserProfile;
+    return emptyUserProfile;
   });
-  const [rewards, setRewards] = useState<RewardBalances>(mockRewardBalances);
-  const [packages, setPackages] = useState<PackageItem[]>(mockPackages);
+
+  const [rewards, setRewards] = useState<RewardBalances>(emptyRewardBalances);
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   const loadActivitiesForWallet = (walletAddress: string): ActivityItem[] => {
+    if (!walletAddress) return [];
     try {
       const key = `mdefi_notifications_${walletAddress.toLowerCase()}`;
       const saved = localStorage.getItem(key);
@@ -83,25 +114,126 @@ function MainApp() {
         }
       }
     } catch {}
-
-    if (walletAddress.toLowerCase() === mockUserProfile.walletAddress.toLowerCase()) {
-      const seeded = mockActivities.map((act) => ({
-        ...act,
-        walletAddress,
-        read: act.read ?? false,
-      }));
-      return normalizeAndDeduplicateActivities(seeded, walletAddress);
-    }
-
     return [];
   };
 
   const [activities, setActivities] = useState<ActivityItem[]>(() => {
     return loadActivitiesForWallet(user.walletAddress);
   });
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(mockTeamMembers);
+
+  const persistAppMode = (mode: 'landing' | 'dashboard') => {
+    setAppMode(mode);
+    try {
+      localStorage.setItem('mdefi_app_mode', mode);
+    } catch {}
+  };
+
+  const persistUserProfile = (updatedUser: UserProfile) => {
+    setUser(updatedUser);
+    try {
+      localStorage.setItem('mdefi_user_profile', JSON.stringify(updatedUser));
+    } catch {}
+  };
+
+  // Sync Live On-Chain Data when wallet changes or refreshes
+  const syncLiveOnChainUser = useCallback(async (walletAddress: string, verifiedNode?: any) => {
+    if (!walletAddress || !ethers.isAddress(walletAddress)) return;
+
+    try {
+      const node = verifiedNode || (await contractAdapter.getHubUserNode(walletAddress));
+      if (!node || !node.isRegistered) return;
+
+      const dashboard: any = await contractAdapter.getHubUserData(walletAddress);
+      const rawNumericId = Number(node.id || 0);
+      const userFacingId = rawNumericId > 0 ? toHumanFacingId(rawNumericId) : `MDF-${rawNumericId}`;
+      const sponsorAddress = node.upline || dashboard?.sponsorId || '';
+
+    const updatedProfile: UserProfile = {
+        walletAddress: node.wallet || walletAddress,
+        userId: userFacingId,
+        sponsorId: sponsorAddress,
+        memberSince: dashboard?.registrationTimestamp 
+          ? new Date(dashboard.registrationTimestamp).toLocaleDateString()
+          : 'Active Node',
+        directTeamCount: Number(node.directTeam?.length ?? dashboard?.directTeamCount ?? 0),
+        totalTeamCount: Number(node.totalTeam ?? dashboard?.totalTeamCount ?? 0),
+        currentRank: 'Node Explorer',
+        totalEarnedUsdt: parseFloat(dashboard?.referralTotalEarned || '0') + parseFloat(dashboard?.packageTotalEarned || '0'),
+        totalEarnedMbttc: 0,
+      };
+
+      persistUserProfile(updatedProfile);
+
+      // Fetch live on-chain balances
+      const freshBalances = await mdefiService.getRewardBalances(walletAddress);
+      setRewards(freshBalances);
+
+      // Fetch live on-chain package states
+      const ids = await contractAdapter.getConfiguredPackageIds();
+      const loadedPackages: PackageItem[] = await Promise.all(
+        ids.map(async (pId) => {
+          const details = await contractAdapter.getHubPackageDetails(pId);
+          const isActive = await contractAdapter.isUserPackageActive(walletAddress, pId);
+          return {
+            id: `pkg-${pId}`,
+            numericId: pId,
+            name: details?.name || `Package #${pId}`,
+            priceUSD: details?.humanAmount || 0,
+            status: (isActive ? 'Active' : 'Available') as 'Active' | 'Available',
+            rewardStatus: isActive ? 'Accumulating Rewards' : 'Pending Activation',
+            activationDate: isActive ? 'Active On-Chain' : undefined,
+          } as unknown as PackageItem;
+        })
+      );
+      setPackages(loadedPackages);
+    } catch (error) {
+      console.error('[App] Failed to sync live on-chain profile:', error);
+    }
+  }, []);
+
+  const verifyWalletRegistration = useCallback(async (walletAddress: string): Promise<{
+    registered: boolean;
+    node: any | null;
+  }> => {
+    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+      return { registered: false, node: null };
+    }
+
+    try {
+      const node = await contractAdapter.getHubUserNode(walletAddress);
+      if (!node) {
+        return { registered: false, node: null };
+      }
+
+      const isRegistered = Boolean(node.isRegistered);
+      const hasValidId = Number(node.id) > 0;
+
+      if (isRegistered && hasValidId) {
+        return { registered: true, node };
+      }
+
+      return { registered: false, node };
+    } catch (error) {
+      console.error('[App] On-chain registration verification failed:', error);
+      return { registered: false, node: null };
+    }
+  }, []);
+
+  // Auto-verify on initial mount if already in dashboard mode
+  useEffect(() => {
+    if (appMode === 'dashboard' && user.walletAddress) {
+      verifyWalletRegistration(user.walletAddress).then(({ registered, node }) => {
+        if (registered && node) {
+          syncLiveOnChainUser(user.walletAddress, node);
+        } else {
+          persistAppMode('landing');
+        }
+      });
+    }
+  }, []);
 
   useEffect(() => {
+    if (!user.walletAddress) return;
     setActivities(loadActivitiesForWallet(user.walletAddress));
 
     const unsubscribe = centralEventSyncService.subscribe((syncState) => {
@@ -120,20 +252,6 @@ function MainApp() {
       }
 
       setTeamMembers(syncState.teamMembers);
-
-      setUser((prev) => {
-        if (
-          prev.directTeamCount !== syncState.directTeamCount ||
-          prev.totalTeamCount !== syncState.totalTeamCount
-        ) {
-          return {
-            ...prev,
-            directTeamCount: syncState.directTeamCount,
-            totalTeamCount: syncState.totalTeamCount,
-          };
-        }
-        return prev;
-      });
     });
 
     return unsubscribe;
@@ -171,12 +289,7 @@ function MainApp() {
   };
 
   const handleMarkAllAsRead = () => {
-    const updated = activities.map((a) => {
-      if (!a.walletAddress || a.walletAddress.toLowerCase() === user.walletAddress.toLowerCase()) {
-        return { ...a, read: true };
-      }
-      return a;
-    });
+    const updated = activities.map((a) => ({ ...a, read: true }));
     saveActivities(updated);
   };
 
@@ -188,9 +301,7 @@ function MainApp() {
   const handleUpdateUser = (updated: Partial<UserProfile>) => {
     setUser((prev) => {
       const next = { ...prev, ...updated };
-      try {
-        localStorage.setItem('mdefi_user_profile', JSON.stringify(next));
-      } catch {}
+      persistUserProfile(next);
       return next;
     });
   };
@@ -244,88 +355,13 @@ function MainApp() {
     }
   };
 
-  const verifyWalletRegistration = useCallback(async (walletAddress: string): Promise<{
-    registered: boolean;
-    node: any | null;
-  }> => {
-    if (!walletAddress || !ethers.isAddress(walletAddress)) {
-      return { registered: false, node: null };
-    }
-
-    try {
-      const node = await contractAdapter.getHubUserNode(walletAddress);
-      if (!node) {
-        return { registered: false, node: null };
-      }
-
-      const isRegistered = Boolean(node.isRegistered);
-      const hasValidId = Number(node.id) > 0;
-
-      if (isRegistered && hasValidId) {
-        return { registered: true, node };
-      }
-
-      return { registered: false, node };
-    } catch (error) {
-      console.error('[App] On-chain registration verification failed:', error);
-      return { registered: false, node: null };
-    }
-  }, []);
-
-  const syncLiveOnChainUser = useCallback(async (walletAddress: string, verifiedNode?: any) => {
-    try {
-      const node = verifiedNode || (await contractAdapter.getHubUserNode(walletAddress));
-      if (!node || !node.isRegistered) return;
-
-      const dashboard = await contractAdapter.getHubUserData(walletAddress);
-      const rawNumericId = Number(node.id || 0);
-      const userFacingId = rawNumericId > 0 ? toHumanFacingId(rawNumericId) : `MDF-${rawNumericId}`;
-      const sponsorAddress = node.upline || dashboard?.sponsorId || '';
-
-      setUser((prev) => ({
-        ...prev,
-        walletAddress: node.wallet || walletAddress,
-        userId: userFacingId,
-        sponsorId: sponsorAddress || prev.sponsorId,
-        isBlocked: Boolean(node.isBlocked),
-        isRegistered: true,
-        directTeamCount: Number(node.directTeam?.length ?? dashboard?.directTeamCount ?? prev.directTeamCount),
-        totalTeamCount: Number(node.totalTeam ?? dashboard?.totalTeamCount ?? prev.totalTeamCount),
-      }));
-    } catch (error) {
-      console.error('[App] Failed to sync live on-chain profile:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleRatingEvent = (event: Event) => {
-      const customEvent = event as CustomEvent<{ rating: number; newAverage: number; totalRatings: number }>;
-      const rating = customEvent.detail?.rating || 5;
-      const newAverage = customEvent.detail?.newAverage || 4.8;
-      showToast(`⭐ Community Rating: You submitted a ${rating}-star rating! Current Index: ${newAverage} / 5.0`, 'success');
-
-      centralEventSyncService.dispatchAction({
-        actionType: 'RATING_SUBMISSION',
-        txHash: `rating-${Date.now()}`,
-        walletAddress: user.walletAddress,
-        title: `${rating} ★ Rating`,
-        details: `Your ${rating}-star rating was recorded in the MDeFi Community Reputation Index.`,
-      });
-    };
-
-    window.addEventListener('mdefi:rating_submitted', handleRatingEvent);
-    return () => {
-      window.removeEventListener('mdefi:rating_submitted', handleRatingEvent);
-    };
-  }, [user.walletAddress]);
-
   useEffect(() => {
     const unsubscribe = contractAdapter.onDataRefresh(async () => {
+      if (!user.walletAddress) return;
       try {
         const freshBalances = await mdefiService.getRewardBalances(user.walletAddress);
         setRewards(freshBalances);
-        const freshProfile = await mdefiService.getUserProfile(user.walletAddress);
-        setUser((prev) => ({ ...prev, ...freshProfile }));
+        await syncLiveOnChainUser(user.walletAddress);
       } catch (err) {
         console.warn('[App] Error during on-chain data refresh:', err);
       }
@@ -333,7 +369,7 @@ function MainApp() {
     return () => {
       unsubscribe();
     };
-  }, [user.walletAddress]);
+  }, [user.walletAddress, syncLiveOnChainUser]);
 
   const handleOpenClaimModal = (type: 'Registration' | 'Referral' | 'Package') => {
     setClaimModalType(type);
@@ -451,9 +487,9 @@ function MainApp() {
         const next = { ...prev };
         if (params.fromToken === 'MBTTC') {
           next.mbttcBalance = Math.max(0, next.mbttcBalance - params.fromAmount);
-          next.usdtBalance = (next.usdtBalance ?? 450) + params.toAmount;
+          next.usdtBalance = (next.usdtBalance ?? 0) + params.toAmount;
         } else {
-          next.usdtBalance = Math.max(0, (next.usdtBalance ?? 450) - params.fromAmount);
+          next.usdtBalance = Math.max(0, (next.usdtBalance ?? 0) - params.fromAmount);
           next.mbttcBalance = next.mbttcBalance + params.toAmount;
         }
         return next;
@@ -503,9 +539,6 @@ function MainApp() {
     if (!s4Access.allowed) {
       showToast(s4Access.lockMessage || 'S4 Matrix unlocks in Phase 2 community launch', 'warning');
       setCurrentPage('s4-matrix');
-      try {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch {}
       return;
     }
     const targetId = pkg === 'senior' ? 'pkg-senior' : 'pkg-junior';
@@ -518,9 +551,6 @@ function MainApp() {
     setMatrixModalOpen(false);
     setS4PackageFocus(pkg);
     setCurrentPage('s4-matrix');
-    try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {}
   };
 
   const handleNavigateQuantum = () => {
@@ -528,9 +558,6 @@ function MainApp() {
     if (!quantumAccess.allowed) {
       showToast(quantumAccess.lockMessage || 'Quantum Nexus unlocks in Phase 3 community launch', 'warning');
       setCurrentPage('quantum-nexus');
-      try {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch {}
       return;
     }
     const quantumPkg = packages.find(p => p.id === 'pkg-quantum');
@@ -541,9 +568,6 @@ function MainApp() {
     }
     setMatrixModalOpen(false);
     setCurrentPage('quantum-nexus');
-    try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {}
   };
 
   const handleNavigateNexusPrime = () => {
@@ -551,9 +575,6 @@ function MainApp() {
     if (!primeAccess.allowed) {
       showToast(primeAccess.lockMessage || 'Nexus Prime unlocks in Phase 3 community launch', 'warning');
       setCurrentPage('nexus-prime');
-      try {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch {}
       return;
     }
     const primePkg = packages.find(p => p.id === 'pkg-nexus-prime');
@@ -564,9 +585,6 @@ function MainApp() {
     }
     setMatrixModalOpen(false);
     setCurrentPage('nexus-prime');
-    try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {}
   };
 
   const handleNavigateNexus = (pkgId: 1 | 2 = 1) => {
@@ -586,6 +604,7 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Entry Point from Landing Page -> Dashboard
   const handleEnterDashboardFromLanding = async (registeredUser?: {
     userId: string;
     sponsorId: string;
@@ -602,29 +621,33 @@ function MainApp() {
 
     showToast('Verifying registration status on blockchain...', 'info');
 
-    const { registered, node } = await verifyWalletRegistration(targetAddress);
+    let verification = await verifyWalletRegistration(targetAddress);
+    if (!verification.registered && registeredUser?.isNewRegistration) {
+      await new Promise((r) => setTimeout(r, 2000));
+      verification = await verifyWalletRegistration(targetAddress);
+    }
 
-    if (!registered || !node) {
+    if (!verification.registered || !verification.node) {
       showToast('Please complete registration first to access the dashboard.', 'warning');
-      setAppMode('landing');
+      persistAppMode('landing');
       return;
     }
 
-    if (node.isBlocked) {
+    if (verification.node.isBlocked) {
       showToast('This account is blocked by the contract. Dashboard access restricted.', 'error');
-      setAppMode('landing');
+      persistAppMode('landing');
       return;
     }
 
-    await syncLiveOnChainUser(targetAddress, node);
+    await syncLiveOnChainUser(targetAddress, verification.node);
 
     if (registeredUser?.isNewRegistration) {
       centralEventSyncService.dispatchAction({
         actionType: 'REGISTRATION',
         txHash: registeredUser.txHash || '',
         walletAddress: targetAddress,
-        userId: toHumanFacingId(node.id),
-        sponsorId: node.upline,
+        userId: toHumanFacingId(verification.node.id),
+        sponsorId: verification.node.upline,
       });
 
       const synced = centralEventSyncService.getState().activities;
@@ -637,7 +660,7 @@ function MainApp() {
       } catch {}
     }
 
-    setAppMode('dashboard');
+    persistAppMode('dashboard');
     showToast('Registration verified! Welcome to MDeFi Dashboard.', 'success');
   };
 
@@ -658,7 +681,7 @@ function MainApp() {
         onOpenClaimModal={() => handleOpenClaimModal('Referral')}
         onNavigate={handleNavigate}
         onTriggerRewardPopup={showRewardPopup}
-        onReturnToLanding={() => setAppMode('landing')}
+        onReturnToLanding={() => persistAppMode('landing')}
         onMarkAllAsRead={handleMarkAllAsRead}
         onMarkAsRead={handleMarkNotificationRead}
       />
@@ -722,11 +745,7 @@ function MainApp() {
                   onNavigateNexus={handleNavigateNexus}
                   onNavigateQuantum={handleNavigateQuantum}
                   onNavigateNexusPrime={handleNavigateNexusPrime}
-                  onResetPackages={() => {
-                    setPackages(mockPackages.map((p) => ({ ...p, status: 'Available' })));
-                    packageActivationService.resetAllowances();
-                    showToast('Reset packages to Available state for testing', 'info');
-                  }}
+                  onResetPackages={() => {}}
                   onShowToast={showToast}
                 />
               )}

@@ -1,65 +1,115 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   CheckCircle2, 
   ArrowRight, 
   Loader2, 
-  Lock, 
+  Zap, 
+  Coins, 
+  Wallet, 
+  UserCheck, 
   Sparkles,
-  Zap,
-  Coins,
-  Wallet,
-  UserCheck,
-  Check
+  AlertCircle
 } from 'lucide-react';
-import { MbttcCoin3D } from '../MbttcCoin3D';
+import { ethers } from 'ethers';
+import { HUB_ADDRESS } from '../../config/contractConfig';
+import { contractAdapter } from '../../services/contractAdapter';
+import { getContractProvider } from '../../services/contractProvider';
+import { formatCompactAddress } from '../../utils/formatAddress';
 import { playClaimSuccessSound } from '../../utils/successSound';
+
+const ERC20_ABI = [
+  'function allowance(address owner, address spender) external view returns (uint256)',
+  'function approve(address spender, uint256 amount) external returns (bool)'
+];
 
 interface SystemApprovalsModalProps {
   onApprovalsComplete: () => void;
+  connectedWalletAddress?: string;
+  userFacingId?: string;
 }
 
 type TxState = 'ready' | 'waiting_wallet' | 'confirming' | 'confirmed';
 
 export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
   onApprovalsComplete,
+  connectedWalletAddress = '',
+  userFacingId = 'MDF-Node',
 }) => {
-  // Real Web3 sequence states
   const [hubState, setHubState] = useState<TxState>('ready');
   const [usdtState, setUsdtState] = useState<TxState>('ready');
   const [activationState, setActivationState] = useState<TxState>('ready');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleStartApprovals = async () => {
     setIsProcessing(true);
-
-    // Step 1: Hub Approval
-    setHubState('waiting_wallet');
-    await new Promise((r) => setTimeout(r, 800));
-    setHubState('confirming');
-    await new Promise((r) => setTimeout(r, 1200));
-    setHubState('confirmed');
-
-    // Step 2: USDT Approval
-    setUsdtState('waiting_wallet');
-    await new Promise((r) => setTimeout(r, 800));
-    setUsdtState('confirming');
-    await new Promise((r) => setTimeout(r, 1200));
-    setUsdtState('confirmed');
-
-    // Step 3: System Activation
-    setActivationState('waiting_wallet');
-    await new Promise((r) => setTimeout(r, 700));
-    setActivationState('confirming');
-    await new Promise((r) => setTimeout(r, 1100));
-    setActivationState('confirmed');
-
-    setIsProcessing(false);
+    setErrorMessage('');
 
     try {
-      playClaimSuccessSound();
-    } catch {
-      // Audio fallback
+      // Step 1: Hub Approval Animation
+      setHubState('waiting_wallet');
+      await new Promise((r) => setTimeout(r, 800));
+      setHubState('confirming');
+      await new Promise((r) => setTimeout(r, 1200));
+      setHubState('confirmed');
+
+      // Step 2: 100% Real On-Chain USDT Token Approval (Hub Contract reads dynamic usdtToken())
+      setUsdtState('waiting_wallet');
+      
+      const liveUsdtAddress = await contractAdapter.getOnChainUsdtAddress();
+      if (!liveUsdtAddress || !ethers.isAddress(liveUsdtAddress) || liveUsdtAddress === ethers.ZeroAddress) {
+        throw new Error('Hub smart contract has not configured a valid USDT token address.');
+      }
+
+      const browserProvider = new ethers.BrowserProvider((window as any).ethereum);
+const signer = await browserProvider.getSigner();
+      if (!signer) {
+        throw new Error('Wallet signer unavailable. Please unlock your Web3 wallet.');
+      }
+
+      const usdtContract = new ethers.Contract(liveUsdtAddress, ERC20_ABI, signer);
+      const activeWallet = connectedWalletAddress || await signer.getAddress();
+
+      // Check live on-chain allowance first
+      const currentAllowance: bigint = await usdtContract.allowance(activeWallet, HUB_ADDRESS);
+
+      if (currentAllowance < ethers.parseUnits('1000', 18)) {
+        // Trigger real wallet popup
+        const tx = await usdtContract.approve(HUB_ADDRESS, ethers.MaxUint256);
+        setUsdtState('confirming');
+        const receipt = await tx.wait(1);
+        if (!receipt || receipt.status === 0) {
+          throw new Error('On-chain USDT approval transaction failed on BSC.');
+        }
+      } else {
+        // Already approved on-chain
+        setUsdtState('confirming');
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      setUsdtState('confirmed');
+
+      // Step 3: System Activation Animation
+      setActivationState('waiting_wallet');
+      await new Promise((r) => setTimeout(r, 700));
+      setActivationState('confirming');
+      await new Promise((r) => setTimeout(r, 1100));
+      setActivationState('confirmed');
+
+      setIsProcessing(false);
+
+      try {
+        playClaimSuccessSound();
+      } catch {
+        // Audio fallback
+      }
+    } catch (err: any) {
+      console.error('[SystemApprovals] Error:', err);
+      const isReject = err?.code === 4001 || err?.message?.includes('rejected');
+      setErrorMessage(isReject ? 'Approval transaction was rejected in your wallet.' : (err?.message || 'On-chain approval failed.'));
+      setUsdtState('ready');
+      setIsProcessing(false);
     }
   };
 
@@ -112,10 +162,18 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
           </p>
         </div>
 
+        {/* Dynamic Error Banner */}
+        {errorMessage && (
+          <div className="p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2 font-mono animate-in fade-in-50">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Approval Checklist */}
         <div className="space-y-2.5">
           
-          {/* Static Item 1: Wallet Connected */}
+          {/* Real Item 1: Live Wallet Connected */}
           <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-emerald-500/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-emerald-400">
@@ -123,7 +181,9 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-white">Wallet Connected</h4>
-                <span className="text-[10px] text-zinc-400 font-mono">0x71C8...4982 (BSC Mainnet)</span>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {connectedWalletAddress ? `${formatCompactAddress(connectedWalletAddress)} (BSC Testnet)` : 'Active On-Chain Wallet'}
+                </span>
               </div>
             </div>
             <span className="flex items-center gap-1 text-xs font-mono font-bold text-emerald-400">
@@ -131,7 +191,7 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
             </span>
           </div>
 
-          {/* Static Item 2: Registration Completed */}
+          {/* Real Item 2: Registration Completed */}
           <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-emerald-500/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-zinc-900 border border-white/10 text-emerald-400">
@@ -139,7 +199,7 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-white">Registration Completed</h4>
-                <span className="text-[10px] text-zinc-400 font-mono">MDeFi ID &amp; Upline Bound</span>
+                <span className="text-[10px] text-zinc-400 font-mono">{userFacingId} • Upline Bound</span>
               </div>
             </div>
             <span className="flex items-center gap-1 text-xs font-mono font-bold text-emerald-400">
@@ -169,7 +229,7 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
             </div>
           </div>
 
-          {/* Step 4: USDT Approval */}
+          {/* Step 4: Real On-Chain USDT Approval */}
           <div className={`p-3.5 rounded-2xl border transition-all ${
             usdtState === 'confirmed' 
               ? 'bg-emerald-950/40 border-emerald-500/50' 
@@ -247,7 +307,7 @@ export const SystemApprovalsModal: React.FC<SystemApprovalsModalProps> = ({
         </div>
 
         <div className="text-center text-[10px] font-mono text-zinc-500">
-          Decentralized on-chain authorization on BNB Smart Chain
+          Decentralized on-chain authorization on BNB Smart Chain Testnet (Chain ID: 97)
         </div>
       </div>
     </div>
