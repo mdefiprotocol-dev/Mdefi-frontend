@@ -160,6 +160,7 @@ export interface ISwapResult {
 export class ContractAdapter {
   private refreshListeners: Set<() => void> = new Set();
   private txLifecycleState: TransactionLifecycleState = 'READY';
+  private cachedUsdtAddress: string = '';
 
   public isLiveMode(): boolean {
     return true;
@@ -199,7 +200,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 1. REGISTRATION FEE & ALPHA THRESHOLD (LIVE DYNAMIC READS)
+  // 1. REGISTRATION FEE, ALPHA THRESHOLD & DYNAMIC USDT (HUB DIRECT READS)
   // =========================================================================
 
   public async getOnChainRegistrationFeeWei(): Promise<bigint> {
@@ -244,6 +245,25 @@ export class ContractAdapter {
     } catch {
       return 0n;
     }
+  }
+
+  public async getOnChainUsdtAddress(): Promise<string> {
+    if (this.cachedUsdtAddress && ethers.isAddress(this.cachedUsdtAddress)) {
+      return this.cachedUsdtAddress;
+    }
+
+    try {
+      const provider = getContractProvider(true);
+      const liveUsdt = await provider.read<string>('mdefiHub', 'usdtToken', []);
+      if (liveUsdt && ethers.isAddress(liveUsdt) && liveUsdt !== ethers.ZeroAddress) {
+        this.cachedUsdtAddress = liveUsdt;
+        return liveUsdt;
+      }
+    } catch (err) {
+      console.warn('[ContractAdapter] Failed to read live usdtToken from Hub:', err);
+    }
+
+    return this.cachedUsdtAddress;
   }
 
   // =========================================================================
