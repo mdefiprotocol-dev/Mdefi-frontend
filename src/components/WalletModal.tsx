@@ -153,98 +153,133 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     },
   ];
 
-  // Handle User Clicking a Wallet
- // Handle User Clicking a Wallet
-const handleConnect = async (wallet: WalletOption) => {
-  setConnectingWalletId(wallet.id);
-  setSelectedWalletName(wallet.name);
-  setConnectionStatus('connecting');
-  setErrorMessage(null);
-
-  try {
-    let resolvedAddress: string;
-    let connectedWalletName: string;
-
-    // MetaMask keeps the existing direct browser-extension flow
-    if (wallet.id === 'metamask') {
-      connectedWalletName = 'MetaMask';
-
-      setStatusMessage(
-        'Please approve the connection in your MetaMask popup...'
-      );
-
-      const anyWindow =
-        typeof window !== 'undefined'
-          ? (window as unknown as {
-              ethereum?: {
-                request?: (args: {
-                  method: string;
-                  params?: unknown[];
-                }) => Promise<unknown>;
-              };
-            })
-          : null;
-
-      if (!anyWindow?.ethereum?.request) {
-        throw new Error(
-          'MetaMask wallet provider is not available in this browser.'
-        );
+  const ensureBscTestnetChain = async (anyWindow: any) => {
+    try {
+      await anyWindow.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x61' }],
+      });
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        await anyWindow.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: '0x61',
+              chainName: 'BNB Smart Chain Testnet',
+              nativeCurrency: {
+                name: 'tBNB',
+                symbol: 'tBNB',
+                decimals: 18,
+              },
+              rpcUrls: [
+                'https://data-seed-prebsc-1-s1.binance.org:8545/',
+                'https://bsc-testnet.publicnode.com',
+              ],
+              blockExplorerUrls: ['https://testnet.bscscan.com'],
+            },
+          ],
+        });
+      } else {
+        throw switchError;
       }
-
-      const accounts = (await anyWindow.ethereum.request({
-        method: 'eth_requestAccounts',
-      })) as string[];
-
-      if (!accounts || !accounts[0]) {
-        throw new Error('No MetaMask account was returned.');
-      }
-
-      resolvedAddress = accounts[0];
-    } else {
-      // Trust Wallet, Binance Wallet, WalletConnect and Coinbase Wallet
-      // all open the same WalletConnect multi-wallet selection flow.
-      connectedWalletName = 'WalletConnect';
-
-      setStatusMessage(
-        'Opening WalletConnect. Select your wallet from the available wallets...'
-      );
-
-      resolvedAddress = await connectWalletConnect();
     }
+  };
 
-    setConnectedAddress(resolvedAddress);
-    setConnectionStatus('connected');
-    setStatusMessage(`Connected via ${connectedWalletName}`);
+  // Handle User Clicking a Wallet
+  const handleConnect = async (wallet: WalletOption) => {
+    setConnectingWalletId(wallet.id);
+    setSelectedWalletName(wallet.name);
+    setConnectionStatus('connecting');
+    setErrorMessage(null);
 
     try {
-      playClaimSuccessSound();
-    } catch {
-      // Audio fallback
+      let resolvedAddress: string;
+      let connectedWalletName: string;
+
+      // MetaMask keeps the existing direct browser-extension flow
+      if (wallet.id === 'metamask') {
+        connectedWalletName = 'MetaMask';
+
+        setStatusMessage(
+          'Please approve the connection in your MetaMask popup...'
+        );
+
+        const anyWindow =
+          typeof window !== 'undefined'
+            ? (window as unknown as {
+                ethereum?: {
+                  request?: (args: {
+                    method: string;
+                    params?: unknown[];
+                  }) => Promise<unknown>;
+                };
+              })
+            : null;
+
+        if (!anyWindow?.ethereum?.request) {
+          throw new Error(
+            'MetaMask wallet provider is not available in this browser.'
+          );
+        }
+
+        const accounts = (await anyWindow.ethereum.request({
+          method: 'eth_requestAccounts',
+        })) as string[];
+
+        if (!accounts || !accounts[0]) {
+          throw new Error('No MetaMask account was returned.');
+        }
+
+        setStatusMessage('Switching network to BNB Smart Chain Testnet...');
+        await ensureBscTestnetChain(anyWindow);
+
+        resolvedAddress = accounts[0];
+      } else {
+        // Trust Wallet, Binance Wallet, WalletConnect and Coinbase Wallet
+        // all open the same WalletConnect multi-wallet selection flow.
+        connectedWalletName = 'WalletConnect';
+
+        setStatusMessage(
+          'Opening WalletConnect. Select your wallet from the available wallets...'
+        );
+
+        resolvedAddress = await connectWalletConnect();
+      }
+
+      setConnectedAddress(resolvedAddress);
+      setConnectionStatus('connected');
+      setStatusMessage(`Connected via ${connectedWalletName} on BSC Testnet`);
+
+      try {
+        playClaimSuccessSound();
+      } catch {
+        // Audio fallback
+      }
+
+      // Continue to the next step after successful connection
+      setTimeout(() => {
+        if (onWalletConnected) {
+          onWalletConnected(resolvedAddress, connectedWalletName);
+        }
+
+        if (onSwitchAddress) {
+          onSwitchAddress(resolvedAddress);
+        }
+
+        onClose();
+      }, 700);
+    } catch (err: unknown) {
+      const errorText =
+        err instanceof Error
+          ? err.message
+          : 'User rejected the request or connection timed out.';
+
+      setConnectionStatus('error');
+      setErrorMessage(errorText);
+      setConnectingWalletId(null);
     }
-
-    // Continue to the next step after successful connection
-    setTimeout(() => {
-      if (onWalletConnected) {
-        onWalletConnected(resolvedAddress, connectedWalletName);
-      }
-
-      if (onSwitchAddress) {
-        onSwitchAddress(resolvedAddress);
-      }
-
-      onClose();
-    }, 700);
-  } catch (err: unknown) {
-    const errorText =
-      err instanceof Error
-        ? err.message
-        : 'User rejected the request or connection timed out.';
-
-    setConnectionStatus('error');
-    setErrorMessage(errorText);
-    setConnectingWalletId(null);
-  }
-};
+  };
 
   const shorten = (addr: string) => {
     return formatCompactAddress(addr);
@@ -270,7 +305,7 @@ const handleConnect = async (wallet: WalletOption) => {
                 Connect Web3 Wallet
               </h3>
               <span className="text-xs text-zinc-400 font-mono">
-                BNB Smart Chain • BEP-20 Network
+                BNB Smart Chain Testnet (Chain ID: 97)
               </span>
             </div>
           </div>
@@ -284,7 +319,7 @@ const handleConnect = async (wallet: WalletOption) => {
           </button>
         </div>
 
-        {/* Active Demo Session Banner when opened from Dashboard */}
+        {/* Active Connected Session Banner when opened from Dashboard */}
         {user && (
           <div className="p-3.5 rounded-2xl bg-zinc-900/70 border border-emerald-500/30 flex items-center justify-between">
             <div className="flex items-center gap-3">

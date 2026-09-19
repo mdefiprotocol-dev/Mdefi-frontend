@@ -20,6 +20,7 @@ import {
   MBTTC_ABI,
 } from '../config/contractConfig';
 import { ethers } from 'ethers';
+
 export type TransactionLifecycleState =
   | 'READY'
   | 'PREPARING'
@@ -94,11 +95,54 @@ export class DemoContractProvider implements IContractProvider {
  * Follows strict safety: Does NOT fake calls or invent ABIs.
  */
 export class RealContractProvider implements IContractProvider {
+  private readonly BSC_TESTNET_CHAIN_ID = 97n;
+
   public isLive(): boolean {
     return true;
   }
 
-    public async read<T = any>(
+  private async ensureBscTestnet(provider: ethers.BrowserProvider): Promise<void> {
+    const network = await provider.getNetwork();
+    if (network.chainId !== this.BSC_TESTNET_CHAIN_ID) {
+      const anyWindow = typeof window !== 'undefined' ? (window as any) : null;
+      if (anyWindow?.ethereum?.request) {
+        try {
+          await anyWindow.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x61' }],
+          });
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            await anyWindow.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: '0x61',
+                  chainName: 'BNB Smart Chain Testnet',
+                  nativeCurrency: {
+                    name: 'tBNB',
+                    symbol: 'tBNB',
+                    decimals: 18,
+                  },
+                  rpcUrls: [
+                    'https://data-seed-prebsc-1-s1.binance.org:8545/',
+                    'https://bsc-testnet.publicnode.com',
+                  ],
+                  blockExplorerUrls: ['https://testnet.bscscan.com'],
+                },
+              ],
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      } else {
+        throw new Error('Please connect to BNB Smart Chain Testnet (Chain ID: 97).');
+      }
+    }
+  }
+
+  public async read<T = any>(
     contractKey: keyof typeof CONTRACT_ADDRESSES,
     methodName: string,
     args?: any[]
@@ -135,6 +179,8 @@ export class RealContractProvider implements IContractProvider {
         (window as any).ethereum
       );
 
+      await this.ensureBscTestnet(provider);
+
       const contract = new ethers.Contract(
         contractAddress,
         abi,
@@ -157,7 +203,8 @@ export class RealContractProvider implements IContractProvider {
       );
     }
   }
-   public async write(
+
+  public async write(
     contractKey: keyof typeof CONTRACT_ADDRESSES,
     methodName: string,
     args?: any[],
@@ -208,6 +255,8 @@ export class RealContractProvider implements IContractProvider {
       const provider = new ethers.BrowserProvider(
         (window as any).ethereum
       );
+
+      await this.ensureBscTestnet(provider);
 
       const signer = await provider.getSigner();
 
@@ -273,7 +322,7 @@ export class RealContractProvider implements IContractProvider {
     }
   }
 
-    public async waitForConfirmation(txHash: string): Promise<boolean> {
+  public async waitForConfirmation(txHash: string): Promise<boolean> {
     if (!txHash || !txHash.startsWith('0x')) {
       return false;
     }
