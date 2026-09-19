@@ -49,7 +49,7 @@ export interface IClaimParams {
 export interface IClaimResult {
   success: boolean;
   txHash: string;
-  claimedAmount: number; // strictly number for UI/mdefiService history
+  claimedAmount: number;
   claimedAmountFormatted?: string;
   rewardType: 'Referral' | 'Package' | 'Registration';
   isRealBlockchainData: boolean;
@@ -199,7 +199,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 1. REGISTRATION FEE & ALPHA THRESHOLD (ON-CHAIN READS)
+  // 1. REGISTRATION FEE & ALPHA THRESHOLD (LIVE DYNAMIC READS)
   // =========================================================================
 
   public async getOnChainRegistrationFeeWei(): Promise<bigint> {
@@ -220,16 +220,16 @@ export class ContractAdapter {
         feeFormatted: `${feeFormatted} BNB`,
         isDynamic: true,
         currency: 'BNB',
-        description: 'Current registration fee configured by the MDeFi Hub contract.',
+        description: 'Dynamic registration fee fetched directly from Hub smart contract.',
         isFromContract: true,
       };
     } catch {
       return {
         feeWei: '0',
-        feeFormatted: 'Fee fetch error',
+        feeFormatted: '0.00 BNB',
         isDynamic: true,
         currency: 'BNB',
-        description: 'Unable to query on-chain fee.',
+        description: 'Registration fee query failed.',
         isFromContract: false,
       };
     }
@@ -380,11 +380,16 @@ export class ContractAdapter {
         return ethers.formatUnits(val.toString(), 18);
       };
 
+      const userFacingId = toHumanFacingId(rawNumericId);
+      const sponsorAddress = dashboard.sponsor || '';
+
       return {
         walletAddress,
-        id: toHumanFacingId(rawNumericId),
+        id: userFacingId,
+        userId: userFacingId,
         numericId: rawNumericId,
-        sponsor: dashboard.sponsor,
+        sponsor: sponsorAddress,
+        sponsorId: sponsorAddress,
         registrationTimestamp: dashboard.registrationTime ? Number(dashboard.registrationTime.toString()) * 1000 : 0,
         directTeamCount: dashboard.directTeamCount ? Number(dashboard.directTeamCount.toString()) : 0,
         totalTeamCount: dashboard.totalTeamCount ? Number(dashboard.totalTeamCount.toString()) : 0,
@@ -441,12 +446,6 @@ export class ContractAdapter {
   // 4. REWARDS CLAIM (HUB: claimReferralReward & claimPackageReward)
   // =========================================================================
 
-  /**
-   * ABI Methods:
-   * - claimReferralReward() payable
-   * - claimPackageReward() payable
-   * Tokens are minted directly into user's wallet via mbttcToken.mintReward()
-   */
   public async executeClaim(params: IClaimParams): Promise<IClaimResult> {
     const { rewardType, walletAddress } = params;
     this.setTxLifecycleState('PREPARING');
@@ -460,12 +459,11 @@ export class ContractAdapter {
         rewardType,
         isRealBlockchainData: true,
         status: 'failed',
-        message: 'Registration rewards are auto-minted at registration in Hub contract.',
+        message: 'Registration rewards are minted automatically at registration by the Hub contract.',
       };
     }
 
     try {
-      // Step A: Calculate exact claimable amount before transaction
       const claimableStr = await this.getClaimableAmount(walletAddress, rewardType);
       const currentClaimableNumber = parseFloat(claimableStr) || 0;
 
@@ -523,7 +521,7 @@ export class ContractAdapter {
         rewardType,
         isRealBlockchainData: true,
         status: 'confirmed',
-        message: `${rewardType} reward claimed! ${currentClaimableNumber.toFixed(4)} MBTTC transferred to your wallet.`,
+        message: `${rewardType} reward claimed successfully on-chain.`,
       };
     } catch (err: any) {
       const isReject = err?.code === 4001 || err?.message?.includes('rejected');
@@ -564,10 +562,6 @@ export class ContractAdapter {
   // 6. MBTTC TOKEN LIVE WALLET BALANCE (mbttcToken.balanceOf)
   // =========================================================================
 
-  /**
-   * Directly reads user's MBTTC token balance from MBTTC contract
-   * ABI Method: balanceOf(address account) view returns (uint256)
-   */
   public async getMbttcWalletBalance(walletAddress: string): Promise<string> {
     if (!walletAddress || !ethers.isAddress(walletAddress)) return '0.00';
 
@@ -616,7 +610,7 @@ export class ContractAdapter {
       const totalEarned = vestingData.totalEarned ? ethers.formatUnits(vestingData.totalEarned.toString(), 18) : '0.00';
       const totalClaimed = vestingData.totalClaimed ? ethers.formatUnits(vestingData.totalClaimed.toString(), 18) : '0.00';
 
-      const FOUR_HOURS_SECONDS = 4 * 60 * 60; // 14400 seconds (Solidity: schedule.lastClaimTimestamp + 4 hours)
+      const FOUR_HOURS_SECONDS = 4 * 60 * 60;
       const nextEligibleTimestamp = lastClaimTimestamp > 0 ? (lastClaimTimestamp + FOUR_HOURS_SECONDS) * 1000 : 0;
       const nowSec = Math.floor(Date.now() / 1000);
       const elapsed = nowSec - lastClaimTimestamp;
@@ -870,7 +864,7 @@ export class ContractAdapter {
       totalLiquidityUsd: 0,
       mbttcReserves: 0,
       usdtReserves: 0,
-      liveRateUsd: 1.5,
+      liveRateUsd: null,
       lastSyncTimestamp: Date.now(),
       source: 'ON_CHAIN',
       isRealBlockchainData: true,
@@ -881,7 +875,7 @@ export class ContractAdapter {
     return {
       routerAddress: '',
       pairAddress: '',
-      mbttcPriceUsd: 1.5,
+      mbttcPriceUsd: 0,
       priceChange24h: 0,
       volume24hUsd: 0,
       liquidityUsd: 0,
@@ -895,10 +889,10 @@ export class ContractAdapter {
       fromToken,
       toToken,
       fromAmount: amount,
-      toAmount: fromToken === 'USDT' ? amount / 1.5 : amount * 1.5,
-      executionPrice: 1.5,
+      toAmount: 0,
+      executionPrice: 0,
       priceImpactPercent: 0,
-      estimatedGasFeeBnb: 0.0005,
+      estimatedGasFeeBnb: 0,
       isRealBlockchainData: true,
     };
   }
@@ -954,7 +948,7 @@ export class ContractAdapter {
       const circulating = BigInt(stats.circulatingSupply?.toString() || '0');
       const burned = BigInt(stats.totalBurnedTokens?.toString() || '0');
 
-      const totalNum = Number(ethers.formatUnits(circulating + burned, 18)) || 2000000;
+      const totalNum = Number(ethers.formatUnits(circulating + burned, 18));
       const mintedNum = Number(ethers.formatUnits(totalMinted, 18));
 
       return {
@@ -980,7 +974,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
-  // 12. ECOSYSTEM STATS (USER-FACING: totalDAORevenue REMOVED)
+  // 12. ECOSYSTEM STATS (HUB: getEcosystemStats)
   // =========================================================================
 
   public async getEcosystemStats(): Promise<IEcosystemStatsData | null> {

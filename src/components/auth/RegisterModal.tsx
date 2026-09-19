@@ -3,20 +3,17 @@ import {
   X, 
   UserPlus, 
   Wallet, 
-  ShieldCheck, 
   UserCheck, 
   ArrowRight, 
   Check, 
-  AlertCircle,
-  FileText,
-  Lock,
-  Sparkles,
-  Loader2
+  AlertCircle, 
+  Lock, 
+  Loader2 
 } from 'lucide-react';
 import { LegalDocType } from './LegalDocsModal';
 import { formatCompactAddress } from '../../utils/formatAddress';
 import { sponsorIdResolver, SponsorIdResolver } from '../../services/sponsorIdResolver';
-import { contractAdapter, IRegistrationFeeInfo } from '../../services/contractAdapter';
+import { contractAdapter } from '../../services/contractAdapter';
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -31,7 +28,7 @@ interface RegisterModalProps {
 export const RegisterModal: React.FC<RegisterModalProps> = ({
   isOpen,
   onClose,
-  connectedWalletAddress = '0x71C839Fa24e93C298B321f8a84620a3b221B389',
+  connectedWalletAddress = '',
   referralSponsorId,
   onSuccess,
   onOpenLegalDoc,
@@ -45,9 +42,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [agreeRisk, setAgreeRisk] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeDisclaimer, setAgreeDisclaimer] = useState(false);
-  
-  // Dynamic Registration Fee State
-  const [feeInfo, setFeeInfo] = useState<IRegistrationFeeInfo | null>(null);
 
   // Submitting / Loading State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,12 +54,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     if (isOpen) {
       setErrorMsg('');
       setIsSubmitting(false);
-      contractAdapter.getRegistrationFee().then(setFeeInfo);
 
       if (referralSponsorId) {
         setHasUpline(true);
         setUplineId(referralSponsorId.trim().toUpperCase());
-      } else if (!hasUpline && (!uplineId || uplineId === 'MDF-00109')) {
+      } else if (!hasUpline && !uplineId) {
         setHasUpline(null);
         setUplineId('');
       }
@@ -74,7 +67,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Shorten address helper
   const shortenAddress = (addr: string) => {
     return formatCompactAddress(addr);
   };
@@ -111,19 +103,20 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Resolve Human-facing ID -> Numeric ID (Single source of truth)
       const rawSponsor = referralSponsorId
         ? referralSponsorId.trim().toUpperCase()
         : (hasUpline ? uplineId.trim().toUpperCase() : SponsorIdResolver.ROOT_ADMIN_HUMAN_ID);
 
-      // Decoupled resolution of Human-facing ID -> Smart Contract Numeric ID
       const resolved = await sponsorIdResolver.resolveSponsorNumericId(rawSponsor);
-      if (!resolved.isValid) {
-        setErrorMsg(resolved.errorMessage || 'Invalid Sponsor ID format.');
+      if (!resolved.isValid || resolved.numericId <= 0) {
+        setErrorMsg(resolved.errorMessage || 'Invalid Sponsor ID. Please verify the ID.');
         setIsSubmitting(false);
         return;
       }
 
-      // Execute through Contract Adapter
+      // Execute on-chain transaction: Hub.register(uint256 _uplineId)
+      // contractAdapter automatically fetches the fresh live fixedRegistrationFeeInBNB from Hub
       const result = await contractAdapter.executeRegistration({
         uplineHumanFacingId: resolved.humanFacingId,
         uplineNumericId: resolved.numericId,
@@ -131,7 +124,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       });
 
       if (!result.success) {
-        setErrorMsg(result.message || 'Registration execution failed.');
+        setErrorMsg(result.message || 'On-chain registration failed.');
         setIsSubmitting(false);
         return;
       }
@@ -164,7 +157,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 Create MDeFi Account
               </h3>
               <span className="text-xs text-zinc-400 font-mono">
-                BNB Smart Chain Web3 Registration
+                BNB Smart Chain Testnet • Master Hub
               </span>
             </div>
           </div>
@@ -174,13 +167,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
             aria-label="Close Modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5">
           
-          {/* Section 1: Connected Web3 Wallet (Auto-populated, Readonly Display) */}
+          {/* Section 1: Connected Web3 Wallet */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-bold text-zinc-300">
@@ -204,7 +197,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 </div>
                 <div>
                   <span className="text-sm font-mono font-bold text-white tracking-wide block">
-                    {shortenAddress(connectedWalletAddress)}
+                    {connectedWalletAddress ? shortenAddress(connectedWalletAddress) : 'No Wallet Detected'}
                   </span>
                   <span className="text-[10px] text-zinc-400 font-mono block">
                     BNB Smart Chain (BEP-20)
@@ -214,7 +207,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold uppercase tracking-wider">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Connected</span>
+                <span>{connectedWalletAddress ? 'Connected' : 'Not Connected'}</span>
               </div>
             </div>
           </div>
@@ -239,7 +232,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 onClick={() => {
                   if (referralSponsorId) return;
                   setHasUpline(true);
-                  if (uplineId === 'MDF-00109') setUplineId('');
+                  setUplineId('');
                 }}
                 className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl text-[11px] sm:text-xs font-mono font-bold border transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-center ${
                   hasUpline === true
@@ -257,7 +250,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 onClick={() => {
                   if (referralSponsorId) return;
                   setHasUpline(false);
-                  setUplineId('MDF-00109');
+                  setUplineId(SponsorIdResolver.ROOT_ADMIN_HUMAN_ID);
                 }}
                 className={`py-2.5 sm:py-3 px-2 sm:px-4 rounded-2xl text-[11px] sm:text-xs font-mono font-bold border transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-center ${
                   hasUpline === false
@@ -269,7 +262,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </button>
             </div>
 
-            {/* If YES: Input Upline ID */}
+            {/* Input Upline ID */}
             {hasUpline === true && (
               <div className="pt-2 animate-in fade-in-50 duration-150 space-y-1">
                 <div className="flex items-center justify-between">
@@ -290,7 +283,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                       }
                     }}
                     readOnly={Boolean(referralSponsorId)}
-                    placeholder="e.g. MDF-08421"
+                    placeholder="e.g. MDF-248161 or numeric ID"
                     className={`w-full px-4 py-2.5 rounded-xl bg-zinc-950 border text-sm font-mono text-white placeholder-zinc-600 outline-none ${
                       referralSponsorId
                         ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 cursor-not-allowed pr-10'
@@ -308,12 +301,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </div>
             )}
 
-            {/* If NO: Admin ID automatic binding notice */}
+            {/* Root Binding Notice */}
             {hasUpline === false && (
               <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs font-mono text-emerald-300 animate-in fade-in-50 duration-150 flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  Automatically assigned to Protocol Admin: <strong>MDF-00109</strong>
+                  Automatically assigned to Protocol Root Upline (ID: 1)
                 </span>
               </div>
             )}
@@ -325,7 +318,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               Required Terms &amp; Compliance Acceptance
             </span>
 
-            {/* Checkbox 1: Risk Management */}
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -349,7 +341,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </span>
             </label>
 
-            {/* Checkbox 2: Privacy Policy */}
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -373,7 +364,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </span>
             </label>
 
-            {/* Checkbox 3: Protocol Disclaimer */}
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -398,19 +388,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             </label>
           </div>
 
-          {/* Dynamic Registration Execution Fee Info */}
-          {feeInfo && (
-            <div className="p-3 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 flex items-center justify-between text-xs font-mono">
-              <span className="text-zinc-400">Protocol Network Fee:</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-emerald-400 font-bold">{feeInfo.feeFormatted}</span>
-                {feeInfo.isDynamic && (
-                  <span className="text-[10px] text-zinc-500 font-mono">(Dynamic)</span>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Error Message */}
           {errorMsg && (
             <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
@@ -419,7 +396,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             </div>
           )}
 
-          {/* Submit Button (Only enabled after all conditions met) */}
+          {/* Register Button */}
           <div className="pt-2 space-y-2">
             <button
               type="submit"
@@ -433,7 +410,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-black" />
-                  <span>CONFIRMING ON BLOCKCHAIN...</span>
+                  <span>EXECUTING CONTRACT REGISTRATION...</span>
                 </>
               ) : (
                 <>

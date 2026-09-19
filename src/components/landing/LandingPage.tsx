@@ -71,18 +71,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   const [showLegalDocs, setShowLegalDocs] = useState(false);
   const [currentDocType, setCurrentDocType] = useState<LegalDocType>('risk');
 
-  // Registered User Context
+  // Real Registered User Context (Zero Mock Data)
   const [registeredUser, setRegisteredUser] = useState<{
     userId: string;
     sponsorId: string;
     walletAddress: string;
   }>({
-    userId: 'MDF-08421',
-    sponsorId: 'MDF-00109',
-    walletAddress: '0x71C839Fa24e93C298B321f8a84620a3b221B389',
+    userId: '',
+    sponsorId: '',
+    walletAddress: '',
   });
 
-  // Referral URL Entry Scenario: If arriving via referral link (?ref=MDF-08421), start existing flow with wallet connection
+  // Referral URL Entry Scenario: If arriving via referral link (?ref=MDF-XXXXX), start flow with wallet connection
   useEffect(() => {
     const refCode = extractReferralCodeFromUrl();
     if (refCode) {
@@ -94,7 +94,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         setShowWalletModal(true);
       }
     }
-  }, []);
+  }, [isWalletConnected, connectedWallet]);
 
   // Smooth scroll helper
   const scrollToSection = (sectionId: string) => {
@@ -174,9 +174,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   const handleDirectLogin = (userIdentifier: string) => {
     setShowLoginModal(false);
     onEnterDashboard({
-      userId: userIdentifier.startsWith('0x') ? 'MDF-08421' : userIdentifier,
-      sponsorId: 'MDF-00109',
-      walletAddress: connectedWallet || (userIdentifier.startsWith('0x') ? userIdentifier : '0x71C839Fa24e93C298B321f8a84620a3b221B389'),
+      userId: userIdentifier,
+      sponsorId: '',
+      walletAddress: connectedWallet || (userIdentifier.startsWith('0x') ? userIdentifier : ''),
     });
   };
 
@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
           onRegisterClick={handleTriggerRegister}
         />
 
-        {/* 5. MBTTC Airdrop Section (4-hour countdown) */}
+        {/* 5. MBTTC Airdrop Section */}
         <MbttcAirdropSection
           onClaimClick={handleTriggerRegister}
         />
@@ -238,16 +238,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         {/* 6. MBTTC Token Utility */}
         <MbttcTokenSection />
 
-        {/* 7. MBTTC Tokenomics (2,000,000 Mint Cap) */}
+        {/* 7. MBTTC Tokenomics */}
         <TokenomicsSection />
 
-        {/* 8. MBTTC Minting Phases (Phase 1, Phase 2, Phase 3) */}
+        {/* 8. MBTTC Minting Phases */}
         <MintingPhasesSection />
 
         {/* 9. Burn / Deflationary Utility */}
         <BurnDeflationSection />
 
-        {/* Why MBTTC? (5 Value Pillars) */}
+        {/* Why MBTTC? */}
         <WhyMbttcSection />
 
         {/* 10. How It Works */}
@@ -255,7 +255,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
           onRegisterClick={handleTriggerRegister}
         />
 
-        {/* 11. Exchange Launch Roadmap (PancakeSwap, Uniswap, Bitget) */}
+        {/* 11. Exchange Launch Roadmap */}
         <ExchangeLaunchSection />
 
         {/* Strategic Roadmap */}
@@ -264,10 +264,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         {/* Frequently Asked Questions */}
         <FaqSection />
 
-        {/* MDeFi Ecosystem Activities (Global Ecosystem Pulse) */}
+        {/* MDeFi Ecosystem Activities */}
         <CommunityRecentActivitySection />
 
-        {/* Public Community Rating (Reflecting Dashboard Submissions) */}
+        {/* Public Community Rating */}
         <CommunityRatingSection 
           variant="public" 
           onActionClick={handleTriggerLogin} 
@@ -300,11 +300,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         onWalletConnected={handleWalletConnected}
       />
 
-      {/* 2. Step 2: Register Modal (Only after wallet connection) */}
+      {/* 2. Step 2: Register Modal */}
       <RegisterModal
         isOpen={showRegisterModal}
         onClose={() => setShowRegisterModal(false)}
-        connectedWalletAddress={connectedWallet || '0x71C839Fa24e93C298B321f8a84620a3b221B389'}
+        connectedWalletAddress={connectedWallet}
         referralSponsorId={referralSponsorId}
         onSuccess={handleRegistrationSuccess}
         onOpenLegalDoc={handleOpenLegalDoc}
@@ -339,11 +339,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         />
       )}
 
-      {/* 6. Step 2 (Alt): Direct Login Modal (Triggered after wallet connect) */}
+      {/* 6. Step 2 (Alt): Direct Login Modal */}
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        connectedWalletAddress={connectedWallet || '0x71C839Fa24e93C298B321f8a84620a3b221B389'}
+        connectedWalletAddress={connectedWallet}
         onLoginSuccess={handleDirectLogin}
         onSwitchToRegister={() => {
           setShowLoginModal(false);
