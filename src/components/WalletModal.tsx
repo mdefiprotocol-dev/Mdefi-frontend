@@ -235,18 +235,21 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         await ensureBscTestnetChain(anyWindow);
 
         resolvedAddress = accounts[0];
-      } else {
+     } else {
         // Trust Wallet, Binance Wallet, WalletConnect and Coinbase Wallet
-        // all open the same WalletConnect multi-wallet selection flow.
-        connectedWalletName = 'WalletConnect';
+        connectedWalletName = wallet.name;
 
         setStatusMessage(
-          'Opening WalletConnect. Select your wallet from the available wallets...'
+          `Opening ${wallet.name}. Please select your active account in the wallet...`
         );
 
+        // Disconnect any stale session and request fresh active account
         resolvedAddress = await connectWalletConnect();
-      }
 
+        if (!resolvedAddress || !resolvedAddress.startsWith('0x')) {
+          throw new Error('No valid BSC Testnet address returned from wallet.');
+        }
+      }
       setConnectedAddress(resolvedAddress);
       setConnectionStatus('connected');
       setStatusMessage(`Connected via ${connectedWalletName} on BSC Testnet`);
