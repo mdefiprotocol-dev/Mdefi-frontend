@@ -86,6 +86,7 @@ function MainApp() {
       return 'landing';
     }
   });
+const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
 
   const [currentPage, setCurrentPage] = useState<NavPage>('overview');
   const [s4PackageFocus, setS4PackageFocus] = useState<'junior' | 'senior'>('junior');
@@ -205,10 +206,16 @@ function MainApp() {
         return { registered: false, node: null };
       }
 
-      const isRegistered = Boolean(node.isRegistered);
-      const hasValidId = Number(node.id) > 0;
+      const numericId = Number(node.id || 0);
 
-      if (isRegistered && hasValidId) {
+      // 1. रूट एडमिन की ऑन-चेन पहचान (कॉन्ट्रैक्ट क्रिएटर / नोड 1)
+      if (numericId === 1) {
+        return { registered: true, node };
+      }
+
+      // 2. आम यूज़र की ऑन-चेन पहचान
+      const isRegistered = Boolean(node.isRegistered);
+      if (isRegistered || numericId > 0) {
         return { registered: true, node };
       }
 
@@ -619,53 +626,86 @@ function MainApp() {
       return;
     }
 
-    showToast('Verifying registration status on blockchain...', 'info');
+    setIsVerifyingOnChain(true);
 
-    let verification = await verifyWalletRegistration(targetAddress);
-    if (!verification.registered && registeredUser?.isNewRegistration) {
-      await new Promise((r) => setTimeout(r, 2000));
-      verification = await verifyWalletRegistration(targetAddress);
+    try {
+      let verification = await verifyWalletRegistration(targetAddress);
+      if (!verification.registered && registeredUser?.isNewRegistration) {
+        await new Promise((r) => setTimeout(r, 2000));
+        verification = await verifyWalletRegistration(targetAddress);
+      }
+
+      if (!verification.registered || !verification.node) {
+        showToast('Please complete registration first to access the dashboard.', 'warning');
+        setIsVerifyingOnChain(false);
+        return; // यूज़र को बाहर नहीं फेकेगा
+      }
+
+      if (verification.node.isBlocked) {
+        showToast('This account is blocked by the contract. Dashboard access restricted.', 'error');
+        setIsVerifyingOnChain(false);
+        persistAppMode('landing');
+        return;
+      }
+
+      await syncLiveOnChainUser(targetAddress, verification.node);
+
+      if (registeredUser?.isNewRegistration) {
+        centralEventSyncService.dispatchAction({
+          actionType: 'REGISTRATION',
+          txHash: registeredUser.txHash || '',
+          walletAddress: targetAddress,
+          userId: toHumanFacingId(verification.node.id),
+          sponsorId: verification.node.upline,
+        });
+
+        const synced = centralEventSyncService.getState().activities;
+        setActivities(synced);
+        try {
+          localStorage.setItem(
+            `mdefi_notifications_${targetAddress.toLowerCase()}`,
+            JSON.stringify(synced)
+          );
+        } catch {}
+      }
+
+      persistAppMode('dashboard');
+      showToast('Registration verified! Welcome to MDeFi Dashboard.', 'success');
+    } catch (err) {
+      console.error('[App] Verification error:', err);
+      showToast('Blockchain verification timeout. Please try again.', 'warning');
+    } finally {
+      setIsVerifyingOnChain(false);
     }
-
-    if (!verification.registered || !verification.node) {
-      showToast('Please complete registration first to access the dashboard.', 'warning');
-      persistAppMode('landing');
-      return;
-    }
-
-    if (verification.node.isBlocked) {
-      showToast('This account is blocked by the contract. Dashboard access restricted.', 'error');
-      persistAppMode('landing');
-      return;
-    }
-
-    await syncLiveOnChainUser(targetAddress, verification.node);
-
-    if (registeredUser?.isNewRegistration) {
-      centralEventSyncService.dispatchAction({
-        actionType: 'REGISTRATION',
-        txHash: registeredUser.txHash || '',
-        walletAddress: targetAddress,
-        userId: toHumanFacingId(verification.node.id),
-        sponsorId: verification.node.upline,
-      });
-
-      const synced = centralEventSyncService.getState().activities;
-      setActivities(synced);
-      try {
-        localStorage.setItem(
-          `mdefi_notifications_${targetAddress.toLowerCase()}`,
-          JSON.stringify(synced)
-        );
-      } catch {}
-    }
-
-    persistAppMode('dashboard');
-    showToast('Registration verified! Welcome to MDeFi Dashboard.', 'success');
   };
-
   if (appMode === 'landing') {
-    return <LandingPage onEnterDashboard={handleEnterDashboardFromLanding} />;
+    return (
+      <>
+        <LandingPage onEnterDashboard={handleEnterDashboardFromLanding} />
+        {isVerifyingOnChain && (
+          <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="relative flex flex-col items-center p-8 rounded-3xl bg-[#09150f] border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.25)] space-y-4 text-center max-w-sm w-full">
+              {/* Spinning Emerald Ring */}
+              <div className="relative w-16 h-16 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-400 border-r-teal-300 animate-spin"></div>
+                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center shadow-inner">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-white tracking-wide">
+                  Verifying On-Chain Status
+                </h4>
+                <p className="text-xs text-emerald-400/80 font-mono">
+                  Syncing with BNB Smart Chain...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   const routeAccess = programPhaseService.canAccessRoute(currentPage);
