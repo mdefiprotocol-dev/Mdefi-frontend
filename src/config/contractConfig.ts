@@ -124,3 +124,20 @@ export function getExplorerTxUrl(txHash?: string): string | null {
   }
   return `${NETWORK_CONFIG.explorerUrl}/tx/${txHash}`;
 }
+export interface ContractRegistryItem {
+  key: string;
+  name: string;
+  address: string;
+  isDeployed: boolean;
+  explorerUrl: string | null;
+}
+
+export function getContractRegistryList(): ContractRegistryItem[] {
+  return Object.entries(CONTRACT_ADDRESSES).map(([key, address]) => ({
+    key,
+    name: key.replace(/([A-Z])/g, ' $1').trim().toUpperCase(),
+    address: address || 'Not Deployed Yet',
+    isDeployed: isContractDeployed(key as keyof typeof CONTRACT_ADDRESSES),
+    explorerUrl: address && address.startsWith('0x') && address.length === 42 ? getExplorerAddressUrl(address) : null,
+  }));
+}
