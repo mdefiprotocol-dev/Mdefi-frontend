@@ -7,7 +7,7 @@ import { CONTRACT_ADDRESSES } from '../config/contractConfig';
 
 export const MBTTC_TOKEN_ADDRESS = CONTRACT_ADDRESSES.mbttcToken;
 export const MDEFI_HUB_ADDRESS = CONTRACT_ADDRESSES.mdefiHub;
-export const USDT_TOKEN_ADDRESS = CONTRACT_ADDRESSES.usdtBsc;
+export const USDT_TOKEN_ADDRESS = '';
 export const BURN_DEAD_ADDRESS = CONTRACT_ADDRESSES.burnDead;
 
 export interface PhaseRewardConfig {

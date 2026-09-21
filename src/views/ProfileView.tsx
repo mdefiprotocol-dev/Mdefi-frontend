@@ -32,7 +32,9 @@ import {
   FileCode,
   CheckCircle,
 } from 'lucide-react';
+import { ethers } from 'ethers';
 import { getContractRegistryList, NETWORK_CONFIG } from '../config/contractConfig';
+import { realContractProvider } from '../services/contractProvider';
 import { UserProfile, RewardBalances, PackageItem } from '../types';
 import { processAvatarImage, AvatarProcessResult } from '../utils/avatarProcessor';
 import { 
@@ -113,6 +115,61 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // Smart Contract Registry State
   const [selectedContractPhase, setSelectedContractPhase] = useState<number | 'all'>('all');
   const [copiedContractKey, setCopiedContractKey] = useState<string | null>(null);
+
+  // ==========================================
+  // REAL ON-CHAIN LIVE DATA STATES
+  // ==========================================
+  const [liveBnbBalance, setLiveBnbBalance] = useState<string>('0.0000');
+  const [liveMbttcVault, setLiveMbttcVault] = useState<number>(0);
+  const [liveDirectPartners, setLiveDirectPartners] = useState<number>(safeUser.directTeamCount ?? 0);
+
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const fetchLiveOnChainTelemetry = async () => {
+      if (!safeUser.walletAddress || !safeUser.walletAddress.startsWith('0x')) return;
+
+      try {
+        const rpcUrl = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+        const rpc = new ethers.JsonRpcProvider(rpcUrl);
+
+        // 1. Live Wallet BNB Balance
+        const rawBnbWei = await rpc.getBalance(safeUser.walletAddress);
+        const formattedBnb = ethers.formatEther(rawBnbWei);
+        if (isSubscribed) {
+          setLiveBnbBalance(parseFloat(formattedBnb).toFixed(4));
+        }
+
+        // 2. Live Hub Node Data (Referral Vault + Package Vault + Direct Partners)
+        try {
+          const userNode = await realContractProvider.read('mdefiHub', 'getUserNode', [safeUser.walletAddress]);
+          if (userNode && isSubscribed) {
+            // Index 5 = referralVault, Index 6 = packageVault
+            const refVault = userNode[5] ? Number(ethers.formatUnits(userNode[5], 18)) : 0;
+            const pkgVault = userNode[6] ? Number(ethers.formatUnits(userNode[6], 18)) : 0;
+            setLiveMbttcVault(refVault + pkgVault);
+
+            // Index 8 = directReferralCount
+            if (userNode[8] !== undefined) {
+              setLiveDirectPartners(Number(userNode[8]));
+            }
+          }
+        } catch (nodeErr) {
+          // Fallback to rewards prop if contract read fails during transition
+          if (rewards?.mbttcBalance !== undefined && isSubscribed) {
+            setLiveMbttcVault(rewards.mbttcBalance);
+          }
+        }
+      } catch (err) {
+        console.warn('[ProfileView] Live on-chain telemetry fetch error:', err);
+      }
+    };
+
+    fetchLiveOnChainTelemetry();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [safeUser.walletAddress, rewards]);
 
   const contractRegistryItems = (typeof getContractRegistryList === 'function' ? getContractRegistryList() : []) || [];
   const filteredContracts = selectedContractPhase === 'all' 
@@ -294,18 +351,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
   };
 
-  // Real Calculated Stats (No Fake 100$, No Fake 2 Packages)
+  // Real Active Packages count
   const activePackages = Array.isArray(packages) ? packages.filter(p => p?.status === 'Active') : [];
   const activePackageCount = activePackages.length;
-  const totalPackageValue = activePackages.reduce((acc, p) => acc + (p?.priceUSD || 0), 0);
-  
-  // Real Matrix Data (No Fake 40 Positions, No Fake 3 Recycles)
-  const totalMatrixPositions = (safeUser as any)?.totalMatrixPositions ?? 0;
-  const totalRecycles = (safeUser as any)?.totalRecycles ?? 0;
-
-  // Real MBTTC and BNB (No Fake 12,540 Token, No Fake 0.4850 BNB)
-  const mbttcBalance = rewards?.mbttcBalance ?? 0;
-  const bnbBalance = (safeUser as any)?.bnbBalance ?? '0.0000';
 
   const shortenedWallet = safeUser.walletAddress 
     ? formatCompactAddress(safeUser.walletAddress)
@@ -603,7 +651,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </section>
 
-      {/* SECTION 2: WALLET & ACCOUNT */}
+      {/* SECTION 2: WALLET & ACCOUNT (Targeted Fix: Only 3 Essential Real-Data Cards) */}
       <section className="p-6 sm:p-8 rounded-3xl bg-zinc-900/60 border border-emerald-500/20 backdrop-blur-xl space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-800/80">
           <div className="flex items-center gap-2.5">
@@ -612,7 +660,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-white tracking-tight">{t('wallet_and_account', 'Wallet & Account')}</h3>
-              <p className="text-xs text-zinc-400">{t('wallet_account_desc', 'Active balances, packages, and matrix position telemetry')}</p>
+              <p className="text-xs text-zinc-400">{t('wallet_account_desc', 'Live balances and package node telemetry')}</p>
             </div>
           </div>
 
@@ -656,48 +704,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
 
-        {/* 6 Account Metric Cards (Zero Demo Values) */}
+        {/* 3 Real-Data Metric Cards (Bugs 1-5 fixed: Clean, No Demo numbers, Deleted 3 obsolete cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* BNB Balance */}
+          {/* Card 1: Live Real BNB Balance */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
             <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
               {t('profile_bnb_balance', 'BNB Balance')}
             </span>
             <div className="text-xl font-extrabold text-white font-mono">
-              {bnbBalance} <span className="text-xs text-amber-400 font-semibold">BNB</span>
+              {liveBnbBalance} <span className="text-xs text-amber-400 font-semibold">BNB</span>
             </div>
             <span className="text-[11px] text-zinc-500 font-mono">
-              {t('profile_gas_reserve', 'Gas Reserve')}
+              {t('profile_gas_reserve', 'Live Wallet Gas Reserve')}
             </span>
           </div>
 
-          {/* MBTTC Balance */}
+          {/* Card 2: Live MBTTC Visiting Vault (Referral + Package Vault from Hub contract) */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-emerald-500/25 space-y-1">
             <span className="text-[10px] text-emerald-400 uppercase font-mono tracking-wider font-semibold block">
-              {t('profile_mbttc_balance', 'MBTTC Balance')}
+              {t('profile_mbttc_balance', 'MBTTC Vault Holding')}
             </span>
             <div className="text-xl font-extrabold text-white font-mono">
-              {Number(mbttcBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-xs text-emerald-400 font-bold">MBTTC</span>
+              {Number(liveMbttcVault).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs text-emerald-400 font-bold">MBTTC</span>
             </div>
             <span className="text-[11px] text-zinc-400 font-mono">
-              {t('profile_token_vault', 'Live Token Vault Holding')}
+              Referral + Package Visiting Vault
             </span>
           </div>
 
-          {/* Total Package Value */}
-          <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
-            <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
-              {t('profile_total_package_value', 'Total Package Value')}
-            </span>
-            <div className="text-xl font-extrabold text-white font-mono">
-              ${Number(totalPackageValue).toFixed(2)} <span className="text-xs text-zinc-400">USD</span>
-            </div>
-            <span className="text-[11px] text-zinc-500 font-mono">
-              {t('profile_cumulative_commitments', 'Cumulative Contract Commitments')}
-            </span>
-          </div>
-
-          {/* Active Packages */}
+          {/* Card 3: Active Packages */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
             <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
               {t('profile_active_packages', 'Active Packages')}
@@ -707,32 +742,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
             <span className="text-[11px] text-zinc-500 font-mono">
               {t('profile_core_quantum_nodes', 'Core & Quantum Matrix Nodes')}
-            </span>
-          </div>
-
-          {/* Total Matrix Positions */}
-          <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
-            <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
-              {t('profile_matrix_positions', 'Total Matrix Positions')}
-            </span>
-            <div className="text-xl font-extrabold text-white font-mono">
-              {totalMatrixPositions} <span className="text-xs text-teal-400 font-semibold">Positions</span>
-            </div>
-            <span className="text-[11px] text-zinc-500 font-mono">
-              {t('profile_matrix_types', 'Quantum, Prime, S4 Junior & Senior')}
-            </span>
-          </div>
-
-          {/* Total Recycles */}
-          <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
-            <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
-              {t('profile_auto_recycles', 'Total Auto-Recycles')}
-            </span>
-            <div className="text-xl font-extrabold text-rose-400 font-mono">
-              {totalRecycles} <span className="text-xs text-zinc-300 font-normal">{t('completed', 'Completed')}</span>
-            </div>
-            <span className="text-[11px] text-zinc-500 font-mono">
-              {t('profile_reentry_completions', 'Re-entry Matrix Completions')}
             </span>
           </div>
         </div>
@@ -797,7 +806,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
           </div>
 
-          {/* My Referral Link Card (Full Width) */}
+          {/* My Referral Link Card (Full Width) with Bug 6 fix: liveDirectPartners */}
           <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-emerald-500/30 md:col-span-2 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] uppercase font-mono text-emerald-400 font-bold tracking-wider flex items-center gap-1.5">
@@ -805,7 +814,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {t('profile_frontline_link', 'My Frontline Referral Link')}
               </span>
               <span className="text-[10px] font-mono text-zinc-400">
-                {t('profile_direct_partners', 'Direct Partners:')} <strong className="text-emerald-300">{safeUser.directTeamCount ?? 0}</strong>
+                {t('profile_direct_partners', 'Direct Partners:')} <strong className="text-emerald-300 font-mono text-xs">{liveDirectPartners}</strong>
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
