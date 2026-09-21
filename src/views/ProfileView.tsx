@@ -84,7 +84,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     referralLink: user?.referralLink || '',
     referralCode: user?.referralCode || user?.userId || '',
     directTeamCount: user?.directTeamCount ?? 0,
-  }
+  };
 
   // Copy state feedback
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -310,7 +310,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const shortenedWallet = safeUser.walletAddress 
     ? formatCompactAddress(safeUser.walletAddress)
     : '0x0000...0000';
-  // Sponsor address detect (agar sponsorId me 0x wallet address aa gaya ho to use address maane)
+
+  // Sponsor address detect
   const actualSponsorAddress = (safeUser.sponsorAddress && safeUser.sponsorAddress.startsWith('0x'))
     ? safeUser.sponsorAddress
     : (safeUser.sponsorId && safeUser.sponsorId.startsWith('0x'))
@@ -321,18 +322,39 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     ? formatCompactAddress(actualSponsorAddress)
     : 'None';
 
- const uplineNum = (safeUser as any)?.sponsorNodeId ?? (safeUser as any)?.uplineId ?? (safeUser as any)?.referrerId;
+  const uplineNum = (safeUser as any)?.sponsorNodeId ?? (safeUser as any)?.uplineId ?? (safeUser as any)?.referrerId;
 
-  const displaySponsorId = (safeUser.sponsorId && !safeUser.sponsorId.startsWith('0x') && safeUser.sponsorId !== 'None (Direct Root)')
-    ? (safeUser.sponsorId.startsWith('MDF-') ? safeUser.sponsorId : `MDF-${safeUser.sponsorId}`)
-    : (uplineNum !== undefined && uplineNum !== null && uplineNum !== '' && uplineNum !== 0)
-      ? `MDF-${uplineNum}`
-      : actualSponsorAddress
-        ? `MDF-${formatCompactAddress(actualSponsorAddress)}`
-        : 'None';
+  // Series alignment to MDF-248161 sequence
+  const displaySponsorId = (() => {
+    if (
+      safeUser.sponsorId &&
+      !safeUser.sponsorId.startsWith('0x') &&
+      safeUser.sponsorId !== 'None' &&
+      safeUser.sponsorId !== 'None (Direct Root)'
+    ) {
+      if (safeUser.sponsorId.startsWith('MDF-')) {
+        return safeUser.sponsorId;
+      }
+      const parsed = Number(safeUser.sponsorId);
+      if (!isNaN(parsed) && parsed > 0) {
+        return `MDF-${parsed < 1000 ? 248160 + parsed : parsed}`;
+      }
+      return `MDF-${safeUser.sponsorId}`;
+    }
+
+    if (uplineNum !== undefined && uplineNum !== null && uplineNum !== '' && uplineNum !== 0) {
+      const num = Number(uplineNum);
+      return !isNaN(num) ? `MDF-${num < 1000 ? 248160 + num : num}` : `MDF-${uplineNum}`;
+    }
+
+    if (actualSponsorAddress) {
+      return 'MDF-248161';
+    }
+
+    return 'None';
+  })();
 
   const referralLinkUrl = safeUser.referralLink || (safeUser.userId && safeUser.userId !== 'MDF-00000' ? `https://mdefipro.xyz/join?ref=${safeUser.userId}` : 'Complete Registration First');
-  const sponsorId = safeUser.sponsorId || 'None (Direct Root)';
   const userInitials = safeUser.userId && safeUser.userId.length >= 2 ? safeUser.userId.slice(-2) : '00';
 
   return (
@@ -367,7 +389,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* SECTION 1: PROFILE HEADER */}
       <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-zinc-900/90 via-zinc-950 to-[#09120c] border border-emerald-500/30 backdrop-blur-xl relative overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.08)]">
-        {/* Subtle decorative glow */}
         <div className="absolute -top-16 -right-16 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-zinc-800/80 relative z-10">
@@ -388,7 +409,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 )}
               </div>
 
-              {/* Upload trigger overlay icon */}
               <button
                 type="button"
                 onClick={handleSelectAvatarFile}
@@ -402,7 +422,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* Display Name & Identifiers */}
             <div className="space-y-1.5">
-              {/* Display Name Row */}
               <div className="flex flex-wrap items-center gap-2">
                 {isEditingName ? (
                   <div className="flex items-center gap-2">
@@ -492,7 +511,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-        {/* Inline Avatar Preview Confirmation Modal */}
         {avatarPreview && (
           <div className="mt-5 p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 animate-in fade-in zoom-in-95">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -598,7 +616,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
 
-          {/* Change / Reconnect Wallet button */}
           <button
             type="button"
             onClick={onOpenWalletModal}
@@ -733,29 +750,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* My Sponsor ID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 1. Sponsor ID Card */}
           <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between">
             <div>
               <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
-                {t('profile_sponsor_id', 'My Sponsor ID')}
+                {t('profile_sponsor_id', 'Sponsor ID')}
               </span>
-              <div className="font-mono text-sm font-bold text-white mt-0.5">
+              <div className="font-mono text-sm font-bold text-emerald-300 mt-0.5">
                 {displaySponsorId}
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-300 text-xs font-mono border border-zinc-800">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-950/80 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/30">
               {t('profile_verified_upline', 'Verified Upline')}
             </span>
           </div>
 
-          {/* Sponsor Wallet Address */}
-          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between gap-2">
+          {/* 2. Sponsor Wallet Address Card with Glowing Premium Copy Button */}
+          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between gap-3">
             <div className="truncate">
               <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
                 {t('profile_sponsor_wallet', 'Sponsor Wallet Address')}
               </span>
-              <div className="font-mono text-xs sm:text-sm font-semibold text-zinc-300 truncate mt-0.5">
+              <div className="font-mono text-xs sm:text-sm font-semibold text-zinc-200 truncate mt-0.5">
                 {shortenedSponsor}
               </div>
             </div>
@@ -763,36 +780,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleCopy(actualSponsorAddress, 'sponsor-address', 'Sponsor address copied!')}
-                className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                className="py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/35 hover:to-teal-500/35 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 text-xs font-mono font-semibold transition-all duration-200 flex items-center gap-1.5 shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.15)] active:scale-95 cursor-pointer"
               >
                 {copiedField === 'sponsor-address' ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
                     <span className="text-emerald-400">{t('copied', 'Copied')}</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5" />
+                    <Copy className="w-3.5 h-3.5 text-emerald-400" />
                     <span>{t('copy', 'Copy')}</span>
                   </>
                 )}
               </button>
             )}
           </div>
-          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
-                {t('profile_sponsor_id', 'My Sponsor ID')}
-              </span>
-              <div className="font-mono text-sm font-bold text-white mt-0.5">
-                {sponsorId}
-              </div>
-            </div>
-            <span className="px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-300 text-xs font-mono border border-zinc-800">
-              {t('profile_verified_upline', 'Verified Upline')}
-            </span>
-          </div>
-
 
           {/* My Referral Link Card (Full Width) */}
           <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-emerald-500/30 md:col-span-2 space-y-2">
@@ -1000,7 +1003,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     {hasAddress ? (
                       <>
                         <code className="text-[11px] font-mono text-emerald-400 bg-zinc-900/80 px-2 py-1 rounded border border-zinc-800 truncate">
-                          {formatCompactAddress(item.address)}
+                          {formatCompactAddress(item.address || '')}
                         </code>
                         <button
                           type="button"
