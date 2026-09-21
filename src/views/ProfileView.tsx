@@ -321,12 +321,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     ? formatCompactAddress(actualSponsorAddress)
     : 'None';
 
-  // Sponsor ID format: agar 0x address na ho to wahi rahe, warna MDF format ya upline ID
+ const uplineNum = (safeUser as any)?.sponsorNodeId ?? (safeUser as any)?.uplineId ?? (safeUser as any)?.referrerId;
+
   const displaySponsorId = (safeUser.sponsorId && !safeUser.sponsorId.startsWith('0x') && safeUser.sponsorId !== 'None (Direct Root)')
-    ? safeUser.sponsorId
-    : actualSponsorAddress
-      ? 'MDF-00001'
-      : 'None';
+    ? (safeUser.sponsorId.startsWith('MDF-') ? safeUser.sponsorId : `MDF-${safeUser.sponsorId}`)
+    : (uplineNum !== undefined && uplineNum !== null && uplineNum !== '' && uplineNum !== 0)
+      ? `MDF-${uplineNum}`
+      : actualSponsorAddress
+        ? `MDF-${formatCompactAddress(actualSponsorAddress)}`
+        : 'None';
+
   const referralLinkUrl = safeUser.referralLink || (safeUser.userId && safeUser.userId !== 'MDF-00000' ? `https://mdefipro.xyz/join?ref=${safeUser.userId}` : 'Complete Registration First');
   const sponsorId = safeUser.sponsorId || 'None (Direct Root)';
   const userInitials = safeUser.userId && safeUser.userId.length >= 2 ? safeUser.userId.slice(-2) : '00';
@@ -789,35 +793,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </span>
           </div>
 
-          {/* Sponsor Wallet Address */}
-          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between gap-2">
-            <div className="truncate">
-              <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
-                {t('profile_sponsor_wallet', 'Sponsor Wallet Address')}
-              </span>
-              <div className="font-mono text-xs sm:text-sm font-semibold text-zinc-300 truncate mt-0.5">
-                {shortenedSponsor}
-              </div>
-            </div>
-            {safeUser.sponsorAddress && (
-              <button
-                onClick={() => handleCopy(safeUser.sponsorAddress|| '' , 'sponsor-address', 'Sponsor address copied!')}
-                className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                {copiedField === 'sponsor-address' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">{t('copied', 'Copied')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>{t('copy', 'Copy')}</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
 
           {/* My Referral Link Card (Full Width) */}
           <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950/90 border border-emerald-500/30 md:col-span-2 space-y-2">
