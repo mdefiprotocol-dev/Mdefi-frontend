@@ -70,12 +70,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenWalletModal,
   onShowToast
 }) => {
+  // Safe Fallback User Object (Zero Fake Demo Data, Pure Real/0 fallbacks)
+  const safeUser: UserProfile = {
+    ...(user || {}),
+    userId: user?.userId || 'MDF-00000',
+    displayName: user?.displayName || 'MDeFi:Commander',
+    walletAddress: user?.walletAddress || '',
+    sponsorAddress: user?.sponsorAddress || '',
+    sponsorId: user?.sponsorId || '',
+    memberSince: user?.memberSince || 'Just now',
+    registrationStatus: user?.registrationStatus || 'Active',
+    avatarUrl: user?.avatarUrl || '',
+    referralLink: user?.referralLink || '',
+    referralCode: user?.referralCode || user?.userId || '',
+    directTeamCount: user?.directTeamCount ?? 0,
+  }
+
   // Copy state feedback
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Display Name editing
   const [isEditingName, setIsEditingName] = useState(false);
-  const [displayNameInput, setDisplayNameInput] = useState(user.displayName || 'CryptoCommander');
+  const [displayNameInput, setDisplayNameInput] = useState(safeUser.displayName || 'CryptoCommander');
   const [nameError, setNameError] = useState<string | null>(null);
 
   // Avatar upload & preview
@@ -85,7 +101,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isProcessingAvatar, setIsProcessingAvatar] = useState(false);
 
   // Preferences state
-  const { language, setLanguage, languages, t } = useLanguage();
+  const { language, setLanguage, languages = [], t } = useLanguage();
   const [soundEnabled, setSoundEnabledState] = useState(() => isSoundEffectsEnabled());
   const [animationsEnabled, setAnimationsEnabledState] = useState(() => isAnimationsEnabled());
   const [txNotifications, setTxNotifications] = useState(true);
@@ -98,10 +114,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [selectedContractPhase, setSelectedContractPhase] = useState<number | 'all'>('all');
   const [copiedContractKey, setCopiedContractKey] = useState<string | null>(null);
 
-  const contractRegistryItems = getContractRegistryList();
+  const contractRegistryItems = (typeof getContractRegistryList === 'function' ? getContractRegistryList() : []) || [];
   const filteredContracts = selectedContractPhase === 'all' 
     ? contractRegistryItems 
-    : contractRegistryItems.filter((c) => c.phase === selectedContractPhase);
+    : contractRegistryItems.filter((c: any) => c.phase === selectedContractPhase);
 
   const handleCopyContract = async (key: string, address: string) => {
     if (!address) return;
@@ -123,7 +139,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setIsDownloadingApk(true);
     setApkDownloadSuccess(false);
 
-    // Provide user confirmation and trigger download of the configured APK build
     setTimeout(() => {
       setIsDownloadingApk(false);
       setApkDownloadSuccess(true);
@@ -156,13 +171,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   // Sync display name if user prop changes
   useEffect(() => {
-    if (user.displayName) {
-      setDisplayNameInput(user.displayName);
+    if (safeUser.displayName) {
+      setDisplayNameInput(safeUser.displayName);
     }
-  }, [user.displayName]);
+  }, [safeUser.displayName]);
 
   // Copy helper
   const handleCopy = async (text: string, field: string, successMessage = 'Copied to clipboard!') => {
+    if (!text) return;
     const ok = await copyFullAddress(text);
     if (ok) {
       setCopiedField(field);
@@ -188,7 +204,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setNameError('Display name must be under 32 characters.');
       return;
     }
-    // Sanitize basic tags
     const sanitized = trimmed.replace(/[<>]/g, '');
 
     setNameError(null);
@@ -212,9 +227,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input value so the same file can be selected again if needed
     e.target.value = '';
-
     setIsProcessingAvatar(true);
     setAvatarError(null);
 
@@ -281,28 +294,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
   };
 
-  // Calculated stats from active packages and matrices
-  const activePackages = packages.filter(p => p.status === 'Active');
-  const activePackageCount = activePackages.length > 0 ? activePackages.length : 2;
-  const totalPackageValue = activePackages.length > 0 
-    ? activePackages.reduce((acc, p) => acc + (p.priceUSD || 0), 0)
-    : 100; // Core ($30) + Quantum ($70)
+  // Real Calculated Stats (No Fake 100$, No Fake 2 Packages)
+  const activePackages = Array.isArray(packages) ? packages.filter(p => p?.status === 'Active') : [];
+  const activePackageCount = activePackages.length;
+  const totalPackageValue = activePackages.reduce((acc, p) => acc + (p?.priceUSD || 0), 0);
   
-  // Matrix data
-  const totalMatrixPositions = 40; // 23 Quantum + 10 Prime + 5 Junior + 2 Senior
-  const totalRecycles = 3; // 1 Quantum + 2 Junior
+  // Real Matrix Data (No Fake 40 Positions, No Fake 3 Recycles)
+  const totalMatrixPositions = (safeUser as any)?.totalMatrixPositions ?? 0;
+  const totalRecycles = (safeUser as any)?.totalRecycles ?? 0;
 
-  const mbttcBalance = rewards?.mbttcBalance ?? 12540;
-  const bnbBalance = '0.4850';
-  const shortenedWallet = user.walletAddress 
-    ? formatCompactAddress(user.walletAddress)
-    : '0x71C8...4982';
-  const shortenedSponsor = user.sponsorAddress
-    ? formatCompactAddress(user.sponsorAddress)
-    : '0xABCD...1234';
+  // Real MBTTC and BNB (No Fake 12,540 Token, No Fake 0.4850 BNB)
+  const mbttcBalance = rewards?.mbttcBalance ?? 0;
+  const bnbBalance = (safeUser as any)?.bnbBalance ?? '0.0000';
 
-  const referralLinkUrl = user.referralLink || `https://mdefi.io/join?ref=${user.referralCode || user.userId}`;
-  const sponsorId = user.sponsorId || 'MDF-00109';
+  const shortenedWallet = safeUser.walletAddress 
+    ? formatCompactAddress(safeUser.walletAddress)
+    : '0x0000...0000';
+  const shortenedSponsor = safeUser.sponsorAddress
+    ? formatCompactAddress(safeUser.sponsorAddress)
+    : 'None (Direct)';
+
+  const referralLinkUrl = safeUser.referralLink || (safeUser.userId && safeUser.userId !== 'MDF-00000' ? `https://mdefipro.xyz/join?ref=${safeUser.userId}` : 'Complete Registration First');
+  const sponsorId = safeUser.sponsorId || 'None (Direct Root)';
+  const userInitials = safeUser.userId && safeUser.userId.length >= 2 ? safeUser.userId.slice(-2) : '00';
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 pb-28 lg:pb-12 max-w-5xl mx-auto">
@@ -344,15 +358,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             {/* Circular Premium Avatar */}
             <div className="relative group">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 bg-gradient-to-tr from-emerald-500/40 via-teal-400/20 to-emerald-500/60 border border-emerald-500/40 shadow-[0_0_25px_rgba(16,185,129,0.25)] flex items-center justify-center overflow-hidden">
-                {user.avatarUrl ? (
+                {safeUser.avatarUrl ? (
                   <img 
-                    src={user.avatarUrl} 
-                    alt={user.displayName || user.userId} 
+                    src={safeUser.avatarUrl} 
+                    alt={safeUser.displayName || safeUser.userId} 
                     className="w-full h-full object-cover rounded-full"
                   />
                 ) : (
                   <div className="w-full h-full rounded-full bg-gradient-to-br from-emerald-950 via-zinc-900 to-zinc-950 flex items-center justify-center text-emerald-300 font-mono font-extrabold text-2xl select-none">
-                    {user.userId.slice(-2)}
+                    {userInitials}
                   </div>
                 )}
               </div>
@@ -362,7 +376,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 type="button"
                 onClick={handleSelectAvatarFile}
                 disabled={isProcessingAvatar}
-                className="absolute bottom-0 right-0 p-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg transition-transform transform active:scale-95 border-2 border-zinc-950"
+                className="absolute bottom-0 right-0 p-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg transition-transform transform active:scale-95 border-2 border-zinc-950 cursor-pointer"
                 title="Change Avatar (Auto-compressed)"
               >
                 <Camera className="w-3.5 h-3.5" />
@@ -385,17 +399,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     />
                     <button
                       onClick={handleSaveDisplayName}
-                      className="py-1.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all"
+                      className="py-1.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-all cursor-pointer"
                     >
                       {t('save', 'Save')}
                     </button>
                     <button
                       onClick={() => {
                         setIsEditingName(false);
-                        setDisplayNameInput(user.displayName || 'CryptoCommander');
+                        setDisplayNameInput(safeUser.displayName || 'CryptoCommander');
                         setNameError(null);
                       }}
-                      className="py-1.5 px-3 rounded-xl bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold"
+                      className="py-1.5 px-3 rounded-xl bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold cursor-pointer"
                     >
                       {t('cancel', 'Cancel')}
                     </button>
@@ -403,11 +417,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 ) : (
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                      {user.displayName || 'CryptoCommander'}
+                      {safeUser.displayName || 'CryptoCommander'}
                     </h2>
                     <button
                       onClick={() => setIsEditingName(true)}
-                      className="px-2 py-0.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono transition-colors"
+                      className="px-2 py-0.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
                       title="Edit Display Name"
                     >
                       {t('edit', 'Edit')}
@@ -416,7 +430,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 )}
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/30 text-emerald-400 text-[11px] font-mono font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {user.registrationStatus || t('status_active', 'Active')}
+                  {safeUser.registrationStatus || t('status_active', 'Active')}
                 </span>
               </div>
 
@@ -428,11 +442,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400 font-mono">
                 <div className="flex items-center gap-1.5">
                   <span className="text-zinc-500">{t('profile_user_id', 'MDefi ID')}:</span>
-                  <span className="text-emerald-300 font-bold">{user.userId}</span>
+                  <span className="text-emerald-300 font-bold">{safeUser.userId}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>{t('overview_member_since', 'Member Since:')} {user.memberSince}</span>
+                  <span>{t('overview_member_since', 'Member Since:')} {safeUser.memberSince}</span>
                 </div>
               </div>
             </div>
@@ -443,15 +457,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <button
               onClick={handleSelectAvatarFile}
               disabled={isProcessingAvatar}
-              className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-emerald-500/30 text-xs font-semibold text-zinc-200 transition-all flex items-center gap-2"
+              className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-emerald-500/30 text-xs font-semibold text-zinc-200 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{user.avatarUrl ? t('replace_photo', 'Replace Photo') : t('upload_avatar', 'Upload Avatar')}</span>
+              <span>{safeUser.avatarUrl ? t('replace_photo', 'Replace Photo') : t('upload_avatar', 'Upload Avatar')}</span>
             </button>
-            {user.avatarUrl && (
+            {safeUser.avatarUrl && (
               <button
                 onClick={handleRemoveAvatar}
-                className="py-2 px-3 rounded-xl bg-zinc-900 hover:bg-rose-950/40 border border-zinc-800 hover:border-rose-500/30 text-xs font-semibold text-zinc-400 hover:text-rose-300 transition-all flex items-center gap-1.5"
+                className="py-2 px-3 rounded-xl bg-zinc-900 hover:bg-rose-950/40 border border-zinc-800 hover:border-rose-500/30 text-xs font-semibold text-zinc-400 hover:text-rose-300 transition-all flex items-center gap-1.5 cursor-pointer"
                 title="Remove Custom Avatar and Revert to Default"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -461,7 +475,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-        {/* Inline Avatar Preview Confirmation Modal/Drawer if image was selected */}
+        {/* Inline Avatar Preview Confirmation Modal */}
         {avatarPreview && (
           <div className="mt-5 p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 animate-in fade-in zoom-in-95">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -481,13 +495,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleSaveAvatar}
-                  className="py-2 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                  className="py-2 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
                 >
                   Save Avatar
                 </button>
                 <button
                   onClick={handleCancelAvatarPreview}
-                  className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-semibold hover:text-white"
+                  className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-semibold hover:text-white cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -496,14 +510,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         )}
 
-        {/* Error Notification if Upload/Processing fails */}
         {avatarError && (
           <div className="mt-4 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{avatarError}</span>
             </div>
-            <button onClick={() => setAvatarError(null)} className="text-rose-400 hover:text-rose-200">
+            <button onClick={() => setAvatarError(null)} className="text-rose-400 hover:text-rose-200 cursor-pointer">
               Dismiss
             </button>
           </div>
@@ -521,8 +534,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </span>
             </div>
             <button
-              onClick={() => handleCopy(user.walletAddress, 'wallet-header', 'Wallet address copied!')}
-              className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0"
+              onClick={() => handleCopy(safeUser.walletAddress, 'wallet-header', 'Wallet address copied!')}
+              className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
               {copiedField === 'wallet-header' ? (
                 <>
@@ -572,7 +585,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <button
             type="button"
             onClick={onOpenWalletModal}
-            className="py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/10 hover:from-emerald-500/30 hover:to-teal-500/20 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition-all flex items-center gap-2 self-start sm:self-auto"
+            className="py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/10 hover:from-emerald-500/30 hover:to-teal-500/20 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>{t('reconnect_wallet', 'Change / Reconnect Wallet')}</span>
@@ -586,28 +599,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {t('active_connected_wallet', 'Active Connected Wallet')}
             </span>
             <div className="font-mono text-xs sm:text-sm text-white font-semibold truncate mt-0.5">
-              {user.walletAddress}
+              {safeUser.walletAddress || 'No Wallet Connected'}
             </div>
           </div>
-          <button
-            onClick={() => handleCopy(user.walletAddress, 'wallet-full', 'Full wallet address copied!')}
-            className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-mono transition-colors flex items-center gap-2 shrink-0 self-start sm:self-auto"
-          >
-            {copiedField === 'wallet-full' ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">{t('copied', 'Copied')}</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                <span>{t('copy_address', 'Copy Address')}</span>
-              </>
-            )}
-          </button>
+          {safeUser.walletAddress && (
+            <button
+              onClick={() => handleCopy(safeUser.walletAddress, 'wallet-full', 'Full wallet address copied!')}
+              className="py-2 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-mono transition-colors flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
+            >
+              {copiedField === 'wallet-full' ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">{t('copied', 'Copied')}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{t('copy_address', 'Copy Address')}</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
-        {/* 6 Account Metric Cards */}
+        {/* 6 Account Metric Cards (Zero Demo Values) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* BNB Balance */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
@@ -618,7 +633,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {bnbBalance} <span className="text-xs text-amber-400 font-semibold">BNB</span>
             </div>
             <span className="text-[11px] text-zinc-500 font-mono">
-              {t('profile_gas_reserve', 'Gas Reserve (~$285.00 USD)')}
+              {t('profile_gas_reserve', 'Gas Reserve')}
             </span>
           </div>
 
@@ -628,7 +643,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {t('profile_mbttc_balance', 'MBTTC Balance')}
             </span>
             <div className="text-xl font-extrabold text-white font-mono">
-              {mbttcBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-xs text-emerald-400 font-bold">MBTTC</span>
+              {Number(mbttcBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-xs text-emerald-400 font-bold">MBTTC</span>
             </div>
             <span className="text-[11px] text-zinc-400 font-mono">
               {t('profile_token_vault', 'Live Token Vault Holding')}
@@ -641,7 +656,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {t('profile_total_package_value', 'Total Package Value')}
             </span>
             <div className="text-xl font-extrabold text-white font-mono">
-              ${totalPackageValue.toFixed(2)} <span className="text-xs text-zinc-400">USD</span>
+              ${Number(totalPackageValue).toFixed(2)} <span className="text-xs text-zinc-400">USD</span>
             </div>
             <span className="text-[11px] text-zinc-500 font-mono">
               {t('profile_cumulative_commitments', 'Cumulative Contract Commitments')}
@@ -727,22 +742,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {shortenedSponsor}
               </div>
             </div>
-            <button
-              onClick={() => handleCopy(user.sponsorAddress, 'sponsor-address', 'Sponsor address copied!')}
-              className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0"
-            >
-              {copiedField === 'sponsor-address' ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">{t('copied', 'Copied')}</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{t('copy', 'Copy')}</span>
-                </>
-              )}
-            </button>
+            {safeUser.sponsorAddress && (
+              <button
+                onClick={() => handleCopy(safeUser.sponsorAddress|| '' , 'sponsor-address', 'Sponsor address copied!')}
+                className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                {copiedField === 'sponsor-address' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">{t('copied', 'Copied')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{t('copy', 'Copy')}</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* My Referral Link Card (Full Width) */}
@@ -753,7 +770,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {t('profile_frontline_link', 'My Frontline Referral Link')}
               </span>
               <span className="text-[10px] font-mono text-zinc-400">
-                {t('profile_direct_partners', 'Direct Partners:')} <strong className="text-emerald-300">{user.directTeamCount || 12}</strong>
+                {t('profile_direct_partners', 'Direct Partners:')} <strong className="text-emerald-300">{safeUser.directTeamCount ?? 0}</strong>
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
@@ -762,7 +779,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
               <button
                 onClick={() => handleCopy(referralLinkUrl, 'referral-link', 'Referral link copied to clipboard!')}
-                className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] shrink-0"
+                className="py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] shrink-0 cursor-pointer"
               >
                 {copiedField === 'referral-link' ? (
                   <>
@@ -874,7 +891,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <div className="flex items-center gap-2 self-start sm:self-center">
             <span className="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-zinc-300 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span>BSC Chain ID: {NETWORK_CONFIG.chainId}</span>
+              <span>BSC Chain ID: {NETWORK_CONFIG?.chainId || 97}</span>
             </span>
           </div>
         </div>
@@ -908,41 +925,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {/* Contract Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {filteredContracts.map((item) => {
-            const hasAddress = Boolean(item.address && item.address.startsWith('0x') && item.address.length === 42);
-            const isCopied = copiedContractKey === item.key;
+          {filteredContracts.map((item: any) => {
+            const hasAddress = Boolean(item?.address && item.address.startsWith('0x') && item.address.length === 42);
+            const isCopied = copiedContractKey === item?.key;
+            const statusBadge = item?.statusBadge || {
+              badgeBg: 'bg-zinc-900/80 text-zinc-400',
+              badgeBorder: 'border-zinc-800',
+              symbol: '●',
+              label: 'Configured'
+            };
 
             return (
               <div
-                key={item.key}
+                key={item?.key || Math.random()}
                 className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 flex flex-col justify-between gap-3 hover:border-zinc-700 transition-colors"
               >
                 <div>
-                  {/* Top Bar: Name, Phase & Status Badge */}
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="text-sm font-bold text-white truncate">{item.name}</h4>
+                        <h4 className="text-sm font-bold text-white truncate">{item?.name || 'Contract'}</h4>
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-800 text-zinc-400">
-                          Phase {item.phase}
+                          Phase {item?.phase || 1}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-400 font-medium">{item.role}</p>
+                      <p className="text-[11px] text-zinc-400 font-medium">{item?.role || 'Core Protocol'}</p>
                     </div>
 
                     <span
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold shrink-0 border flex items-center gap-1 ${item.statusBadge.badgeBg} ${item.statusBadge.badgeBorder}`}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold shrink-0 border flex items-center gap-1 ${statusBadge.badgeBg} ${statusBadge.badgeBorder}`}
                     >
-                      <span className="text-[10px]">{item.statusBadge.symbol}</span>
-                      <span>{item.statusBadge.label}</span>
+                      <span className="text-[10px]">{statusBadge.symbol}</span>
+                      <span>{statusBadge.label}</span>
                     </span>
                   </div>
 
-                  {/* Description */}
-                  <p className="text-xs text-zinc-400 leading-relaxed mt-2">{item.description}</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed mt-2">{item?.description || 'Smart contract module for decentralized logic.'}</p>
                 </div>
 
-                {/* Bottom Address & Explorer Bar */}
                 <div className="pt-3 border-t border-zinc-900 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
                     {hasAddress ? (
@@ -971,7 +991,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     )}
                   </div>
 
-                  {hasAddress && item.explorerUrl && (
+                  {hasAddress && item?.explorerUrl && (
                     <a
                       href={item.explorerUrl}
                       target="_blank"
@@ -988,7 +1008,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           })}
         </div>
 
-        {/* Roadmap & Transparency Disclosure */}
         <div className="p-3.5 rounded-2xl bg-zinc-950/40 border border-zinc-800/60 flex items-start gap-2.5 text-xs text-zinc-400 leading-relaxed">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <div>
@@ -1012,7 +1031,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         <div className="space-y-4">
-          {/* Sound Effects Toggle */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${soundEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}>
@@ -1031,7 +1049,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     unlockAudioContext();
                     playClaimSuccessSound();
                   }}
-                  className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors"
+                  className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                   title="Preview Audio Chime"
                 >
                   {t('profile_test_sound', 'Test Sound')}
@@ -1051,7 +1069,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
 
-          {/* Animation Toggle */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${animationsEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}>
@@ -1075,7 +1092,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </button>
           </div>
 
-          {/* Notification Settings */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -1099,7 +1115,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </button>
           </div>
 
-          {/* Dashboard Theme / Appearance Theme Selector */}
           <div className="p-5 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/60">
               <div className="flex items-center gap-3">
@@ -1126,7 +1141,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             </div>
 
-            {/* Responsive Grid of 7 Theme Preview Swatches */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
               {DASHBOARD_THEMES.map((theme) => {
                 const isActive = selectedTheme === theme.id;
@@ -1145,7 +1159,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       boxShadow: isActive ? `0 0 16px ${theme.accentColor}33` : undefined,
                     }}
                   >
-                    {/* Visual Theme Swatch / Mini Mockup */}
                     <div 
                       className="w-full h-14 rounded-lg p-2 flex flex-col justify-between mb-3 border relative overflow-hidden"
                       style={{
@@ -1153,7 +1166,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         borderColor: theme.borderColor,
                       }}
                     >
-                      {/* Mini Header Bar */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <div 
@@ -1177,7 +1189,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         </span>
                       </div>
 
-                      {/* Mini Metric Card */}
                       <div 
                         className="rounded px-2 py-1 flex items-center justify-between border"
                         style={{
@@ -1202,7 +1213,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Card Content & Active Indicator */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -1220,7 +1230,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         </p>
                       </div>
 
-                      {/* Active Checkmark */}
                       <div className="shrink-0 mt-0.5">
                         {isActive ? (
                           <div 
@@ -1240,7 +1249,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
 
-          {/* Language Selector */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
