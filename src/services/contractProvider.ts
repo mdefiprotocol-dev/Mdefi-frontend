@@ -156,12 +156,7 @@ export class RealContractProvider implements IContractProvider {
       );
     }
 
-    if (typeof window === 'undefined' || !(window as any).ethereum) {
-      throw new Error(
-        '[RealContractProvider] No Web3 provider detected in environment.'
-      );
-    }
-
+   
     let abi: readonly any[];
 
     if (contractKey === 'mdefiHub') {
@@ -175,12 +170,7 @@ export class RealContractProvider implements IContractProvider {
     }
 
     try {
-      const provider = new ethers.BrowserProvider(
-        (window as any).ethereum
-      );
-
-      await this.ensureBscTestnet(provider);
-
+      const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
       const contract = new ethers.Contract(
         contractAddress,
         abi,
