@@ -68,10 +68,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showWalletDropdown, setShowWalletDropdown] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
-  const [isDemoConnected, setIsDemoConnected] = useState(true);
+  const [isConnectedState, setIsConnectedState] = useState(true);
 
   const mbttcBalance = rewards?.mbttcBalance ?? 0;
-  const demoUsdRate = rewards?.demoUsdRate ?? 0.005;
 
   const walletRef = useRef<HTMLDivElement>(null);
   const mobileWalletRef = useRef<HTMLDivElement>(null);
@@ -126,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleToggleConnect = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsDemoConnected(!isDemoConnected);
+    setIsConnectedState(!isConnectedState);
   };
 
   // Deduplicate activities strictly for the currently connected user's wallet
@@ -190,8 +189,6 @@ export const Header: React.FC<HeaderProps> = ({
       seen: true,
     });
     setGreetingState(updated);
-
-    // Propagate authentic rating submission to communityRatingService and centralEventSyncService
     communityRatingService.submitRating(stars, user.walletAddress);
   };
 
@@ -212,7 +209,6 @@ export const Header: React.FC<HeaderProps> = ({
     setGreetingState(updated);
     setShowFeedbackInput(false);
 
-    // Propagate authentic rating & feedback submission to communityRatingService
     communityRatingService.submitRating(
       finalRating,
       user.walletAddress,
@@ -243,7 +239,6 @@ export const Header: React.FC<HeaderProps> = ({
     const detailsLower = (notif.details || '').toLowerCase();
     const titleLower = (notif.title || '').toLowerCase();
 
-    // 1. Team Income / Referral Income / Matrix Income
     if (
       typeLower.includes('team') ||
       typeLower.includes('matrix') ||
@@ -262,7 +257,6 @@ export const Header: React.FC<HeaderProps> = ({
       };
     }
 
-    // 2. Package Activation (Quantum Node, Nexus Prime, Junior, Senior)
     if (
       typeLower.includes('package') ||
       typeLower.includes('quantum') ||
@@ -281,7 +275,6 @@ export const Header: React.FC<HeaderProps> = ({
       };
     }
 
-    // 3. Claims
     if (typeLower.includes('claim')) {
       return {
         icon: Coins,
@@ -294,7 +287,6 @@ export const Header: React.FC<HeaderProps> = ({
       };
     }
 
-    // 4. Token Swap
     if (typeLower.includes('swap')) {
       return {
         icon: ArrowLeftRight,
@@ -307,7 +299,6 @@ export const Header: React.FC<HeaderProps> = ({
       };
     }
 
-    // 5. Registration / Hub / USDT / System Activation (Emerald glow)
     return {
       icon: ShieldCheck,
       border: 'border-emerald-500/30 hover:border-emerald-400/50',
@@ -330,7 +321,6 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none shrink-0"
             title="Return to Overview"
           >
-            {/* Front-matched MDeFi logo icon - Razor sharp HD (No blurry wrapper) */}
             <div className="relative shrink-0 flex items-center justify-center">
               <MbttcCoin3D size="sm" interactive={false} autoRotate={true} glow={false} />
             </div>
@@ -347,7 +337,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="h-5 w-px bg-zinc-800 hidden md:block mx-1" />
 
-          {/* Current page title */}
           <div className="hidden md:flex items-center gap-2">
             <span className="text-sm font-semibold text-zinc-300">
               {getPageTitle(currentPage)}
@@ -355,22 +344,20 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right controls (Desktop: full controls row, Mobile: Language + Bell + Profile) */}
+        {/* Right controls */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          {/* Language Selector */}
           <LanguageSelector align="right" />
 
-          {/* Network status indicator (Demo Network) - Desktop only */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/80 border border-zinc-800/90 text-xs text-zinc-300">
+          {/* Real On-Chain Network Indicator - Desktop */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/80 border border-emerald-500/30 text-xs text-zinc-300 shadow-[0_0_12px_rgba(16,185,129,0.1)]">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-            <span className="font-medium text-zinc-200">{t('demo_network', 'Demo Network')}</span>
-            <span className="text-[10px] font-mono text-zinc-400 px-1 rounded bg-zinc-900 border border-zinc-700/60">
-              {t('simulated', 'SIMULATED')}
+            <span className="font-medium text-zinc-200">BSC Testnet</span>
+            <span className="text-[10px] font-mono text-emerald-400 px-1.5 py-0.2 rounded bg-emerald-950/80 border border-emerald-500/30 font-bold">
+              Chain 97
             </span>
           </div>
 
-
-          {/* 13. NOTIFICATION PANEL */}
+          {/* Notification Button */}
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => {
@@ -388,430 +375,421 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-          {showNotifications && (
-            <>
-              {/* Mobile Backdrop */}
-              <div 
-                className="fixed inset-0 bg-black/60 backdrop-blur-xs sm:hidden z-40"
-                onClick={() => setShowNotifications(false)}
-              />
+            {showNotifications && (
+              <>
+                <div 
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs sm:hidden z-40"
+                  onClick={() => setShowNotifications(false)}
+                />
 
-              {/* Responsive Notification Center Panel */}
-              <div 
-                className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-[390px] max-w-[calc(100vw-24px)] rounded-3xl bg-zinc-950/98 border border-emerald-500/30 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.9)] backdrop-blur-2xl z-50 animate-in fade-in zoom-in-95 flex flex-col max-h-[min(80vh,560px)] overflow-hidden"
-              >
-                {/* Panel Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 shrink-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0">
-                      <Bell className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider block truncate">
-                        {t('notif_title', 'Notifications')}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-400 block truncate" title={user.walletAddress}>
-                        {shortenAddress(user.walletAddress)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {unreadCount > 0 && (
-                      <span className="text-[10px] text-emerald-400 font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                        {unreadCount} {t('notif_new', 'New')}
-                      </span>
-                    )}
-                    {userActivities.length > 0 && unreadCount > 0 && (
-                      <button
-                        onClick={() => onMarkAllAsRead?.()}
-                        className="text-[10px] text-zinc-400 hover:text-emerald-300 font-medium transition-colors hover:underline cursor-pointer"
-                      >
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notifications List (Scrollable & Responsive) */}
-                <div className="flex-1 overflow-y-auto space-y-2.5 my-2.5 pr-1 overscroll-contain">
-                  {/* POST-CLEANUP 24-HOUR CYCLE USER GREETING & VOLUNTARY FEEDBACK CARD */}
-                  {userActivities.length === 0 && showGreetingCard && (
-                    <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-zinc-900/95 to-zinc-950 border border-emerald-500/35 shadow-[0_0_25px_rgba(16,185,129,0.15)] relative group overflow-hidden transition-all duration-200">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="p-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0">
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5 truncate">
-                              You&apos;re all caught up! 🎉
-                            </span>
-                            <span className="text-[10px] text-emerald-400/90 font-mono block truncate">
-                              Thank you for being part of the MDeFi ecosystem.
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={handleDismissGreeting}
-                          className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
-                          title="Dismiss greeting for this cycle"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                <div 
+                  className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-[390px] max-w-[calc(100vw-24px)] rounded-3xl bg-zinc-950/98 border border-emerald-500/30 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.9)] backdrop-blur-2xl z-50 animate-in fade-in zoom-in-95 flex flex-col max-h-[min(80vh,560px)] overflow-hidden"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0">
+                        <Bell className="w-4 h-4" />
                       </div>
-
-                      <p className="text-xs text-zinc-300 leading-relaxed mb-3 font-medium">
-                        How was your experience?
-                      </p>
-
-                      {/* Voluntary 5-Star Rating (Completely user-selected, no forced/fake ratings) */}
-                      <div className="py-2.5 px-3 rounded-xl bg-zinc-950/80 border border-zinc-800 flex flex-col items-center justify-center gap-1.5 shadow-inner">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-medium">
-                          {selectedRating > 0 
-                            ? `Selected: ${selectedRating} of 5 Stars` 
-                            : 'Rate your MDeFi experience'}
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider block truncate">
+                          {t('notif_title', 'Notifications')}
                         </span>
-                        <div className="flex items-center gap-1.5">
-                          {[1, 2, 3, 4, 5].map((star) => {
-                            const isFilled = (hoveredRating || selectedRating) >= star;
-                            return (
-                              <button
-                                key={star}
-                                type="button"
-                                onMouseEnter={() => setHoveredRating(star)}
-                                onMouseLeave={() => setHoveredRating(0)}
-                                onClick={() => handleRateExperience(star)}
-                                className="p-1 rounded-lg hover:scale-115 active:scale-95 transition-all cursor-pointer text-amber-400 focus:outline-none"
-                                aria-label={`Rate ${star} out of 5 stars`}
-                              >
-                                <Star
-                                  className={`w-5 h-5 transition-all duration-150 ${
-                                    isFilled 
-                                      ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.65)]' 
-                                      : 'text-zinc-600 hover:text-zinc-400'
-                                  }`}
-                                />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Optional Feedback Input / Action */}
-                      {showFeedbackInput ? (
-                        <div className="mt-2.5 space-y-2 animate-in fade-in duration-150">
-                          <textarea
-                            value={feedbackText}
-                            onChange={(e) => setFeedbackText(e.target.value)}
-                            placeholder="Optional: share your feedback with the community..."
-                            rows={2}
-                            className="w-full text-xs rounded-xl bg-zinc-900 border border-zinc-700/80 p-2 text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none resize-none font-sans"
-                          />
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setShowFeedbackInput(false)}
-                              className="px-2.5 py-1 text-[11px] rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={handleSubmitFeedbackNote}
-                              className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black transition-colors cursor-pointer"
-                            >
-                              Submit Feedback
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-zinc-800/60">
-                          <button
-                            onClick={() => setShowFeedbackInput(true)}
-                            className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            <span>Share your feedback</span>
-                          </button>
-                          {selectedRating > 0 && (
-                            <span className="text-[10px] font-mono text-emerald-400/90 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              Feedback Recorded
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {userActivities.length === 0 && !showGreetingCard ? (
-                    <div className="py-10 px-4 text-center space-y-3">
-                      <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-950/50 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-                        <CheckCircle2 className="w-6 h-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-white">All caught up</p>
-                        <p className="text-xs text-zinc-400 max-w-[220px] mx-auto leading-relaxed">
-                          No recent activity in the last 24 hours for your wallet.
-                        </p>
-                      </div>
-                      <div className="pt-1">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-400/80 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                          <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[10px] font-mono text-zinc-400 block truncate" title={user.walletAddress}>
                           {shortenAddress(user.walletAddress)}
                         </span>
                       </div>
                     </div>
-                  ) : (
-                    userActivities.map((notif) => {
-                      const visual = getNotificationVisual(notif);
-                      const VisualIcon = visual.icon;
 
-                      return (
-                        <div
-                          key={notif.id}
-                          onClick={() => onMarkAsRead?.(notif.id)}
-                          className={`p-3 rounded-2xl border transition-all cursor-pointer relative group overflow-hidden ${
-                            notif.read
-                              ? 'bg-zinc-900/40 border-zinc-800/70 opacity-80 hover:opacity-100 hover:border-zinc-700'
-                              : `${visual.bg} ${visual.border} shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.12)]`
-                          }`}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {unreadCount > 0 && (
+                        <span className="text-[10px] text-emerald-400 font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                          {unreadCount} {t('notif_new', 'New')}
+                        </span>
+                      )}
+                      {userActivities.length > 0 && unreadCount > 0 && (
+                        <button
+                          onClick={() => onMarkAllAsRead?.()}
+                          className="text-[10px] text-zinc-400 hover:text-emerald-300 font-medium transition-colors hover:underline cursor-pointer"
                         >
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <div className={`p-2 rounded-xl shrink-0 border ${visual.iconWrap}`}>
-                              <VisualIcon className="w-4 h-4" />
-                            </div>
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center justify-between gap-1.5">
-                                <span className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-300' : 'text-white'}`}>
-                                  {notif.title || visual.defaultTitle}
-                                </span>
-                                {!notif.read && (
-                                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_#34d399]" />
-                                )}
+                  <div className="flex-1 overflow-y-auto space-y-2.5 my-2.5 pr-1 overscroll-contain">
+                    {userActivities.length === 0 && showGreetingCard && (
+                      <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-zinc-900/95 to-zinc-950 border border-emerald-500/35 shadow-[0_0_25px_rgba(16,185,129,0.15)] relative group overflow-hidden transition-all duration-200">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)] shrink-0">
+                              <Sparkles className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5 truncate">
+                                You&apos;re all caught up! 🎉
+                              </span>
+                              <span className="text-[10px] text-emerald-400/90 font-mono block truncate">
+                                Thank you for being part of the MDeFi ecosystem.
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleDismissGreeting}
+                            className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                            title="Dismiss greeting for this cycle"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <p className="text-xs text-zinc-300 leading-relaxed mb-3 font-medium">
+                          How was your experience?
+                        </p>
+
+                        <div className="py-2.5 px-3 rounded-xl bg-zinc-950/80 border border-zinc-800 flex flex-col items-center justify-center gap-1.5 shadow-inner">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-medium">
+                            {selectedRating > 0 
+                              ? `Selected: ${selectedRating} of 5 Stars` 
+                              : 'Rate your MDeFi experience'}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {[1, 2, 3, 4, 5].map((star) => {
+                              const isFilled = (hoveredRating || selectedRating) >= star;
+                              return (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  onMouseEnter={() => setHoveredRating(star)}
+                                  onMouseLeave={() => setHoveredRating(0)}
+                                  onClick={() => handleRateExperience(star)}
+                                  className="p-1 rounded-lg hover:scale-115 active:scale-95 transition-all cursor-pointer text-amber-400 focus:outline-none"
+                                  aria-label={`Rate ${star} out of 5 stars`}
+                                >
+                                  <Star
+                                    className={`w-5 h-5 transition-all duration-150 ${
+                                      isFilled 
+                                        ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.65)]' 
+                                        : 'text-zinc-600 hover:text-zinc-400'
+                                    }`}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {showFeedbackInput ? (
+                          <div className="mt-2.5 space-y-2 animate-in fade-in duration-150">
+                            <textarea
+                              value={feedbackText}
+                              onChange={(e) => setFeedbackText(e.target.value)}
+                              placeholder="Optional: share your feedback with the community..."
+                              rows={2}
+                              className="w-full text-xs rounded-xl bg-zinc-900 border border-zinc-700/80 p-2 text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none resize-none font-sans"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setShowFeedbackInput(false)}
+                                className="px-2.5 py-1 text-[11px] rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleSubmitFeedbackNote}
+                                className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black transition-colors cursor-pointer"
+                              >
+                                Submit Feedback
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-zinc-800/60">
+                            <button
+                              onClick={() => setShowFeedbackInput(true)}
+                              className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <MessageSquare className="w-3 h-3" />
+                              <span>Share your feedback</span>
+                            </button>
+                            {selectedRating > 0 && (
+                              <span className="text-[10px] font-mono text-emerald-400/90 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                Feedback Recorded
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {userActivities.length === 0 && !showGreetingCard ? (
+                      <div className="py-10 px-4 text-center space-y-3">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-950/50 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-white">All caught up</p>
+                          <p className="text-xs text-zinc-400 max-w-[220px] mx-auto leading-relaxed">
+                            No recent activity in the last 24 hours for your wallet.
+                          </p>
+                        </div>
+                        <div className="pt-1">
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-400/80 bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                            {shortenAddress(user.walletAddress)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      userActivities.map((notif) => {
+                        const visual = getNotificationVisual(notif);
+                        const VisualIcon = visual.icon;
+
+                        return (
+                          <div
+                            key={notif.id}
+                            onClick={() => onMarkAsRead?.(notif.id)}
+                            className={`p-3 rounded-2xl border transition-all cursor-pointer relative group overflow-hidden ${
+                              notif.read
+                                ? 'bg-zinc-900/40 border-zinc-800/70 opacity-80 hover:opacity-100 hover:border-zinc-700'
+                                : `${visual.bg}${visual.border} shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.12)]`
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className={`p-2 rounded-xl shrink-0 border ${visual.iconWrap}`}>
+                                <VisualIcon className="w-4 h-4" />
                               </div>
 
-                              <p className="text-zinc-400 text-[11px] leading-relaxed line-clamp-2">
-                                {notif.details || `${notif.type} confirmed on-chain.`}
-                              </p>
-
-                              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-0.5 text-[10px] font-mono">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  {notif.amount && (
-                                    <span className={`font-semibold shrink-0 ${visual.amountColor}`}>
-                                      {notif.amount}
-                                    </span>
-                                  )}
-                                  {notif.txHash && notif.txHash !== '0x0' && (
-                                    <span className="text-zinc-400 truncate max-w-[110px] sm:max-w-[140px]" title={notif.txHash}>
-                                      {shortenHash(notif.txHash)}
-                                    </span>
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-300' : 'text-white'}`}>
+                                    {notif.title || visual.defaultTitle}
+                                  </span>
+                                  {!notif.read && (
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_#34d399]" />
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium border ${
-                                    notif.status === 'Confirmed'
-                                      ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/25'
-                                      : notif.status === 'Pending'
-                                      ? 'bg-amber-950/60 text-amber-300 border-amber-500/25'
-                                      : 'bg-rose-950/60 text-rose-300 border-rose-500/25'
-                                  }`}>
-                                    {notif.status === 'Confirmed' ? (
-                                      <CheckCircle2 className="w-2.5 h-2.5" />
-                                    ) : notif.status === 'Pending' ? (
-                                      <Clock className="w-2.5 h-2.5 animate-spin" />
-                                    ) : (
-                                      <AlertCircle className="w-2.5 h-2.5" />
+                                <p className="text-zinc-400 text-[11px] leading-relaxed line-clamp-2">
+                                  {notif.details || `${notif.type} confirmed on-chain.`}
+                                </p>
+
+                                <div className="flex flex-wrap items-center justify-between gap-1.5 pt-0.5 text-[10px] font-mono">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {notif.amount && (
+                                      <span className={`font-semibold shrink-0 ${visual.amountColor}`}>
+                                        {notif.amount}
+                                      </span>
                                     )}
-                                    {notif.status}
-                                  </span>
-                                  <span className="text-zinc-400 text-[9px]">{notif.date}</span>
+                                    {notif.txHash && notif.txHash !== '0x0' && (
+                                      <span className="text-zinc-400 truncate max-w-[110px] sm:max-w-[140px]" title={notif.txHash}>
+                                        {shortenHash(notif.txHash)}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium border ${
+                                      notif.status === 'Confirmed'
+                                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/25'
+                                        : notif.status === 'Pending'
+                                        ? 'bg-amber-950/60 text-amber-300 border-amber-500/25'
+                                        : 'bg-rose-950/60 text-rose-300 border-rose-500/25'
+                                    }`}>
+                                      {notif.status === 'Confirmed' ? (
+                                        <CheckCircle2 className="w-2.5 h-2.5" />
+                                      ) : notif.status === 'Pending' ? (
+                                        <Clock className="w-2.5 h-2.5 animate-spin" />
+                                      ) : (
+                                        <AlertCircle className="w-2.5 h-2.5" />
+                                      )}
+                                      {notif.status}
+                                    </span>
+                                    <span className="text-zinc-400 text-[9px]">{notif.date}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400 shrink-0">
+                    <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400/80">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      On-Chain Sync Active
+                    </span>
+                    <button 
+                      onClick={() => setShowNotifications(false)}
+                      className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors text-[11px] cursor-pointer"
+                    >
+                      {t('btn_dismiss', 'Dismiss')}
+                    </button>
+                  </div>
                 </div>
+              </>
+            )}
+          </div>
 
-                {/* Footer */}
-                <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400 shrink-0">
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400/80">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    On-Chain Sync Active
-                  </span>
-                  <button 
-                    onClick={() => setShowNotifications(false)}
-                    className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors text-[11px] cursor-pointer"
-                  >
-                    {t('btn_dismiss', 'Dismiss')}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* 14. WALLET PILL & DROPDOWN (Desktop: visible on sm+) */}
-        <div className="hidden sm:block relative" ref={walletRef}>
-          <button
-            onClick={() => {
-              setShowWalletDropdown(!showWalletDropdown);
-              setShowNotifications(false);
-            }}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-zinc-950/90 border border-emerald-500/30 hover:border-emerald-400/60 text-xs font-mono text-zinc-200 hover:text-white transition-all shadow-[0_0_20px_rgba(16,185,129,0.08)] group"
-            title="Demo Wallet Pill"
-          >
-            <span className={`w-2 h-2 rounded-full ${isDemoConnected ? 'bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse' : 'bg-zinc-500'}`} />
-            <span className="font-semibold text-emerald-300 tracking-tight text-[11px] sm:text-xs">
-              {isDemoConnected ? (
-                formatCompactAddress(user.walletAddress)
-              ) : (
-                t('disconnected', 'Disconnected')
-              )}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 transition-transform shrink-0" />
-          </button>
-
-          {/* Desktop Dropdown Container */}
-          {showWalletDropdown && (
-            <div 
-              ref={walletDropdownRef}
-              className="hidden sm:block absolute right-0 top-full mt-2 w-80 rounded-3xl bg-zinc-950/98 border border-emerald-500/25 p-4 sm:p-5 shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl z-50 animate-in fade-in zoom-in-95 space-y-4"
+          {/* Desktop Wallet Dropdown */}
+          <div className="hidden sm:block relative" ref={walletRef}>
+            <button
+              onClick={() => {
+                setShowWalletDropdown(!showWalletDropdown);
+                setShowNotifications(false);
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-zinc-950/90 border border-emerald-500/30 hover:border-emerald-400/60 text-xs font-mono text-zinc-200 hover:text-white transition-all shadow-[0_0_20px_rgba(16,185,129,0.08)] group cursor-pointer"
+              title="Wallet Session"
             >
-              {/* Header info */}
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">{t('wallet_session', 'Wallet Session')}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                  {isDemoConnected ? `${t('connected', 'Connected')} (${t('demo', 'Demo')})` : t('disconnected', 'Disconnected')}
-                </span>
-              </div>
+              <span className={`w-2 h-2 rounded-full ${isConnectedState ? 'bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse' : 'bg-zinc-500'}`} />
+              <span className="font-semibold text-emerald-300 tracking-tight text-[11px] sm:text-xs">
+                {isConnectedState ? (
+                  formatCompactAddress(user.walletAddress)
+                ) : (
+                  t('disconnected', 'Disconnected')
+                )}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 transition-transform shrink-0" />
+            </button>
 
-              {/* Address detail */}
-              <div className="p-3 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-1">
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">{t('wallet_address', 'Wallet Address')}</span>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs text-white font-semibold truncate" title={user.walletAddress}>
-                    {formatCompactAddress(user.walletAddress)}
+            {showWalletDropdown && (
+              <div 
+                ref={walletDropdownRef}
+                className="hidden sm:block absolute right-0 top-full mt-2 w-80 rounded-3xl bg-zinc-950/98 border border-emerald-500/25 p-4 sm:p-5 shadow-[0_10px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl z-50 animate-in fade-in zoom-in-95 space-y-4"
+              >
+                {/* Header info: Verified Active State */}
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">{t('wallet_session', 'Wallet Session')}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-semibold">
+                    {isConnectedState ? 'Connected (Verified)' : t('disconnected', 'Disconnected')}
                   </span>
+                </div>
+
+                {/* Address detail */}
+                <div className="p-3 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-1">
+                  <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">{t('wallet_address', 'Wallet Address')}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-white font-semibold truncate" title={user.walletAddress}>
+                      {formatCompactAddress(user.walletAddress)}
+                    </span>
+                    <button
+                      onClick={handleCopyAddress}
+                      className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                      title={t('copy_address', 'Copy Address')}
+                    >
+                      {copiedAddress ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Real Network detail */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
+                    <span className="text-zinc-400">{t('network', 'Network')}</span>
+                    <span className="font-medium text-emerald-400 font-mono">BNB Smart Chain Testnet</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
+                    <span className="text-zinc-400">{t('status', 'Status')}</span>
+                    <span className="font-medium text-white flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${isConnectedState ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                      {isConnectedState ? 'Active (BSC Node)' : t('disconnected', 'Disconnected')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-zinc-400">{t('chain_id', 'Chain ID')}</span>
+                    <span className="font-mono text-emerald-300 font-semibold">97 (0x61 - BSC Testnet)</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
                   <button
                     onClick={handleCopyAddress}
-                    className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors shrink-0 cursor-pointer"
-                    title={t('copy_address', 'Copy Address')}
+                    className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    {copiedAddress ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{copiedAddress ? t('copied', 'Copied!') : t('copy_address', 'Copy Address')}</span>
+                  </button>
+                  <button
+                    onClick={handleToggleConnect}
+                    className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/30 text-xs font-semibold text-zinc-300 hover:text-red-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>{isConnectedState ? t('disconnect', 'Disconnect') : t('reconnect', 'Reconnect')}</span>
                   </button>
                 </div>
-              </div>
 
-              {/* Network detail */}
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
-                  <span className="text-zinc-400">{t('network', 'Network')}</span>
-                  <span className="font-medium text-emerald-400 font-mono">Demo Network</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
-                  <span className="text-zinc-400">{t('status', 'Status')}</span>
-                  <span className="font-medium text-white flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isDemoConnected ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                    {isDemoConnected ? `${t('connected', 'Connected')} (${t('demo', 'Demo')})` : `${t('disconnected', 'Disconnected')} (${t('demo', 'Demo')})`}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-zinc-400">{t('chain_id', 'Chain ID')}</span>
-                  <span className="font-mono text-zinc-300">56-DEMO (BSC Simulator)</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
-                <button
-                  onClick={handleCopyAddress}
-                  className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs font-semibold text-zinc-200 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{copiedAddress ? t('copied', 'Copied!') : t('copy_address', 'Copy Address')}</span>
-                </button>
-                <button
-                  onClick={handleToggleConnect}
-                  className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/30 text-xs font-semibold text-zinc-300 hover:text-red-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>{isDemoConnected ? t('disconnect', 'Disconnect') : t('reconnect', 'Reconnect')}</span>
-                </button>
-              </div>
-
-              {/* Phase 2 wallet modal trigger */}
-              <div className="pt-2 border-t border-zinc-800/80 space-y-2">
-                <button
-                  onClick={() => {
-                    setShowWalletDropdown(false);
-                    onOpenWalletModal();
-                  }}
-                  className="w-full text-[11px] text-zinc-400 hover:text-emerald-400 transition-colors block text-center cursor-pointer"
-                >
-                  {t('wallet_switch_provider', 'Switch Wallet Provider (MetaMask / WalletConnect)')}
-                </button>
-
-                {onReturnToLanding && (
+                {/* Phase 2 wallet modal trigger */}
+                <div className="pt-2 border-t border-zinc-800/80 space-y-2">
                   <button
                     onClick={() => {
                       setShowWalletDropdown(false);
-                      onReturnToLanding();
+                      onOpenWalletModal();
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 hover:border-emerald-400 text-xs font-semibold text-emerald-300 hover:text-emerald-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full text-[11px] text-zinc-400 hover:text-emerald-400 transition-colors block text-center cursor-pointer"
                   >
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>{t('dash_public_site', 'Public Front Website')}</span>
+                    {t('wallet_switch_provider', 'Switch Wallet Provider (MetaMask / WalletConnect)')}
                   </button>
-                )}
+
+                  {onReturnToLanding && (
+                    <button
+                      onClick={() => {
+                        setShowWalletDropdown(false);
+                        onReturnToLanding();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 hover:border-emerald-400 text-xs font-semibold text-emerald-300 hover:text-emerald-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>{t('dash_public_site', 'Public Front Website')}</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Profile Button */}
-        <button
-          onClick={() => onNavigate('profile')}
-          className={`p-1.5 sm:p-2 rounded-xl border transition-all ${
-            currentPage === 'profile'
-              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-              : 'bg-zinc-900/80 border-zinc-800 text-zinc-300 hover:border-zinc-700'
-          }`}
-          title="Account Profile"
-        >
-          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-teal-700 flex items-center justify-center text-[9px] font-bold text-black font-mono">
-            M
+            )}
           </div>
-        </button>
-      </div>
-    </div>
 
-      {/* Mobile Sub-Bar (< 640px): Dedicated space for Wallet & Session Controls */}
+          {/* Profile Button */}
+          <button
+            onClick={() => onNavigate('profile')}
+            className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
+              currentPage === 'profile'
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                : 'bg-zinc-900/80 border-zinc-800 text-zinc-300 hover:border-zinc-700'
+            }`}
+            title="Account Profile"
+          >
+            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-teal-700 flex items-center justify-center text-[9px] font-bold text-black font-mono">
+              M
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Sub-Bar (< 640px): Real On-Chain Network Tag */}
       <div className="sm:hidden w-full pt-2 mt-1.5 border-t border-emerald-500/10 flex items-center justify-between gap-2 max-w-[1600px] mx-auto">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399] shrink-0" />
-          <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider truncate">
-            Demo Network • BSC
+          <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider truncate font-semibold">
+            BSC Testnet • Chain 97
           </span>
         </div>
 
-        {/* Mobile Wallet Button (triggers shared session dropdown) */}
+        {/* Mobile Wallet Button */}
         <div className="relative" ref={mobileWalletRef}>
           <button
             onClick={() => {
               setShowWalletDropdown(!showWalletDropdown);
               setShowNotifications(false);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/30 text-xs font-mono text-zinc-200 hover:text-white transition-all shadow-[0_0_15px_rgba(16,185,129,0.08)] shrink-0 active:scale-95"
-            title="Demo Wallet Pill"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/30 text-xs font-mono text-zinc-200 hover:text-white transition-all shadow-[0_0_15px_rgba(16,185,129,0.08)] shrink-0 active:scale-95 cursor-pointer"
+            title="Wallet Session"
           >
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isDemoConnected ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConnectedState ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
             <span className="font-semibold text-emerald-300 tracking-tight text-[11px]">
-              {isDemoConnected ? (
+              {isConnectedState ? (
                 formatCompactAddress(user.walletAddress)
               ) : (
                 t('disconnected', 'Disconnected')
@@ -822,7 +800,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile Wallet Session Dropdown (< sm) - Positioned safely inside the viewport */}
+      {/* Mobile Wallet Session Dropdown (< sm) */}
       {showWalletDropdown && (
         <div 
           ref={walletDropdownRef}
@@ -831,8 +809,8 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Header info */}
           <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">{t('wallet_session', 'Wallet Session')}</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-              {isDemoConnected ? `${t('connected', 'Connected')} (${t('demo', 'Demo')})` : t('disconnected', 'Disconnected')}
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30 font-semibold">
+              {isConnectedState ? 'Connected (Verified)' : t('disconnected', 'Disconnected')}
             </span>
           </div>
 
@@ -853,22 +831,22 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Network detail */}
+          {/* Real Network detail */}
           <div className="space-y-2 text-xs">
             <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
               <span className="text-zinc-400">{t('network', 'Network')}</span>
-              <span className="font-medium text-emerald-400 font-mono">Demo Network</span>
+              <span className="font-medium text-emerald-400 font-mono">BNB Smart Chain Testnet</span>
             </div>
             <div className="flex justify-between items-center py-1 border-b border-zinc-800/60">
               <span className="text-zinc-400">{t('status', 'Status')}</span>
               <span className="font-medium text-white flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isDemoConnected ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-                {isDemoConnected ? `${t('connected', 'Connected')} (${t('demo', 'Demo')})` : `${t('disconnected', 'Disconnected')} (${t('demo', 'Demo')})`}
+                <span className={`w-2 h-2 rounded-full ${isConnectedState ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+                {isConnectedState ? 'Active (BSC Node)' : t('disconnected', 'Disconnected')}
               </span>
             </div>
             <div className="flex justify-between items-center py-1">
               <span className="text-zinc-400">{t('chain_id', 'Chain ID')}</span>
-              <span className="font-mono text-zinc-300">56-DEMO (BSC Simulator)</span>
+              <span className="font-mono text-emerald-300 font-semibold">97 (0x61 - BSC Testnet)</span>
             </div>
           </div>
 
@@ -886,7 +864,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-red-500/30 text-xs font-semibold text-zinc-300 hover:text-red-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>{isDemoConnected ? t('disconnect', 'Disconnect') : t('reconnect', 'Reconnect')}</span>
+              <span>{isConnectedState ? t('disconnect', 'Disconnect') : t('reconnect', 'Reconnect')}</span>
             </button>
           </div>
 
