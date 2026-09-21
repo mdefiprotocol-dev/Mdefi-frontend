@@ -310,10 +310,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const shortenedWallet = safeUser.walletAddress 
     ? formatCompactAddress(safeUser.walletAddress)
     : '0x0000...0000';
-  const shortenedSponsor = safeUser.sponsorAddress
-    ? formatCompactAddress(safeUser.sponsorAddress)
-    : 'None (Direct)';
+  // Sponsor address detect (agar sponsorId me 0x wallet address aa gaya ho to use address maane)
+  const actualSponsorAddress = (safeUser.sponsorAddress && safeUser.sponsorAddress.startsWith('0x'))
+    ? safeUser.sponsorAddress
+    : (safeUser.sponsorId && safeUser.sponsorId.startsWith('0x'))
+      ? safeUser.sponsorId
+      : '';
 
+  const shortenedSponsor = actualSponsorAddress
+    ? formatCompactAddress(actualSponsorAddress)
+    : 'None';
+
+  // Sponsor ID format: agar 0x address na ho to wahi rahe, warna MDF format ya upline ID
+  const displaySponsorId = (safeUser.sponsorId && !safeUser.sponsorId.startsWith('0x') && safeUser.sponsorId !== 'None (Direct Root)')
+    ? safeUser.sponsorId
+    : actualSponsorAddress
+      ? 'MDF-00001'
+      : 'None';
   const referralLinkUrl = safeUser.referralLink || (safeUser.userId && safeUser.userId !== 'MDF-00000' ? `https://mdefipro.xyz/join?ref=${safeUser.userId}` : 'Complete Registration First');
   const sponsorId = safeUser.sponsorId || 'None (Direct Root)';
   const userInitials = safeUser.userId && safeUser.userId.length >= 2 ? safeUser.userId.slice(-2) : '00';
@@ -716,8 +729,52 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* My Sponsor ID */}
+          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
+                {t('profile_sponsor_id', 'My Sponsor ID')}
+              </span>
+              <div className="font-mono text-sm font-bold text-white mt-0.5">
+                {displaySponsorId}
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-zinc-900 text-zinc-300 text-xs font-mono border border-zinc-800">
+              {t('profile_verified_upline', 'Verified Upline')}
+            </span>
+          </div>
+
+          {/* Sponsor Wallet Address */}
+          <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between gap-2">
+            <div className="truncate">
+              <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
+                {t('profile_sponsor_wallet', 'Sponsor Wallet Address')}
+              </span>
+              <div className="font-mono text-xs sm:text-sm font-semibold text-zinc-300 truncate mt-0.5">
+                {shortenedSponsor}
+              </div>
+            </div>
+            {actualSponsorAddress && (
+              <button
+                type="button"
+                onClick={() => handleCopy(actualSponsorAddress, 'sponsor-address', 'Sponsor address copied!')}
+                className="py-1.5 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                {copiedField === 'sponsor-address' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">{t('copied', 'Copied')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{t('copy', 'Copy')}</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
           <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 flex items-center justify-between">
             <div>
               <span className="text-[10px] uppercase font-mono text-zinc-400 block tracking-wider">
