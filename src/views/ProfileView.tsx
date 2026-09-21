@@ -117,7 +117,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [copiedContractKey, setCopiedContractKey] = useState<string | null>(null);
 
   // ==========================================
-  // REAL ON-CHAIN LIVE DATA STATES
+  // REAL ON-CHAIN LIVE DATA TELEMETRY (BUG FIX 1, 2 & 6)
   // ==========================================
   const [liveBnbBalance, setLiveBnbBalance] = useState<string>('0.0000');
   const [liveMbttcVault, setLiveMbttcVault] = useState<number>(0);
@@ -133,33 +133,52 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         const rpcUrl = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
         const rpc = new ethers.JsonRpcProvider(rpcUrl);
 
-        // 1. Live Wallet BNB Balance
+        // 1. Live Wallet BNB Balance [Bug 1]
         const rawBnbWei = await rpc.getBalance(safeUser.walletAddress);
         const formattedBnb = ethers.formatEther(rawBnbWei);
         if (isSubscribed) {
           setLiveBnbBalance(parseFloat(formattedBnb).toFixed(4));
         }
 
-        // 2. Live Hub Node Data (Referral Vault + Package Vault + Direct Partners)
+        // 2. Live MBTTC Visiting Vault (Referral + Package) from Hub [Bug 2]
         try {
-          const userNode = await realContractProvider.read('mdefiHub', 'getUserNode', [safeUser.walletAddress]);
-          if (userNode && isSubscribed) {
-            // Index 5 = referralVault, Index 6 = packageVault
-            const refVault = userNode[5] ? Number(ethers.formatUnits(userNode[5], 18)) : 0;
-            const pkgVault = userNode[6] ? Number(ethers.formatUnits(userNode[6], 18)) : 0;
-            setLiveMbttcVault(refVault + pkgVault);
+          const [refVesting, pkgVesting] = await Promise.all([
+            realContractProvider.read('mdefiHub', 'referralVesting', [safeUser.walletAddress]),
+            realContractProvider.read('mdefiHub', 'packageVesting', [safeUser.walletAddress])
+          ]);
 
-            // Index 8 = directReferralCount
-            if (userNode[8] !== undefined) {
-              setLiveDirectPartners(Number(userNode[8]));
-            }
+          if (isSubscribed) {
+            const refEarned = refVesting?.totalEarned ? BigInt(refVesting.totalEarned) : 0n;
+            const refClaimed = refVesting?.totalClaimed ? BigInt(refVesting.totalClaimed) : 0n;
+            const refRem = refEarned > refClaimed ? refEarned - refClaimed : 0n;
+
+            const pkgEarned = pkgVesting?.totalEarned ? BigInt(pkgVesting.totalEarned) : 0n;
+            const pkgClaimed = pkgVesting?.totalClaimed ? BigInt(pkgVesting.totalClaimed) : 0n;
+            const pkgRem = pkgEarned > pkgClaimed ? pkgEarned - pkgClaimed : 0n;
+
+            const totalVaultWei = refRem + pkgRem;
+            setLiveMbttcVault(Number(ethers.formatUnits(totalVaultWei, 18)));
           }
-        } catch (nodeErr) {
-          // Fallback to rewards prop if contract read fails during transition
+        } catch (vaultErr) {
           if (rewards?.mbttcBalance !== undefined && isSubscribed) {
             setLiveMbttcVault(rewards.mbttcBalance);
           }
         }
+
+        // 3. Live Direct Team Count from getUserNode [Bug 6]
+        try {
+          const userNode = await realContractProvider.read('mdefiHub', 'getUserNode', [safeUser.walletAddress]);
+          if (userNode && isSubscribed) {
+            // directTeam is at index 6 in UserNode struct
+            const directTeamArray = userNode.directTeam || userNode[6];
+            if (Array.isArray(directTeamArray)) {
+              setLiveDirectPartners(directTeamArray.length);
+            }
+          }
+        } catch (nodeErr) {
+          // Keep current fallback if silent
+        }
+
       } catch (err) {
         console.warn('[ProfileView] Live on-chain telemetry fetch error:', err);
       }
@@ -706,7 +725,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {/* 3 Real-Data Metric Cards (Bugs 1-5 fixed: Clean, No Demo numbers, Deleted 3 obsolete cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Card 1: Live Real BNB Balance */}
+          {/* Card 1: Live Real BNB Balance [Bug Fix 1] */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 space-y-1">
             <span className="text-[10px] text-zinc-400 uppercase font-mono tracking-wider block">
               {t('profile_bnb_balance', 'BNB Balance')}
@@ -719,7 +738,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </span>
           </div>
 
-          {/* Card 2: Live MBTTC Visiting Vault (Referral + Package Vault from Hub contract) */}
+          {/* Card 2: Live MBTTC Visiting Vault (Referral + Package Vault from Hub contract) [Bug Fix 2] */}
           <div className="p-4 rounded-2xl bg-zinc-950/70 border border-emerald-500/25 space-y-1">
             <span className="text-[10px] text-emerald-400 uppercase font-mono tracking-wider font-semibold block">
               {t('profile_mbttc_balance', 'MBTTC Vault Holding')}
@@ -982,18 +1001,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             return (
               <div
                 key={item?.key || Math.random()}
-                className="p-4 rounded-2xl bg-zinc-950/70 border border-zinc-800/90 flex flex-col justify-between gap-3 hover:border-zinc-700 transition-colors"
+                className={`p-4 rounded-2xl bg-zinc-950/70 border flex flex-col justify-between gap-3 transition-colors ${item.isDeployed ? 'border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.06)]' : 'border-zinc-800/90'}`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <h4 className="text-sm font-bold text-white truncate">{item?.name || 'Contract'}</h4>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-900 border border-zinc-800 text-zinc-400">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${item.isDeployed ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
                           Phase {item?.phase || 1}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-400 font-medium">{item?.role || 'Core Protocol'}</p>
+                      <p className="text-[11px] text-zinc-400 font-medium mt-0.5">{item?.role || 'Core Protocol'}</p>
                     </div>
 
                     <span
@@ -1030,7 +1049,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     ) : (
                       <div className="flex items-center gap-1.5 text-zinc-500 text-[11px] font-mono">
                         <Lock className="w-3.5 h-3.5 text-zinc-600" />
-                        <span>Undeployed • Pending Mainnet Deployment</span>
+                        <span>Pending Deployment</span>
                       </div>
                     )}
                   </div>
