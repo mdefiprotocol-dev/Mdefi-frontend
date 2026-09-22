@@ -6,11 +6,9 @@
  * - Real Contract Provider (future deployed smart contracts)
  * 
  * ARCHITECTURAL RULES:
- * - Smart contracts are NOT deployed yet.
- * - Demo data must NEVER accidentally appear as LIVE blockchain data.
- * - In Live Mode, the blockchain is the sole source of truth.
- * - In Live Mode, no fake transaction hashes or guessed function calls.
- * - Where ABI/function is unknown: leave clear TODO integration placeholder.
+ * - Smart contracts are deployed on BSC Testnet (Chain ID: 97).
+ * - Multi-provider detection (MetaMask, TrustWallet, Binance Web3, WalletConnect / AppKit).
+ * - Zero design/style alterations.
  */
 
 import {
@@ -54,7 +52,6 @@ export interface IContractProvider {
 
 /**
  * Demo Provider: Implements benchmark simulated responses for developer & preview testing
- * Guaranteed to flag isRealBlockchainData: false so demo values are never confused with live state.
  */
 export class DemoContractProvider implements IContractProvider {
   public isLive(): boolean {
@@ -90,9 +87,7 @@ export class DemoContractProvider implements IContractProvider {
 }
 
 /**
- * Real Contract Provider: Future on-chain integration harness for deployed smart contracts
- * Connects via EIP-1193 window.ethereum provider.
- * Follows strict safety: Does NOT fake calls or invent ABIs.
+ * Real Contract Provider: Complete Mobile & WalletConnect Compatible EIP-1193 Engine
  */
 export class RealContractProvider implements IContractProvider {
   private readonly BSC_TESTNET_CHAIN_ID = 97n;
@@ -101,19 +96,41 @@ export class RealContractProvider implements IContractProvider {
     return true;
   }
 
-  private async ensureBscTestnet(provider: ethers.BrowserProvider): Promise<void> {
+  /**
+   * Helper: Resolves active Ethereum/EIP-1193 provider across desktop extensions, 
+   * mobile in-app browsers, and WalletConnect sessions.
+   */
+  private getActiveEip1193Provider(): any {
+    if (typeof window === 'undefined') return null;
+    const w = window as any;
+
+    if (w.ethereum) {
+      if (Array.isArray(w.ethereum.providers) && w.ethereum.providers.length > 0) {
+        return w.ethereum.providers.find((p: any) => p.isMetaMask) || w.ethereum.providers[0];
+      }
+      return w.ethereum;
+    }
+
+    if (w.walletConnectProvider) return w.walletConnectProvider;
+    if (w.trustwallet?.ethereum) return w.trustwallet.ethereum;
+    if (w.BinanceChain) return w.BinanceChain;
+    if (w.appKit?.getWalletProvider) return w.appKit.getWalletProvider();
+
+    return null;
+  }
+
+  private async ensureBscTestnet(provider: ethers.BrowserProvider, rawProvider: any): Promise<void> {
     const network = await provider.getNetwork();
     if (network.chainId !== this.BSC_TESTNET_CHAIN_ID) {
-      const anyWindow = typeof window !== 'undefined' ? (window as any) : null;
-      if (anyWindow?.ethereum?.request) {
+      if (rawProvider?.request) {
         try {
-          await anyWindow.ethereum.request({
+          await rawProvider.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: '0x61' }],
           });
         } catch (switchError: any) {
           if (switchError.code === 4902) {
-            await anyWindow.ethereum.request({
+            await rawProvider.request({
               method: 'wallet_addEthereumChain',
               params: [
                 {
@@ -156,9 +173,7 @@ export class RealContractProvider implements IContractProvider {
       );
     }
 
-   
     let abi: readonly any[];
-
     if (contractKey === 'mdefiHub') {
       abi = HUB_ABI;
     } else if (contractKey === 'mbttcToken') {
@@ -184,7 +199,6 @@ export class RealContractProvider implements IContractProvider {
       }
 
       const result = await contract[methodName](...(args || []));
-
       return result as T;
     } catch (err: any) {
       throw new Error(
@@ -213,19 +227,18 @@ export class RealContractProvider implements IContractProvider {
       };
     }
 
-    if (typeof window === 'undefined' || !(window as any).ethereum) {
+    const rawProvider = this.getActiveEip1193Provider();
+    if (!rawProvider) {
       return {
         success: false,
         txHash: '',
         status: 'FAILED',
         isRealBlockchainData: true,
-        message:
-          'No Web3 wallet provider detected. Please connect a compatible BEP-20 wallet.',
+        message: 'No active Web3 wallet session found. Please reconnect your BEP-20 wallet.',
       };
     }
 
     let abi: readonly any[];
-
     if (contractKey === 'mdefiHub') {
       abi = HUB_ABI;
     } else if (contractKey === 'mbttcToken') {
@@ -236,20 +249,15 @@ export class RealContractProvider implements IContractProvider {
         txHash: '',
         status: 'FAILED',
         isRealBlockchainData: true,
-        message:
-          `[RealContractProvider] Verified ABI is not configured for "${contractKey}".`,
+        message: `[RealContractProvider] Verified ABI is not configured for "${contractKey}".`,
       };
     }
 
     try {
-      const provider = new ethers.BrowserProvider(
-        (window as any).ethereum
-      );
+      const browserProvider = new ethers.BrowserProvider(rawProvider);
+      await this.ensureBscTestnet(browserProvider, rawProvider);
 
-      await this.ensureBscTestnet(provider);
-
-      const signer = await provider.getSigner();
-
+      const signer = await browserProvider.getSigner();
       const contract = new ethers.Contract(
         contractAddress,
         abi,
@@ -262,8 +270,7 @@ export class RealContractProvider implements IContractProvider {
           txHash: '',
           status: 'FAILED',
           isRealBlockchainData: true,
-          message:
-            `Method "${methodName}" was not found in the verified ABI for "${contractKey}".`,
+          message: `Method "${methodName}" was not found in the verified ABI for "${contractKey}".`,
         };
       }
 
@@ -287,7 +294,9 @@ export class RealContractProvider implements IContractProvider {
     } catch (err: any) {
       if (
         err?.code === 4001 ||
-        err?.code === 'ACTION_REJECTED'
+        err?.code === 'ACTION_REJECTED' ||
+        err?.message?.includes('rejected') ||
+        err?.message?.includes('denied')
       ) {
         return {
           success: false,
@@ -317,30 +326,15 @@ export class RealContractProvider implements IContractProvider {
       return false;
     }
 
-    if (
-      typeof window === 'undefined' ||
-      !(window as any).ethereum
-    ) {
-      return false;
-    }
-
     try {
-      const provider = new ethers.BrowserProvider(
-        (window as any).ethereum
-      );
-
-      const receipt = await provider.waitForTransaction(
-        txHash,
-        1
-      );
-
+      const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
+      const receipt = await provider.waitForTransaction(txHash, 1);
       return receipt?.status === 1;
     } catch (err: any) {
       console.error(
         '[RealContractProvider] Transaction confirmation check failed:',
         err
       );
-
       return false;
     }
   }
