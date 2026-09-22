@@ -267,6 +267,7 @@ export class ContractAdapter {
   }
 
   // =========================================================================
+ // =========================================================================
   // 2. USER REGISTRATION (register(uint256 _uplineId) PAYABLE)
   // =========================================================================
 
@@ -275,22 +276,6 @@ export class ContractAdapter {
     const { walletAddress } = params;
     this.setTxLifecycleState('PREPARING');
 
-    if (typeof window === 'undefined' || !(window as any).ethereum) {
-      this.setTxLifecycleState('FAILED');
-      return {
-        success: false,
-        txHash: '',
-        userFacingId: '',
-        numericId: 0,
-        sponsorId: String(uplineInput),
-        walletAddress,
-        timestamp: Date.now(),
-        isRealBlockchainData: true,
-        status: 'failed',
-        message: 'Web3 Wallet not detected. Please unlock your wallet.',
-      };
-    }
-
     try {
       const contractUplineId = toContractNumericId(uplineInput);
       if (contractUplineId <= 0) {
@@ -298,10 +283,27 @@ export class ContractAdapter {
       }
 
       const feeWei = await this.getOnChainRegistrationFeeWei();
-
-      this.setTxLifecycleState('WALLET_CONFIRMATION');
       const provider = getContractProvider(true);
 
+    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+        this.setTxLifecycleState('FAILED');
+        return {
+          success: false,
+          txHash: '',
+          userFacingId: '',
+          numericId: 0,
+          sponsorId: String(uplineInput),
+          walletAddress,
+          timestamp: Date.now(),
+          isRealBlockchainData: true,
+          status: 'failed',
+          message: 'Connected wallet address not found. Please connect your Web3 wallet.',
+        };
+      }
+
+      this.setTxLifecycleState('WALLET_CONFIRMATION');
+
+      // Execute on-chain write with payable registration fee
       const txResult = await provider.write(
         'mdefiHub',
         'register',
@@ -321,7 +323,7 @@ export class ContractAdapter {
           timestamp: Date.now(),
           isRealBlockchainData: true,
           status: txResult.status === 'REJECTED' ? 'rejected' : 'failed',
-          message: txResult.message,
+          message: txResult.message || 'On-chain registration failed.',
         };
       }
 
@@ -362,7 +364,7 @@ export class ContractAdapter {
         message: 'User registered successfully on MDeFi Hub.',
       };
     } catch (err: any) {
-      const isReject = err?.code === 4001 || err?.message?.includes('rejected');
+      const isReject = err?.code === 4001 || err?.message?.includes('rejected') || err?.message?.includes('denied');
       this.setTxLifecycleState(isReject ? 'REJECTED' : 'FAILED');
       return {
         success: false,
@@ -374,7 +376,7 @@ export class ContractAdapter {
         timestamp: Date.now(),
         isRealBlockchainData: true,
         status: isReject ? 'rejected' : 'failed',
-        message: isReject ? 'Transaction rejected by user in wallet.' : (err?.message || 'On-chain registration failed.'),
+        message: isReject ? 'Transaction rejected in wallet.' : (err?.message || 'On-chain registration failed.'),
       };
     }
   }
