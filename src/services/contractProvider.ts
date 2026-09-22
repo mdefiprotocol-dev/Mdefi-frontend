@@ -100,21 +100,35 @@ export class RealContractProvider implements IContractProvider {
    * Helper: Resolves active Ethereum/EIP-1193 provider across desktop extensions, 
    * mobile in-app browsers, and WalletConnect sessions.
    */
-  private getActiveEip1193Provider(): any {
+ private getActiveEip1193Provider(): any {
     if (typeof window === 'undefined') return null;
     const w = window as any;
 
+    // 1. Standard window.ethereum (Desktop extension ya Mobile DApp browser)
     if (w.ethereum) {
       if (Array.isArray(w.ethereum.providers) && w.ethereum.providers.length > 0) {
-        return w.ethereum.providers.find((p: any) => p.isMetaMask) || w.ethereum.providers[0];
+        return w.ethereum.providers.find((p: any) => p.isMetaMask || p.isTrust) || w.ethereum.providers[0];
       }
       return w.ethereum;
     }
 
-    if (w.walletConnectProvider) return w.walletConnectProvider;
+    // 2. Mobile Specific Wallet injections
     if (w.trustwallet?.ethereum) return w.trustwallet.ethereum;
     if (w.BinanceChain) return w.BinanceChain;
+    if (w.bitkeep?.ethereum) return w.bitkeep.ethereum;
+    if (w.okxwallet) return w.okxwallet;
+
+    // 3. WalletConnect / AppKit session connectors
+    if (w.walletConnectProvider) return w.walletConnectProvider;
     if (w.appKit?.getWalletProvider) return w.appKit.getWalletProvider();
+    if (w._eip1193Provider) return w._eip1193Provider;
+
+    // 4. Global scanner (Android Chrome me koi bhi active Web3 provider ho to pakad lega)
+    for (const key of Object.keys(w)) {
+      if ((key.toLowerCase().includes('provider') || key.toLowerCase().includes('ethereum')) && w[key]?.request) {
+        return w[key];
+      }
+    }
 
     return null;
   }
