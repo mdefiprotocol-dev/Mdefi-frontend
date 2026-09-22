@@ -1,4 +1,5 @@
 import EthereumProvider from '@walletconnect/ethereum-provider';
+import { setExternalWalletProvider } from './contractProvider';
 
 const PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
@@ -50,6 +51,7 @@ export async function connectWalletConnect(): Promise<string> {
       await wcProvider.disconnect();
     }
     await wcProvider.connect();
+   setExternalWalletProvider(wcProvider); 
   } catch (error) {
     console.warn('[WalletConnect] connect() failed or rejected:', error);
   }

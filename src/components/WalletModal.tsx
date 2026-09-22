@@ -19,6 +19,7 @@ import { UserProfile } from '../types';
 import { playClaimSuccessSound } from '../utils/successSound';
 import { formatCompactAddress } from '../utils/formatAddress';
 import { connectWalletConnect } from '../services/walletConnectService';
+import { setExternalWalletProvider } from '../services/contractProvider';
 
 interface WalletOption {
   id: string;
