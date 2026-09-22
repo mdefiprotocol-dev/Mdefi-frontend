@@ -73,6 +73,6 @@ export async function disconnectWalletConnect() {
   } catch (error) {
     console.warn('[WalletConnect] disconnect failed:', error);
   }
-
+setExternalWalletProvider(null);
   provider = null;
 }
