@@ -89,6 +89,13 @@ export class DemoContractProvider implements IContractProvider {
 /**
  * Real Contract Provider: Complete Mobile & WalletConnect Compatible EIP-1193 Engine
  */
+// Chrome / Telegram se aaye WalletConnect session ko pakadne ke liye
+let externalWalletProvider: any = null;
+
+export function setExternalWalletProvider(provider: any) {
+  externalWalletProvider = provider;
+}
+
 export class RealContractProvider implements IContractProvider {
   private readonly BSC_TESTNET_CHAIN_ID = 97n;
 
@@ -101,6 +108,9 @@ export class RealContractProvider implements IContractProvider {
    * mobile in-app browsers, and WalletConnect sessions.
    */
  private getActiveEip1193Provider(): any {
+    if (externalWalletProvider) {
+      return externalWalletProvider;
+    }
     if (typeof window === 'undefined') return null;
     const w = window as any;
 
