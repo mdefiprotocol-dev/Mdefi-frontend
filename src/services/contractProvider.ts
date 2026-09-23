@@ -7,7 +7,7 @@
  * 
  * ARCHITECTURAL RULES:
  * - Smart contracts are deployed on BSC Testnet (Chain ID: 97).
- * - Multi-provider detection (MetaMask, TrustWallet, Binance Web3, WalletConnect / AppKit).
+ * - Multi-provider detection (MetaMask, TrustWallet, TokenPocket, Bitget, WalletConnect).
  * - Zero design/style alterations.
  */
 
@@ -50,6 +50,11 @@ export interface IContractProvider {
   waitForConfirmation(txHash: string): Promise<boolean>;
 }
 
+const BSC_TESTNET_RPC_URLS = [
+  'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+  'https://bsc-testnet.bnbchain.org',
+];
+
 /**
  * Demo Provider: Implements benchmark simulated responses for developer & preview testing
  */
@@ -89,11 +94,14 @@ export class DemoContractProvider implements IContractProvider {
 /**
  * Real Contract Provider: Complete Mobile & WalletConnect Compatible EIP-1193 Engine
  */
-// Chrome / Telegram se aaye WalletConnect session ko pakadne ke liye
 let externalWalletProvider: any = null;
 
 export function setExternalWalletProvider(provider: any) {
-  externalWalletProvider = provider;
+  if (provider && typeof provider.request === 'function') {
+    externalWalletProvider = provider;
+  } else if (!provider) {
+    externalWalletProvider = null;
+  }
 }
 
 export class RealContractProvider implements IContractProvider {
@@ -107,35 +115,54 @@ export class RealContractProvider implements IContractProvider {
    * Helper: Resolves active Ethereum/EIP-1193 provider across desktop extensions, 
    * mobile in-app browsers, and WalletConnect sessions.
    */
- private getActiveEip1193Provider(): any {
-    if (externalWalletProvider) {
+  public getActiveEip1193Provider(): any {
+    if (externalWalletProvider && typeof externalWalletProvider.request === 'function') {
       return externalWalletProvider;
     }
     if (typeof window === 'undefined') return null;
     const w = window as any;
 
-    // 1. Standard window.ethereum (Desktop extension ya Mobile DApp browser)
-    if (w.ethereum) {
+    // 1. DApp Browser Specific Injections (TokenPocket, Bitget, Trust Wallet)
+    if (w.tokenpocket?.ethereum && typeof w.tokenpocket.ethereum.request === 'function') {
+      return w.tokenpocket.ethereum;
+    }
+    if (w.bitget?.ethereum && typeof w.bitget.ethereum.request === 'function') {
+      return w.bitget.ethereum;
+    }
+    if (w.bitkeep?.ethereum && typeof w.bitkeep.ethereum.request === 'function') {
+      return w.bitkeep.ethereum;
+    }
+    if (w.trustwallet?.ethereum && typeof w.trustwallet.ethereum.request === 'function') {
+      return w.trustwallet.ethereum;
+    }
+
+    // 2. Standard window.ethereum (Desktop extension ya Mobile DApp browser)
+    if (w.ethereum && typeof w.ethereum.request === 'function') {
       if (Array.isArray(w.ethereum.providers) && w.ethereum.providers.length > 0) {
-        return w.ethereum.providers.find((p: any) => p.isMetaMask || p.isTrust) || w.ethereum.providers[0];
+        const found = w.ethereum.providers.find(
+          (p: any) => p && typeof p.request === 'function' && (p.isMetaMask || p.isTrust || p.isTokenPocket || p.isBitget)
+        );
+        if (found) return found;
+        return w.ethereum.providers[0];
       }
       return w.ethereum;
     }
 
-    // 2. Mobile Specific Wallet injections
-    if (w.trustwallet?.ethereum) return w.trustwallet.ethereum;
-    if (w.BinanceChain) return w.BinanceChain;
-    if (w.bitkeep?.ethereum) return w.bitkeep.ethereum;
-    if (w.okxwallet) return w.okxwallet;
-
     // 3. WalletConnect / AppKit session connectors
-    if (w.walletConnectProvider) return w.walletConnectProvider;
-    if (w.appKit?.getWalletProvider) return w.appKit.getWalletProvider();
-    if (w._eip1193Provider) return w._eip1193Provider;
+    if (w.walletConnectProvider && typeof w.walletConnectProvider.request === 'function') {
+      return w.walletConnectProvider;
+    }
+    if (w.appKit?.getWalletProvider) {
+      const p = w.appKit.getWalletProvider();
+      if (p && typeof p.request === 'function') return p;
+    }
+    if (w._eip1193Provider && typeof w._eip1193Provider.request === 'function') {
+      return w._eip1193Provider;
+    }
 
-    // 4. Global scanner (Android Chrome me koi bhi active Web3 provider ho to pakad lega)
+    // 4. Global scanner fallback
     for (const key of Object.keys(w)) {
-      if ((key.toLowerCase().includes('provider') || key.toLowerCase().includes('ethereum')) && w[key]?.request) {
+      if ((key.toLowerCase().includes('provider') || key.toLowerCase().includes('ethereum')) && typeof w[key]?.request === 'function') {
         return w[key];
       }
     }
@@ -165,10 +192,7 @@ export class RealContractProvider implements IContractProvider {
                     symbol: 'tBNB',
                     decimals: 18,
                   },
-                  rpcUrls: [
-                    'https://data-seed-prebsc-1-s1.binance.org:8545/',
-                    'https://bsc-testnet.publicnode.com',
-                  ],
+                  rpcUrls: BSC_TESTNET_RPC_URLS,
                   blockExplorerUrls: ['https://testnet.bscscan.com'],
                 },
               ],
@@ -209,7 +233,7 @@ export class RealContractProvider implements IContractProvider {
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
+      const provider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC_URLS[0]);
       const contract = new ethers.Contract(
         contractAddress,
         abi,
@@ -252,7 +276,7 @@ export class RealContractProvider implements IContractProvider {
     }
 
     const rawProvider = this.getActiveEip1193Provider();
-    if (!rawProvider) {
+    if (!rawProvider || typeof rawProvider.request !== 'function') {
       return {
         success: false,
         txHash: '',
@@ -351,7 +375,7 @@ export class RealContractProvider implements IContractProvider {
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider('https://data-seed-prebsc-1-s1.binance.org:8545/');
+      const provider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC_URLS[0]);
       const receipt = await provider.waitForTransaction(txHash, 1);
       return receipt?.status === 1;
     } catch (err: any) {
