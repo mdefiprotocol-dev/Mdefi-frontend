@@ -1,21 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   ShieldCheck, 
   AlertTriangle, 
   CheckCircle2, 
   Loader2, 
-  ArrowRight,
-  Sparkles,
-  Wallet,
-  Check,
-  Radio
+  ArrowRight, 
+  Sparkles, 
+  Wallet, 
+  Check, 
+  Radio 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { playClaimSuccessSound } from '../utils/successSound';
 import { formatCompactAddress } from '../utils/formatAddress';
 import { connectWalletConnect } from '../services/walletConnectService';
 import { setExternalWalletProvider } from '../services/contractProvider';
+
+interface EIP1193Provider {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+  on?(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener?(event: string, listener: (...args: unknown[]) => void): void;
+}
 
 interface WalletOption {
   id: string;
@@ -38,6 +44,26 @@ export interface WalletModalProps {
   onWalletConnected?: (connectedAddress: string, walletName: string) => void;
 }
 
+const BSC_TESTNET_HEX_CHAIN_ID = '0x61';
+const BSC_TESTNET_CONFIG = {
+  chainId: BSC_TESTNET_HEX_CHAIN_ID,
+  chainName: 'BNB Smart Chain Testnet',
+  nativeCurrency: {
+    name: 'tBNB',
+    symbol: 'tBNB',
+    decimals: 18,
+  },
+  rpcUrls: [
+    'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    'https://bsc-testnet.bnbchain.org',
+  ],
+  blockExplorerUrls: ['https://testnet.bscscan.com'],
+};
+
+const isValidEthereumAddress = (address: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
+
 export const WalletModal: React.FC<WalletModalProps> = ({
   isOpen,
   onClose,
@@ -55,6 +81,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   const [selectedWalletName, setSelectedWalletName] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const activeSessionIdRef = useRef<number>(0);
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setConnectingWalletId(null);
@@ -62,15 +91,18 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setStatusMessage('');
       setErrorMessage(null);
       document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
     }
+
+    return () => {
+      document.body.style.overflow = '';
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // 100% Authentic Vectors for Web3 Wallets (MetaMask, Trust, TokenPocket, WalletConnect, Bitget)
   const walletOptions: WalletOption[] = [
     {
       id: 'metamask',
@@ -150,68 +182,151 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     },
   ];
 
-  const ensureBscTestnetChain = async (rawProvider: any) => {
+  const ensureBscTestnetChain = async (rawProvider: EIP1193Provider): Promise<void> => {
     try {
       await rawProvider.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x61' }],
+        params: [{ chainId: BSC_TESTNET_HEX_CHAIN_ID }],
       });
-    } catch (switchError: any) {
-      if (switchError.code === 4902) {
+    } catch (switchError: unknown) {
+      const err = switchError as { code?: number };
+      if (err?.code === 4902) {
         await rawProvider.request({
           method: 'wallet_addEthereumChain',
-          params: [
-            {
-              chainId: '0x61',
-              chainName: 'BNB Smart Chain Testnet',
-              nativeCurrency: {
-                name: 'tBNB',
-                symbol: 'tBNB',
-                decimals: 18,
-              },
-              rpcUrls: [
-                'https://data-seed-prebsc-1-s1.binance.org:8545/',
-                'https://bsc-testnet.publicnode.com',
-              ],
-              blockExplorerUrls: ['https://testnet.bscscan.com'],
-            },
-          ],
+          params: [BSC_TESTNET_CONFIG],
         });
       } else {
         throw switchError;
       }
     }
+
+    const currentChainId = (await rawProvider.request({
+      method: 'eth_chainId',
+    })) as string;
+
+    const normalizedChainId = String(currentChainId).toLowerCase();
+    if (normalizedChainId !== BSC_TESTNET_HEX_CHAIN_ID && normalizedChainId !== '0x061' && normalizedChainId !== '97') {
+      throw new Error('Please confirm and switch your wallet network to BNB Smart Chain Testnet (Chain ID: 97).');
+    }
   };
 
-  // Helper to detect specific injected Web3 provider
-  const getSpecificProvider = (id: string) => {
+  const getSpecificProvider = (id: string): EIP1193Provider | null => {
     if (typeof window === 'undefined') return null;
-    const w = window as any;
+    const w = window as unknown as {
+      ethereum?: {
+        isMetaMask?: boolean;
+        isTrust?: boolean;
+        isTokenPocket?: boolean;
+        providers?: Array<{
+          isMetaMask?: boolean;
+          isTrust?: boolean;
+          isTokenPocket?: boolean;
+          isBitKeep?: boolean;
+          isBitget?: boolean;
+          request?: EIP1193Provider['request'];
+        }>;
+        request?: EIP1193Provider['request'];
+      };
+      trustwallet?: { ethereum?: EIP1193Provider };
+      tokenpocket?: { ethereum?: EIP1193Provider };
+      bitkeep?: { ethereum?: EIP1193Provider };
+      bitget?: { ethereum?: EIP1193Provider };
+    };
 
     if (id === 'metamask') {
-      if (w.ethereum?.isMetaMask && !w.ethereum?.isTokenPocket && !w.ethereum?.isTrust) return w.ethereum;
-      if (Array.isArray(w.ethereum?.providers)) {
-        return w.ethereum.providers.find((p: any) => p.isMetaMask && !p.isTokenPocket);
+      if (w.ethereum?.isMetaMask && !w.ethereum?.isTokenPocket && !w.ethereum?.isTrust) {
+        return w.ethereum as unknown as EIP1193Provider;
       }
-      return w.ethereum;
+      if (Array.isArray(w.ethereum?.providers)) {
+        const found = w.ethereum.providers.find(
+          (p) => Boolean(p?.isMetaMask) && !p?.isTokenPocket && !p?.isTrust
+        );
+        if (found && typeof found.request === 'function') return found as unknown as EIP1193Provider;
+      }
+      return null;
     }
 
     if (id === 'trustwallet') {
-      return w.trustwallet?.ethereum || (w.ethereum?.isTrust ? w.ethereum : null);
+      if (w.trustwallet?.ethereum && typeof w.trustwallet.ethereum.request === 'function') {
+        return w.trustwallet.ethereum;
+      }
+      if (w.ethereum?.isTrust && typeof w.ethereum.request === 'function') {
+        return w.ethereum as unknown as EIP1193Provider;
+      }
+      if (Array.isArray(w.ethereum?.providers)) {
+        const found = w.ethereum.providers.find((p) => Boolean(p?.isTrust));
+        if (found && typeof found.request === 'function') return found as unknown as EIP1193Provider;
+      }
+      return null;
     }
 
     if (id === 'tokenpocket') {
-      return w.tokenpocket?.ethereum || (w.ethereum?.isTokenPocket ? w.ethereum : null);
+      if (w.tokenpocket?.ethereum && typeof w.tokenpocket.ethereum.request === 'function') {
+        return w.tokenpocket.ethereum;
+      }
+      if (w.ethereum?.isTokenPocket && typeof w.ethereum.request === 'function') {
+        return w.ethereum as unknown as EIP1193Provider;
+      }
+      if (Array.isArray(w.ethereum?.providers)) {
+        const found = w.ethereum.providers.find((p) => Boolean(p?.isTokenPocket));
+        if (found && typeof found.request === 'function') return found as unknown as EIP1193Provider;
+      }
+      return null;
     }
 
     if (id === 'bitget') {
-      return w.bitkeep?.ethereum || w.bitget?.ethereum;
+      if (w.bitkeep?.ethereum && typeof w.bitkeep.ethereum.request === 'function') {
+        return w.bitkeep.ethereum;
+      }
+      if (w.bitget?.ethereum && typeof w.bitget.ethereum.request === 'function') {
+        return w.bitget.ethereum;
+      }
+      if (Array.isArray(w.ethereum?.providers)) {
+        const found = w.ethereum.providers.find((p) => Boolean(p?.isBitKeep || p?.isBitget));
+        if (found && typeof found.request === 'function') return found as unknown as EIP1193Provider;
+      }
+      return null;
     }
 
     return null;
   };
 
+  const isMobileEnvironment = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return isMobileUa || (hasTouch && window.innerWidth <= 768);
+  };
+
+  const triggerWalletDeepLink = (walletId: string): boolean => {
+    if (typeof window === 'undefined') return false;
+    const currentHref = window.location.href;
+    const cleanUrl = currentHref.replace(/^https?:\/\//, '');
+
+    if (walletId === 'metamask') {
+      window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
+      return true;
+    }
+    if (walletId === 'trustwallet') {
+      window.location.href = `https://link.trustwallet.com/open_url?coin_id=20000714&url=${encodeURIComponent(currentHref)}`;
+      return true;
+    }
+    if (walletId === 'tokenpocket') {
+      const tpParams = { url: currentHref, chain: 'BSC' };
+      window.location.href = `tpdapp://open?params=${encodeURIComponent(JSON.stringify(tpParams))}`;
+      return true;
+    }
+    if (walletId === 'bitget') {
+      window.location.href = `bitkeep://bkconnect?action=dapp&url=${encodeURIComponent(currentHref)}`;
+      return true;
+    }
+    return false;
+  };
+
   const handleConnect = async (wallet: WalletOption) => {
+    const currentSessionId = Date.now();
+    activeSessionIdRef.current = currentSessionId;
+
     setConnectingWalletId(wallet.id);
     setSelectedWalletName(wallet.name);
     setConnectionStatus('connecting');
@@ -219,58 +334,115 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
     try {
       let resolvedAddress: string;
+
+      if (wallet.id === 'walletconnect') {
+        setStatusMessage('Connecting via WalletConnect...');
+        resolvedAddress = await connectWalletConnect();
+
+        if (activeSessionIdRef.current !== currentSessionId) return;
+
+        if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {
+          throw new Error('Wallet connection timed out or did not return a valid address.');
+        }
+
+        setConnectedAddress(resolvedAddress);
+        setConnectionStatus('connected');
+        setStatusMessage('Connected via WalletConnect (Verified)');
+
+        try {
+          playClaimSuccessSound();
+        } catch {}
+
+        successTimeoutRef.current = setTimeout(() => {
+          if (activeSessionIdRef.current !== currentSessionId) return;
+          if (onWalletConnected) {
+            onWalletConnected(resolvedAddress, 'WalletConnect');
+          }
+          if (onSwitchAddress) {
+            onSwitchAddress(resolvedAddress);
+          }
+          onClose();
+        }, 700);
+        return;
+      }
+
       const injectedProvider = getSpecificProvider(wallet.id);
 
-      // Check for direct browser injection
-      if (injectedProvider && injectedProvider.request) {
+      if (injectedProvider && typeof injectedProvider.request === 'function') {
         setStatusMessage(`Authorizing ${wallet.name} on BSC Testnet...`);
-        setExternalWalletProvider(injectedProvider);
 
         const accounts = (await injectedProvider.request({
           method: 'eth_requestAccounts',
         })) as string[];
 
-        if (!accounts || !accounts[0]) {
-          throw new Error(`No account unlocked in ${wallet.name}.`);
+        if (activeSessionIdRef.current !== currentSessionId) return;
+
+        if (!Array.isArray(accounts) || !accounts[0] || !isValidEthereumAddress(accounts[0])) {
+          throw new Error(`No valid BSC account unlocked in ${wallet.name}.`);
         }
 
         setStatusMessage('Verifying BNB Smart Chain Testnet...');
         await ensureBscTestnetChain(injectedProvider);
+
+        if (activeSessionIdRef.current !== currentSessionId) return;
+
+        setExternalWalletProvider(injectedProvider);
         resolvedAddress = accounts[0];
-      } else if (wallet.id === 'walletconnect' || !injectedProvider) {
-        // Fallback to WalletConnect with AppKit
-        setStatusMessage(`Opening ${wallet.name} secure handshake...`);
-        resolvedAddress = await connectWalletConnect();
 
-        if (!resolvedAddress || !resolvedAddress.startsWith('0x')) {
-          throw new Error('Wallet connection timed out or was rejected.');
-        }
+        setConnectedAddress(resolvedAddress);
+        setConnectionStatus('connected');
+        setStatusMessage(`Connected via ${wallet.name} (Verified)`);
+
+        try {
+          playClaimSuccessSound();
+        } catch {}
+
+        successTimeoutRef.current = setTimeout(() => {
+          if (activeSessionIdRef.current !== currentSessionId) return;
+          if (onWalletConnected) {
+            onWalletConnected(resolvedAddress, wallet.name);
+          }
+          if (onSwitchAddress) {
+            onSwitchAddress(resolvedAddress);
+          }
+          onClose();
+        }, 700);
       } else {
-        throw new Error(`${wallet.name} is not installed in this browser.`);
+        if (isMobileEnvironment()) {
+          setStatusMessage(`Opening ${wallet.name} App...`);
+          const opened = triggerWalletDeepLink(wallet.id);
+          if (opened) {
+            successTimeoutRef.current = setTimeout(() => {
+              if (activeSessionIdRef.current !== currentSessionId) return;
+              setConnectionStatus('idle');
+              setConnectingWalletId(null);
+            }, 3000);
+            return;
+          }
+        }
+
+        const walletErrors: Record<string, string> = {
+          metamask: 'MetaMask was not detected. Please open MDeFi in MetaMask or install MetaMask.',
+          trustwallet: "Trust Wallet was not detected. Please open MDeFi inside Trust Wallet's DApp browser.",
+          tokenpocket: "TokenPocket was not detected. Please open MDeFi inside TokenPocket's DApp browser.",
+          bitget: "Bitget Wallet was not detected. Please open MDeFi inside Bitget Wallet's DApp browser.",
+        };
+
+        throw new Error(
+          walletErrors[wallet.id] || `${wallet.name} was not detected. Please open MDeFi inside ${wallet.name}'s DApp browser or select WalletConnect.`
+        );
       }
-
-      setConnectedAddress(resolvedAddress);
-      setConnectionStatus('connected');
-      setStatusMessage(`Connected via ${wallet.name} (Verified)`);
-
-      try {
-        playClaimSuccessSound();
-      } catch {}
-
-      setTimeout(() => {
-        if (onWalletConnected) {
-          onWalletConnected(resolvedAddress, wallet.name);
-        }
-        if (onSwitchAddress) {
-          onSwitchAddress(resolvedAddress);
-        }
-        onClose();
-      }, 700);
     } catch (err: unknown) {
-      const errorText =
-        err instanceof Error
-          ? err.message
-          : 'Connection request rejected or timed out.';
+      if (activeSessionIdRef.current !== currentSessionId) return;
+
+      const rawError = err as { code?: number; message?: string };
+      let errorText = 'Connection request failed.';
+
+      if (rawError?.code === 4001 || rawError?.message?.includes('User rejected')) {
+        errorText = 'Connection request was cancelled or rejected by user.';
+      } else if (rawError?.message) {
+        errorText = rawError.message;
+      }
 
       setConnectionStatus('error');
       setErrorMessage(errorText);
@@ -288,10 +460,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         className="relative w-full max-w-lg my-auto max-h-[92vh] overflow-y-auto rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#091811] via-[#05110a] to-[#030906] border-2 border-emerald-500/40 shadow-[0_0_80px_rgba(16,185,129,0.35)] p-4 sm:p-7 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Glow Element */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Modal Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800 relative z-10">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
@@ -316,7 +486,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </button>
         </div>
 
-        {/* Active Connected Session Banner */}
         {user && (
           <div className="p-3.5 rounded-2xl bg-zinc-900/70 border border-emerald-500/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -337,7 +506,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </div>
         )}
 
-        {/* Intended Action Notice */}
         {!user && intendedAction === 'register' && (
           <div className="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-500/30 text-xs font-mono text-emerald-300 flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -362,7 +530,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </div>
         )}
 
-        {/* High-Tech Dual Orbit Loader Banner */}
         {connectionStatus === 'connecting' && (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-zinc-950 via-[#071910] to-zinc-950 border border-emerald-500/60 shadow-[0_0_30px_rgba(16,185,129,0.25)] text-center space-y-3 animate-in fade-in-50">
             <div className="flex items-center justify-center gap-3">
@@ -372,7 +539,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
               <span className="text-emerald-400 font-mono text-xs font-bold uppercase tracking-wider">
-                Authorizing {selectedWalletName}...
+                {statusMessage.includes('Connecting via WalletConnect') 
+                  ? 'Connecting via WalletConnect...' 
+                  : statusMessage.includes('Opening')
+                  ? statusMessage
+                  : `Authorizing ${selectedWalletName}...`}
               </span>
             </div>
             <p className="text-xs text-zinc-300 font-mono">
@@ -411,7 +582,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </div>
         )}
 
-        {/* Wallets List */}
         <div className="space-y-2.5 relative z-10">
           <span className="text-[11px] font-mono text-zinc-400 font-bold uppercase tracking-wider block">
             Select Web3 Wallet Provider
@@ -474,7 +644,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </div>
         </div>
 
-        {/* Security & Non-Custodial Footer Guarantee */}
         <div className="pt-3 border-t border-zinc-800/80 flex items-start gap-2.5 text-[11px] text-zinc-400 leading-relaxed relative z-10">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <p>
