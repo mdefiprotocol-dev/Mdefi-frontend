@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { 
   UserProfile, 
@@ -12,6 +12,7 @@ import { mdefiService } from './services/mdefiService';
 import { centralEventSyncService } from './services/centralEventSyncService';
 import { contractAdapter } from './services/contractAdapter';
 import { nexusContractService } from './services/nexusContractService';
+import { setExternalWalletProvider } from './services/contractProvider';
 import { normalizeAndDeduplicateActivities, isDuplicateActivity } from './utils/notificationDeduplication';
 import { formatCompactAddress } from './utils/formatAddress';
 import { toHumanFacingId } from './utils/idConverter';
@@ -48,7 +49,6 @@ import { MBTTC_TOKEN_INFO } from './data/mbttcTokenInfo';
 import { PhaseLockedView } from './components/common/PhaseLockedView';
 import { programPhaseService } from './services/programPhaseService';
 
-// Zero Mock Initial States
 const emptyUserProfile: UserProfile = {
   walletAddress: '',
   userId: '',
@@ -74,7 +74,6 @@ const emptyRewardBalances: RewardBalances = {
   lastPackageClaim: 'Never',
   nextReferralClaimSec: 0,
   nextPackageClaimSec: 0,
-
 };
 
 function MainApp() {
@@ -86,7 +85,7 @@ function MainApp() {
       return 'landing';
     }
   });
-const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
+  const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
 
   const [currentPage, setCurrentPage] = useState<NavPage>('overview');
   const [s4PackageFocus, setS4PackageFocus] = useState<'junior' | 'senior'>('junior');
@@ -102,6 +101,11 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
   const [rewards, setRewards] = useState<RewardBalances>(emptyRewardBalances);
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  const userRef = useRef<UserProfile>(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const loadActivitiesForWallet = (walletAddress: string): ActivityItem[] => {
     if (!walletAddress) return [];
@@ -136,7 +140,7 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
     } catch {}
   };
 
-  // Sync Live On-Chain Data when wallet changes or refreshes
+  // Live on-chain sync
   const syncLiveOnChainUser = useCallback(async (walletAddress: string, verifiedNode?: any) => {
     if (!walletAddress || !ethers.isAddress(walletAddress)) return;
 
@@ -149,7 +153,7 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
       const userFacingId = rawNumericId > 0 ? toHumanFacingId(rawNumericId) : `MDF-${rawNumericId}`;
       const sponsorAddress = node.upline || dashboard?.sponsorId || '';
 
-    const updatedProfile: UserProfile = {
+      const updatedProfile: UserProfile = {
         walletAddress: node.wallet || walletAddress,
         userId: userFacingId,
         sponsorId: sponsorAddress,
@@ -165,11 +169,9 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
 
       persistUserProfile(updatedProfile);
 
-      // Fetch live on-chain balances
       const freshBalances = await mdefiService.getRewardBalances(walletAddress);
       setRewards(freshBalances);
 
-      // Fetch live on-chain package states
       const ids = await contractAdapter.getConfiguredPackageIds();
       const loadedPackages: PackageItem[] = await Promise.all(
         ids.map(async (pId) => {
@@ -208,12 +210,10 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
 
       const numericId = Number(node.id || 0);
 
-      // 1. रूट एडमिन की ऑन-चेन पहचान (कॉन्ट्रैक्ट क्रिएटर / नोड 1)
       if (numericId === 1) {
         return { registered: true, node };
       }
 
-      // 2. आम यूज़र की ऑन-चेन पहचान
       const isRegistered = Boolean(node.isRegistered);
       if (isRegistered || numericId > 0) {
         return { registered: true, node };
@@ -226,18 +226,100 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
     }
   }, []);
 
-  // Auto-verify on initial mount if already in dashboard mode
+  // SINGLE UNIFIED INJECTED WALLET AND DAPP AUTO-SYNC
   useEffect(() => {
-    if (appMode === 'dashboard' && user.walletAddress) {
-      verifyWalletRegistration(user.walletAddress).then(({ registered, node }) => {
-        if (registered && node) {
-          syncLiveOnChainUser(user.walletAddress, node);
-        } else {
+    if (typeof window === 'undefined') return;
+    const w = window as any;
+    const activeProvider = w.ethereum || w.trustwallet?.ethereum || w.tokenpocket?.ethereum || w.bitkeep?.ethereum || w.bitget?.ethereum;
+
+    if (!activeProvider || typeof activeProvider.request !== 'function') {
+      // If not in injected DApp browser, verify cached user if in dashboard
+      if (appMode === 'dashboard' && userRef.current.walletAddress) {
+        verifyWalletRegistration(userRef.current.walletAddress).then(({ registered, node }) => {
+          if (registered && node) {
+            syncLiveOnChainUser(userRef.current.walletAddress, node);
+          } else {
+            persistAppMode('landing');
+          }
+        });
+      }
+      return;
+    }
+
+    // Set provider globally immediately
+    setExternalWalletProvider(activeProvider);
+
+    const checkAndSyncAccount = async () => {
+      try {
+        const accounts = (await activeProvider.request({ method: 'eth_accounts' })) as string[];
+        if (Array.isArray(accounts) && accounts[0] && ethers.isAddress(accounts[0])) {
+          const liveAddr = accounts[0];
+          const currentStored = userRef.current.walletAddress;
+
+          // If address changed or not set, force refresh state
+          if (!currentStored || currentStored.toLowerCase() !== liveAddr.toLowerCase()) {
+            const { registered, node } = await verifyWalletRegistration(liveAddr);
+            if (registered && node) {
+              await syncLiveOnChainUser(liveAddr, node);
+              persistAppMode('dashboard');
+            } else {
+              persistUserProfile({ ...emptyUserProfile, walletAddress: liveAddr });
+              persistAppMode('landing');
+            }
+          } else if (appMode === 'dashboard') {
+            // Address matches, verify node status
+            const { registered, node } = await verifyWalletRegistration(liveAddr);
+            if (registered && node) {
+              await syncLiveOnChainUser(liveAddr, node);
+            } else {
+              persistAppMode('landing');
+            }
+          }
+        } else if (appMode === 'dashboard' && userRef.current.walletAddress) {
+          // Injected wallet locked
           persistAppMode('landing');
         }
-      });
+      } catch (err) {
+        console.warn('[App] Injected wallet auto-sync error:', err);
+      }
+    };
+
+    checkAndSyncAccount();
+
+    const handleAccountsChanged = async (accounts: unknown) => {
+      const accs = accounts as string[];
+      if (Array.isArray(accs) && accs.length > 0 && ethers.isAddress(accs[0])) {
+        const newAddr = accs[0];
+        const { registered, node } = await verifyWalletRegistration(newAddr);
+        if (registered && node) {
+          await syncLiveOnChainUser(newAddr, node);
+          persistAppMode('dashboard');
+        } else {
+          persistUserProfile({ ...emptyUserProfile, walletAddress: newAddr });
+          persistAppMode('landing');
+        }
+      } else {
+        persistUserProfile(emptyUserProfile);
+        persistAppMode('landing');
+      }
+    };
+
+    const handleChainChanged = () => {
+      window.location.reload();
+    };
+
+    if (activeProvider.on) {
+      activeProvider.on('accountsChanged', handleAccountsChanged);
+      activeProvider.on('chainChanged', handleChainChanged);
     }
-  }, []);
+
+    return () => {
+      if (activeProvider.removeListener) {
+        activeProvider.removeListener('accountsChanged', handleAccountsChanged);
+        activeProvider.removeListener('chainChanged', handleChainChanged);
+      }
+    };
+  }, []); // Run once on mount safely, handles live events internally
 
   useEffect(() => {
     if (!user.walletAddress) return;
@@ -611,7 +693,6 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Entry Point from Landing Page -> Dashboard
   const handleEnterDashboardFromLanding = async (registeredUser?: {
     userId: string;
     sponsorId: string;
@@ -638,7 +719,7 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
       if (!verification.registered || !verification.node) {
         showToast('Please complete registration first to access the dashboard.', 'warning');
         setIsVerifyingOnChain(false);
-        return; // यूज़र को बाहर नहीं फेकेगा
+        return;
       }
 
       if (verification.node.isBlocked) {
@@ -678,6 +759,7 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
       setIsVerifyingOnChain(false);
     }
   };
+
   if (appMode === 'landing') {
     return (
       <>
@@ -685,7 +767,6 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
         {isVerifyingOnChain && (
           <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="relative flex flex-col items-center p-8 rounded-3xl bg-[#09150f] border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.25)] space-y-4 text-center max-w-sm w-full">
-              {/* Spinning Emerald Ring */}
               <div className="relative w-16 h-16 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20"></div>
                 <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-400 border-r-teal-300 animate-spin"></div>
@@ -930,6 +1011,7 @@ const [isVerifyingOnChain, setIsVerifyingOnChain] = useState<boolean>(false);
         currentAddress={user.walletAddress}
         mbttcBalance={rewards.mbttcBalance}
         onSwitchAddress={handleSwitchWallet}
+        onWalletConnected={(addr) => handleSwitchWallet(addr)}
       />
 
       <MatrixModal
