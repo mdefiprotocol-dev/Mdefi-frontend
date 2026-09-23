@@ -30,7 +30,8 @@ import { PhaseLockedView } from '../common/PhaseLockedView';
 import { programPhaseService } from '../../services/programPhaseService';
 import { LaunchPhase, LaunchModuleKey, MODULE_LAUNCH_DEFINITIONS } from '../../config/launchPhaseConfig';
 import { extractReferralCodeFromUrl, clearReferralParamFromUrl } from '../../utils/referralUtils';
-import { X } from 'lucide-react';
+import { contractAdapter } from '../../services/contractAdapter';
+import { X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface LandingPageProps {
   onEnterDashboard: (user?: { userId: string; sponsorId: string; walletAddress: string; isNewRegistration?: boolean }) => void;
@@ -42,6 +43,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   const [walletModalAction, setWalletModalAction] = useState<'register' | 'login' | 'general'>('register');
   const [connectedWallet, setConnectedWallet] = useState<string>('');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
+
+  // Status Notification Banners for Registration/Login status
+  const [statusNotice, setStatusNotice] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null);
 
   // Referral Entry Context (Session Scoped)
   const [referralSponsorId, setReferralSponsorId] = useState<string | null>(() => {
@@ -82,19 +86,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     walletAddress: '',
   });
 
+  // Check on-chain registration helper
+  const checkRegistrationStatus = async (address: string): Promise<boolean> => {
+    try {
+      const node = await contractAdapter.getHubUserNode(address);
+      if (!node) return false;
+      const numId = Number(node.id || 0);
+      return Boolean(node.isRegistered || numId > 0);
+    } catch {
+      return false;
+    }
+  };
+
   // Referral URL Entry Scenario: If arriving via referral link (?ref=MDF-XXXXX), start flow with wallet connection
   useEffect(() => {
     const refCode = extractReferralCodeFromUrl();
     if (refCode) {
       setReferralSponsorId(refCode);
       if (isWalletConnected && connectedWallet) {
-        setShowRegisterModal(true);
+        checkRegistrationStatus(connectedWallet).then((isReg) => {
+          if (isReg) {
+            setStatusNotice({ message: 'You are already registered! Please login.', type: 'info' });
+            setShowLoginModal(true);
+          } else {
+            setShowRegisterModal(true);
+          }
+        });
       } else {
         setWalletModalAction('register');
         setShowWalletModal(true);
       }
     }
   }, [isWalletConnected, connectedWallet]);
+
+  // Auto-clear notification banners after 5 seconds
+  useEffect(() => {
+    if (statusNotice) {
+      const timer = setTimeout(() => setStatusNotice(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [statusNotice]);
 
   // Smooth scroll helper
   const scrollToSection = (sectionId: string) => {
@@ -113,7 +144,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   // 1. REGISTER TRIGGER: Must open Web3 Wallet Connect first
   const handleTriggerRegister = () => {
     if (isWalletConnected && connectedWallet) {
-      setShowRegisterModal(true);
+      checkRegistrationStatus(connectedWallet).then((isReg) => {
+        if (isReg) {
+          setStatusNotice({ message: 'You are already registered! Redirecting to login...', type: 'info' });
+          setShowLoginModal(true);
+        } else {
+          setShowRegisterModal(true);
+        }
+      });
     } else {
       setWalletModalAction('register');
       setShowWalletModal(true);
@@ -123,23 +161,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   // 2. LOGIN TRIGGER: Must open Web3 Wallet Connect first
   const handleTriggerLogin = () => {
     if (isWalletConnected && connectedWallet) {
-      setShowLoginModal(true);
+      checkRegistrationStatus(connectedWallet).then((isReg) => {
+        if (!isReg) {
+          setStatusNotice({ message: 'Please register first then login.', type: 'warning' });
+          setShowRegisterModal(true);
+        } else {
+          setShowLoginModal(true);
+        }
+      });
     } else {
       setWalletModalAction('login');
       setShowWalletModal(true);
     }
   };
 
-  // 3. WALLET CONNECTED CALLBACK: Transition to respective flow
-  const handleWalletConnected = (address: string, _walletName: string) => {
+  // 3. WALLET CONNECTED CALLBACK: Transition with instant On-Chain Verification
+  const handleWalletConnected = async (address: string, _walletName: string) => {
     setConnectedWallet(address);
     setIsWalletConnected(true);
     setShowWalletModal(false);
 
+    const isReg = await checkRegistrationStatus(address);
+
     if (walletModalAction === 'register') {
-      setShowRegisterModal(true);
+      if (isReg) {
+        setStatusNotice({ message: 'You are already registered! Please login to your dashboard.', type: 'info' });
+        setShowLoginModal(true);
+      } else {
+        setShowRegisterModal(true);
+      }
     } else if (walletModalAction === 'login') {
-      setShowLoginModal(true);
+      if (!isReg) {
+        setStatusNotice({ message: 'This wallet is not registered yet. Please register first then login.', type: 'warning' });
+        setShowRegisterModal(true);
+      } else {
+        setShowLoginModal(true);
+      }
+    } else {
+      if (isReg) {
+        setShowLoginModal(true);
+      } else {
+        setShowRegisterModal(true);
+      }
     }
   };
 
@@ -207,6 +270,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     <div className="min-h-screen bg-[#040805] text-white selection:bg-emerald-500/20 selection:text-emerald-300 relative overflow-x-hidden">
       {/* Cosmic Background */}
       <CosmicBackground />
+
+      {/* Floating Status Notification Banner */}
+      {statusNotice && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-11/12 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className={`p-4 rounded-2xl border shadow-2xl flex items-center justify-between gap-3 ${
+            statusNotice.type === 'warning'
+              ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+              : 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              {statusNotice.type === 'warning' ? (
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              )}
+              <span className="text-xs font-mono font-medium">{statusNotice.message}</span>
+            </div>
+            <button 
+              onClick={() => setStatusNotice(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Layer */}
       <div className="relative z-10 flex flex-col min-h-screen">
@@ -308,6 +397,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
         referralSponsorId={referralSponsorId}
         onSuccess={handleRegistrationSuccess}
         onOpenLegalDoc={handleOpenLegalDoc}
+        onSwitchToLogin={() => {
+          setShowRegisterModal(false);
+          setShowLoginModal(true);
+        }}
         onSwitchWallet={() => {
           setShowRegisterModal(false);
           setWalletModalAction('register');

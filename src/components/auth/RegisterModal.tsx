@@ -23,6 +23,7 @@ interface RegisterModalProps {
   onSuccess: (data: { userId: string; sponsorId: string; walletAddress: string }) => void;
   onOpenLegalDoc: (type: LegalDocType) => void;
   onSwitchWallet?: () => void;
+  onSwitchToLogin?: () => void;
 }
 
 export const RegisterModal: React.FC<RegisterModalProps> = ({
@@ -33,6 +34,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   onSuccess,
   onOpenLegalDoc,
   onSwitchWallet,
+  onSwitchToLogin,
 }) => {
   // Form State
   const [hasUpline, setHasUpline] = useState<boolean | null>(referralSponsorId ? true : null);
@@ -46,14 +48,19 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   // Submitting / Loading State
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Verification State: Already registered check
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
+  const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
+
   // Validation / Error state
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Reset or initialize form when modal opens
+  // Reset or initialize form & check registration on modal open
   useEffect(() => {
     if (isOpen) {
       setErrorMsg('');
       setIsSubmitting(false);
+      setIsAlreadyRegistered(false);
 
       if (referralSponsorId) {
         setHasUpline(true);
@@ -62,8 +69,21 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         setHasUpline(null);
         setUplineId('');
       }
+
+      // Check on-chain if connected wallet is already registered
+      if (connectedWalletAddress) {
+        setIsCheckingRegistration(true);
+        contractAdapter.getHubUserNode(connectedWalletAddress)
+          .then((node) => {
+            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
+              setIsAlreadyRegistered(true);
+            }
+          })
+          .catch(() => {})
+          .finally(() => setIsCheckingRegistration(false));
+      }
     }
-  }, [isOpen, referralSponsorId]);
+  }, [isOpen, referralSponsorId, connectedWalletAddress]);
 
   if (!isOpen) return null;
 
@@ -74,11 +94,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const isWalletConnected = Boolean(connectedWalletAddress && connectedWalletAddress.length > 0);
   const isUplineValid = hasUpline === false || (hasUpline === true && (referralSponsorId ? referralSponsorId.trim().length > 0 : uplineId.trim().length > 0));
   const isTermsAccepted = agreeRisk && agreePrivacy && agreeDisclaimer;
-  const isReadyToRegister = isWalletConnected && isUplineValid && isTermsAccepted && !isSubmitting;
+  const isReadyToRegister = isWalletConnected && isUplineValid && isTermsAccepted && !isSubmitting && !isAlreadyRegistered && !isCheckingRegistration;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (isAlreadyRegistered) {
+      setErrorMsg('This wallet is already registered. Please login instead.');
+      return;
+    }
 
     if (!isWalletConnected) {
       setErrorMsg('A connected Web3 wallet is required to register.');
@@ -116,7 +141,6 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       }
 
       // Execute on-chain transaction: Hub.register(uint256 _uplineId)
-      // contractAdapter automatically fetches the fresh live fixedRegistrationFeeInBNB from Hub
       const result = await contractAdapter.executeRegistration({
         uplineHumanFacingId: resolved.humanFacingId,
         uplineNumericId: resolved.numericId,
@@ -171,6 +195,31 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           </button>
         </div>
 
+        {/* Already Registered Alert Banner */}
+        {isAlreadyRegistered && (
+          <div className="p-4 rounded-2xl bg-emerald-950/90 border border-emerald-400/80 shadow-[0_0_30px_rgba(16,185,129,0.25)] space-y-3 animate-in fade-in-50">
+            <div className="flex items-center gap-2.5 text-emerald-300">
+              <Check className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider">
+                Account Already Registered
+              </span>
+            </div>
+            <p className="text-xs text-zinc-300 font-mono leading-relaxed">
+              This connected wallet (<strong className="text-emerald-400">{shortenAddress(connectedWalletAddress)}</strong>) is already an active on-chain node. You do not need to register again.
+            </p>
+            {onSwitchToLogin && (
+              <button
+                type="button"
+                onClick={onSwitchToLogin}
+                className="w-full py-3 rounded-xl font-black text-xs font-mono uppercase tracking-wider bg-emerald-400 text-black hover:bg-emerald-300 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+              >
+                <span>PROCEED TO LOGIN</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleRegister} className="space-y-5">
           
           {/* Section 1: Connected Web3 Wallet */}
@@ -207,7 +256,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold uppercase tracking-wider">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{connectedWalletAddress ? 'Connected' : 'Not Connected'}</span>
+                <span>
+                  {isCheckingRegistration ? 'Checking...' : isAlreadyRegistered ? 'Registered' : connectedWalletAddress ? 'Connected' : 'Not Connected'}
+                </span>
               </div>
             </div>
           </div>
@@ -228,9 +279,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 type="button"
-                disabled={Boolean(referralSponsorId)}
+                disabled={Boolean(referralSponsorId) || isAlreadyRegistered}
                 onClick={() => {
-                  if (referralSponsorId) return;
+                  if (referralSponsorId || isAlreadyRegistered) return;
                   setHasUpline(true);
                   setUplineId('');
                 }}
@@ -238,7 +289,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   hasUpline === true
                     ? 'bg-emerald-950 border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)] ring-1 ring-emerald-500/40'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                } ${referralSponsorId ? 'cursor-default' : 'cursor-pointer'}`}
+                } ${referralSponsorId || isAlreadyRegistered ? 'cursor-default' : 'cursor-pointer'}`}
               >
                 <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span className="truncate">YES, I HAVE UPLINE</span>
@@ -246,9 +297,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
               <button
                 type="button"
-                disabled={Boolean(referralSponsorId)}
+                disabled={Boolean(referralSponsorId) || isAlreadyRegistered}
                 onClick={() => {
-                  if (referralSponsorId) return;
+                  if (referralSponsorId || isAlreadyRegistered) return;
                   setHasUpline(false);
                   setUplineId(SponsorIdResolver.ROOT_ADMIN_HUMAN_ID);
                 }}
@@ -256,7 +307,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                   hasUpline === false
                     ? 'bg-emerald-950 border-emerald-400 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.3)] ring-1 ring-emerald-500/40'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
-                } ${referralSponsorId ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                } ${referralSponsorId || isAlreadyRegistered ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
               >
                 <span className="truncate">NO UPLINE</span>
               </button>
@@ -276,21 +327,22 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
                 <div className="relative">
                   <input
                     type="text"
+                    disabled={isAlreadyRegistered}
                     value={referralSponsorId ? referralSponsorId.toUpperCase() : uplineId}
                     onChange={(e) => {
-                      if (!referralSponsorId) {
+                      if (!referralSponsorId && !isAlreadyRegistered) {
                         setUplineId(e.target.value);
                       }
                     }}
-                    readOnly={Boolean(referralSponsorId)}
+                    readOnly={Boolean(referralSponsorId) || isAlreadyRegistered}
                     placeholder="e.g. MDF-248161 or numeric ID"
                     className={`w-full px-4 py-2.5 rounded-xl bg-zinc-950 border text-sm font-mono text-white placeholder-zinc-600 outline-none ${
-                      referralSponsorId
+                      referralSponsorId || isAlreadyRegistered
                         ? 'border-emerald-500/50 bg-emerald-950/20 text-emerald-300 cursor-not-allowed pr-10'
                         : 'border-zinc-800 focus:border-emerald-400'
                     }`}
                     required
-                    autoFocus={!referralSponsorId}
+                    autoFocus={!referralSponsorId && !isAlreadyRegistered}
                   />
                   {referralSponsorId && (
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-400 flex items-center pointer-events-none">
@@ -321,6 +373,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
+                disabled={isAlreadyRegistered}
                 checked={agreeRisk}
                 onChange={(e) => setAgreeRisk(e.target.checked)}
                 className="mt-0.5 w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-400 cursor-pointer"
@@ -344,6 +397,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
+                disabled={isAlreadyRegistered}
                 checked={agreePrivacy}
                 onChange={(e) => setAgreePrivacy(e.target.checked)}
                 className="mt-0.5 w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-400 cursor-pointer"
@@ -367,6 +421,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
             <label className="flex items-start gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
               <input
                 type="checkbox"
+                disabled={isAlreadyRegistered}
                 checked={agreeDisclaimer}
                 onChange={(e) => setAgreeDisclaimer(e.target.checked)}
                 className="mt-0.5 w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-emerald-400 cursor-pointer"
@@ -397,35 +452,37 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
           )}
 
           {/* Register Button */}
-          <div className="pt-2 space-y-2">
-            <button
-              type="submit"
-              disabled={!isReadyToRegister}
-              className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                isReadyToRegister
-                  ? 'text-black bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 shadow-[0_0_35px_rgba(16,185,129,0.45)] hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
-                  : 'text-zinc-500 bg-zinc-900 border border-zinc-800 opacity-60 cursor-not-allowed'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-black" />
-                  <span>EXECUTING CONTRACT REGISTRATION...</span>
-                </>
-              ) : (
-                <>
-                  <span>REGISTER ACCOUNT</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+          {!isAlreadyRegistered && (
+            <div className="pt-2 space-y-2">
+              <button
+                type="submit"
+                disabled={!isReadyToRegister}
+                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  isReadyToRegister
+                    ? 'text-black bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 shadow-[0_0_35px_rgba(16,185,129,0.45)] hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
+                    : 'text-zinc-500 bg-zinc-900 border border-zinc-800 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                    <span>EXECUTING CONTRACT REGISTRATION...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>REGISTER ACCOUNT</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
 
-            {!isReadyToRegister && !isSubmitting && (
-              <p className="text-[11px] font-mono text-zinc-500 text-center">
-                Select upline option and accept all 3 policies to enable registration
-              </p>
-            )}
-          </div>
+              {!isReadyToRegister && !isSubmitting && (
+                <p className="text-[11px] font-mono text-zinc-500 text-center">
+                  Select upline option and accept all 3 policies to enable registration
+                </p>
+              )}
+            </div>
+          )}
 
         </form>
       </div>
