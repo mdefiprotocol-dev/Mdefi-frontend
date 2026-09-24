@@ -56,9 +56,24 @@ export const RegistrationCelebration: React.FC<RegistrationCelebrationProps> = (
     }
   };
 
-  const truncatedWallet = walletAddress
+ const truncatedWallet = walletAddress
     ? formatCompactAddress(walletAddress)
-    : '0x71C8...4982';
+    : '0x0000...0000';
+
+  // Bug 3 Root Fix: Agar NO UPLINE ya Root mapping ho, to guaranteed MDF-248161 dikhe
+  const displaySponsor = (() => {
+    if (!sponsorId || sponsorId === 'None' || sponsorId === '0' || sponsorId === '1' || sponsorId.includes('248269')) {
+      return 'MDF-248161';
+    }
+    if (sponsorId.startsWith('MDF-')) {
+      return sponsorId;
+    }
+    const num = Number(sponsorId);
+    if (!isNaN(num) && num > 0) {
+      return `MDF-${num < 1000 ? 248160 + num : num}`;
+    }
+    return sponsorId;
+  })();
 
   const isDeployed = Boolean(MBTTC_TOKEN_ADDRESS && MBTTC_TOKEN_ADDRESS.length >= 18);
   const truncatedContract = isDeployed
@@ -151,7 +166,7 @@ export const RegistrationCelebration: React.FC<RegistrationCelebrationProps> = (
           </div>
           <div className="flex items-center justify-between">
             <span className="text-zinc-400 font-mono">Upline Sponsor:</span>
-            <span className="font-mono font-semibold text-cyan-300">{sponsorId}</span>
+            <span className="font-mono font-semibold text-cyan-300">{displaySponsor}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-zinc-400 font-mono">Your Wallet:</span>

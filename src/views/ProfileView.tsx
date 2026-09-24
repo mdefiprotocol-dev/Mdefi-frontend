@@ -391,8 +391,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const uplineNum = (safeUser as any)?.sponsorNodeId ?? (safeUser as any)?.uplineId ?? (safeUser as any)?.referrerId;
 
-  // Series alignment to MDF-248161 sequence
+ // Bug 2 Fix: Actual sponsor ID ko prioritize karein, hardcoded fallback ko rokein
+  const [liveSponsorId, setLiveSponsorId] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    const fetchLiveSponsor = async () => {
+      // Agar sponsor address maujood hai to Hub contract se uska direct UserNode check karo
+      if (actualSponsorAddress && ethers.isAddress(actualSponsorAddress)) {
+        try {
+          const uplineNode = await realContractProvider.read('mdefiHub', 'getUserNode', [actualSponsorAddress]);
+          if (uplineNode && active) {
+            const rawId = Number(uplineNode.id || uplineNode[0] || 0);
+            if (rawId > 0) {
+              setLiveSponsorId(`MDF-${rawId < 1000 ? 248160 + rawId : rawId}`);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[ProfileView] Failed to fetch upline node:', e);
+        }
+      }
+    };
+    fetchLiveSponsor();
+    return () => { active = false; };
+  }, [actualSponsorAddress]);
+
+  // Priority: 1. Live fetched upline ID -> 2. Formatted User.sponsorId -> 3. Upline Address Shortened -> 4. None
   const displaySponsorId = (() => {
+    if (liveSponsorId) return liveSponsorId;
+
     if (
       safeUser.sponsorId &&
       !safeUser.sponsorId.startsWith('0x') &&
@@ -415,13 +443,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
 
     if (actualSponsorAddress) {
-      return 'MDF-248161';
+      return formatCompactAddress(actualSponsorAddress);
     }
 
-    return 'None';
+    return 'None (Protocol Root)';
   })();
-
-  const referralLinkUrl = safeUser.referralLink || (safeUser.userId && safeUser.userId !== 'MDF-00000' ? `https://mdefipro.xyz/join?ref=${safeUser.userId}` : 'Complete Registration First');
+// Bug 1 Fix: Overview ke working link (https://www.mdefipro.xyz/?ref=...) ke sath 100% sync
+  const referralLinkUrl = (safeUser.userId && safeUser.userId !== 'MDF-00000')
+    ? `https://www.mdefipro.xyz/?ref=${safeUser.userId}`
+    : (safeUser.referralLink || 'Complete Registration First');
   const userInitials = safeUser.userId && safeUser.userId.length >= 2 ? safeUser.userId.slice(-2) : '00';
 
   return (
