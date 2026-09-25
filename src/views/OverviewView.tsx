@@ -78,7 +78,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [copiedRefLink, setCopiedRefLink] = useState<boolean>(false);
 
   // Live On-Chain Telemetry States (Bugs 1 - 6)
-  const [liveWalletMbttc, setLiveWalletMbttc] = useState<number>(0);
+const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
   const [onChainCirculatingMinted, setOnChainCirculatingMinted] = useState<number>(0);
   const [globalEcosystemRewards, setGlobalEcosystemRewards] = useState<number>(0);
   const [userTotalClaimedMbttc, setUserTotalClaimedMbttc] = useState<number>(0);
@@ -141,22 +141,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       // Bug 1 & Bug 6: User-Specific Live Balances
       if (user.walletAddress && ethers.isAddress(user.walletAddress)) {
-        try {
-          const rawBal = await provider.read<bigint>('mbttcToken', 'balanceOf', [user.walletAddress]);
-          const bal = Number(ethers.formatUnits(rawBal || 0n, 18));
-          setLiveWalletMbttc(bal);
-        } catch (e) {
-          console.warn('[OverviewView] balanceOf read failed:', e);
-        }
+       
 
-        try {
+       try {
           const userDash = await provider.read<any>('mdefiHub', 'getUserDashboard', [user.walletAddress]);
           if (userDash) {
+            const refEarned = Number(ethers.formatUnits(userDash.referralTotalEarned?.toString() || '0', 18));
             const refClaimed = Number(ethers.formatUnits(userDash.referralTotalClaimed?.toString() || '0', 18));
+            const pkgEarned = Number(ethers.formatUnits(userDash.packageTotalEarned?.toString() || '0', 18));
             const pkgClaimed = Number(ethers.formatUnits(userDash.packageTotalClaimed?.toString() || '0', 18));
-            const genesisRegBonus = userDash.userId && Number(userDash.userId) > 0 ? 30 : 0;
-            
+
+            // Bug 1 Live Sync: Profile की तरह Hub Contract का एक्टिव Vault Balance (Remaining)
+            const remainingRefVault = Math.max(0, refEarned - refClaimed);
+            const remainingPkgVault = Math.max(0, pkgEarned - pkgClaimed);
+            setLiveVaultMbttc(remainingRefVault + remainingPkgVault);
+
             // Bug 6: User actual claimed reward
+            const genesisRegBonus = userDash.userId && Number(userDash.userId) > 0 ? 30 : 0;
             setUserTotalClaimedMbttc(genesisRegBonus + refClaimed + pkgClaimed);
           }
         } catch (err) {
@@ -292,12 +293,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const remainingAmount = Math.max(0, TOTAL_MAX_SUPPLY - mintedAmount);
   const mintedPercent = TOTAL_MAX_SUPPLY > 0 ? (mintedAmount / TOTAL_MAX_SUPPLY) * 100 : 0;
 
-  // Bug 1: Display Live Top Bar Balance (Live wallet balance or live unearned vesting)
+  // Bug 1: 100% On-Chain Dynamic Hub Vault Balance (Zero Hardcoded Numbers)
   const displayTopMbttcBalance = useMemo(() => {
-    if (liveWalletMbttc > 0) return liveWalletMbttc;
-    if (rewards.mbttcBalance && rewards.mbttcBalance !== 12540) return rewards.mbttcBalance;
-    return 118.02; // Aligned with on-chain profile fallback
-  }, [liveWalletMbttc, rewards.mbttcBalance]);
+    return liveVaultMbttc;
+  }, [liveVaultMbttc]);
 
   // Bug 5: Total MDeFi Global Rewards Value
   const displayGlobalRewards = useMemo(() => {
