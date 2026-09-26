@@ -138,7 +138,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   };
 
   const candleSpacing = plotWidth / (candles.length || 1);
-  const candleBodyWidth = Math.max(3, Math.min(candleSpacing * 0.65 * zoomLevel, 24));
+  const candleBodyWidth = Math.max(6, Math.min(candleSpacing * 0.75 * zoomLevel, 22));
 
   const getX = (index: number) => {
     return padLeft + index * candleSpacing + candleSpacing / 2;
