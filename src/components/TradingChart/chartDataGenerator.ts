@@ -6,8 +6,8 @@ import {
 } from './types';
 import { ActivityItem } from '../../types';
 
-// Hub Contract Benchmark Baseline Price
-const BASELINE_PRICE = 1.50;
+// Default Target Launching Price (Configurable dynamically)
+export const DEFAULT_TARGET_LAUNCH_PRICE = 3.50;
 
 /**
  * Maps on-chain Hub Contract activities directly to chart events
@@ -16,13 +16,13 @@ export function mapActivityToEventType(typeStr: string): EcosystemEventType {
   const lower = (typeStr || '').toLowerCase();
   if (lower.includes('claim')) return 'Claim';
   if (lower.includes('referral') || lower.includes('partner')) return 'Referral';
-  if (lower.includes('package') || lower.includes('node') || lower.includes('prime')) return 'Package Activation';
+  if (lower.includes('package') || lower.includes('node') || lower.includes('prime') || lower.includes('buy')) return 'Package Activation';
   if (lower.includes('register') || lower.includes('registration')) return 'Registration';
   return 'Referral';
 }
 
 /**
- * Creates clean on-chain chart event
+ * Creates clean on-chain chart event (Mint vs Claim)
  */
 export function createChartEvent(
   type: EcosystemEventType,
@@ -57,18 +57,20 @@ export function createChartEvent(
 }
 
 /**
- * Generates Candlesticks strictly with Real Volatility and Activity Engine:
- * - Solves straight flat line bug by generating realistic OHLC spreads
- * - Distributes Green Candles (Mint/Buy) and Red Candles (Claim/Retract) realistically
+ * Generates Candlesticks Dynamically:
+ * @param timeframe - Selected timeframe (1m, 5m, 1D, etc.)
+ * @param activities - Live on-chain activities from Hub Contract
+ * @param baseTargetPrice - Dynamic targeted price (Defaults to 3.50, but can accept live contract price)
  */
 export function generateCandlesForTimeframe(
   timeframe: TradingTimeframe,
-  activities: ActivityItem[] = []
+  activities: ActivityItem[] = [],
+  baseTargetPrice: number = DEFAULT_TARGET_LAUNCH_PRICE
 ): TradingCandle[] {
   const count = timeframe === '1m' || timeframe === '5m' ? 34 : 30;
   const onChainEvents: ChartEcosystemEvent[] = [];
 
-  // Bind live on-chain activities from props
+  // Bind live on-chain activities directly
   if (Array.isArray(activities) && activities.length > 0) {
     activities.forEach((act) => {
       const actTs = act.timestamp || (act.createdAt ? Number(act.createdAt) : Date.now());
@@ -128,8 +130,9 @@ export function generateCandlesForTimeframe(
   const candles: TradingCandle[] = [];
   const startTs = now - (count - 1) * stepMs;
 
-  // Set realistic starting base price
-  let currentOpen = BASELINE_PRICE - (timeframe === 'ALL' ? 0.18 : 0.04);
+  // Percentage-based dynamic step (0.2% - 0.4% ratio) so it scales with ANY price
+  const microDelta = baseTargetPrice * 0.0025; // Dynamic relative delta
+  let currentOpen = baseTargetPrice - (timeframe === 'ALL' ? microDelta * 5 : microDelta);
   let haPrevOpen = currentOpen;
   let haPrevClose = currentOpen;
 
@@ -141,9 +144,9 @@ export function generateCandlesForTimeframe(
       ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    // Filter events belonging to this candle period
+    // Filter events belonging to this timeframe window
     const candleEvents = onChainEvents.filter(
-      (ev) => Math.abs(ev.timestamp - candleTs) <= stepMs
+      (ev) => Math.abs(ev.timestamp - candleTs) <= Math.max(stepMs, 60000)
     );
 
     const hasClaim = candleEvents.some((e) => e.type === 'Claim');
@@ -151,46 +154,38 @@ export function generateCandlesForTimeframe(
       (e) => e.type === 'Referral' || e.type === 'Package Activation' || e.type === 'Registration'
     );
 
-    // Natural Market Volatility Determinant (prevents flat straight line)
-    // Wave pattern + deterministic pseudo-seed for authentic candles
-    const wave = Math.sin(i * 0.72) * 0.009 + Math.cos(i * 1.34) * 0.005;
-    
-    // In ALL timeframe: natural cycle of Minting vs Claims
     let isGreen = true;
-    let bodySpread = 0.008;
+    let spreadRatio = 0.002;
 
     if (hasClaim && !hasMint) {
       isGreen = false;
-      bodySpread = 0.014;
+      spreadRatio = 0.0035;
     } else if (hasMint) {
       isGreen = true;
-      bodySpread = 0.016;
+      spreadRatio = 0.004;
     } else {
-      // Periodic claim dips in ecosystem history (Red candles in ALL & Daily)
-      const periodicClaimDip = (i % 4 === 1 || i % 7 === 0);
+      const periodicClaimDip = (i % 4 === 1 || i % 6 === 0);
       isGreen = !periodicClaimDip;
-      bodySpread = Math.max(0.005, Math.abs(wave) + 0.004);
+      spreadRatio = 0.0018 + Math.abs(Math.sin(i * 0.7)) * 0.0012;
     }
 
+    const dynamicSpread = Number((baseTargetPrice * spreadRatio).toFixed(4));
     const open = Number(currentOpen.toFixed(4));
     const close = isGreen 
-      ? Number((open + bodySpread).toFixed(4))
-      : Number((Math.max(1.30, open - bodySpread)).toFixed(4));
+      ? Number((open + dynamicSpread).toFixed(4))
+      : Number((open - dynamicSpread).toFixed(4));
 
-    // Wicks Calculation (Upper and Lower Shadow)
-    const wickHigh = Number((Math.max(open, close) + 0.003 + (Math.abs(Math.sin(i * 1.5)) * 0.005)).toFixed(4));
-    const wickLow = Number((Math.min(open, close) - 0.003 - (Math.abs(Math.cos(i * 1.8)) * 0.005)).toFixed(4));
+    // Dynamic wicks proportional to price
+    const wickOffset = baseTargetPrice * 0.001;
+    const high = Number((Math.max(open, close) + wickOffset).toFixed(4));
+    const low = Number((Math.min(open, close) - wickOffset).toFixed(4));
 
-    const high = Math.max(open, close, wickHigh);
-    const low = Math.min(open, close, wickLow);
-
-    // Volume calculation
-    const baseVol = isGreen ? 14000 : 8500;
+    // Proportional volume
+    const baseVol = isGreen ? 16000 : 9000;
     const volume = Math.round(baseVol + Math.abs(Math.sin(i * 2.1)) * 12000 + (candleEvents.length * 6000));
     const volumeUsd = Math.round(volume * close);
 
-    // Next candle open starts around previous close
-    currentOpen = close + (isGreen ? -0.001 : 0.001);
+    currentOpen = close;
 
     // Heikin Ashi Calculation
     const haClose = Number(((open + high + low + close) / 4).toFixed(4));
@@ -216,7 +211,7 @@ export function generateCandlesForTimeframe(
       volumeUsd,
       isGreen,
       events: candleEvents.length > 0 ? candleEvents : undefined,
-      intensity: Math.min(1, volume / 28000),
+      intensity: Math.min(1, volume / 30000),
       haOpen,
       haHigh,
       haLow,
@@ -225,7 +220,7 @@ export function generateCandlesForTimeframe(
     });
   }
 
-  // Calculate Moving Averages (MA7 and MA25)
+  // Calculate Moving Averages dynamically
   for (let i = 0; i < candles.length; i++) {
     if (i >= 6) {
       const slice7 = candles.slice(i - 6, i + 1);
@@ -243,11 +238,12 @@ export function generateCandlesForTimeframe(
 }
 
 /**
- * Real-time event push: Green Candle on Buy/Ref, Red Candle on Claim
+ * Dynamic Real-time Event Append
  */
 export function appendEcosystemEventToCandles(
   currentCandles: TradingCandle[],
-  event: ChartEcosystemEvent
+  event: ChartEcosystemEvent,
+  baseTargetPrice: number = DEFAULT_TARGET_LAUNCH_PRICE
 ): TradingCandle[] {
   if (currentCandles.length === 0) return currentCandles;
 
@@ -256,18 +252,20 @@ export function appendEcosystemEventToCandles(
   const last = updated[lastIndex];
 
   const isClaim = event.type === 'Claim';
-  const priceDelta = isClaim ? -0.015 : 0.020;
+  const priceDelta = isClaim 
+    ? -(baseTargetPrice * 0.0035) 
+    : (baseTargetPrice * 0.0045);
 
   const newOpen = last.close;
   const newClose = Number((newOpen + priceDelta).toFixed(4));
-  const newHigh = Number(Math.max(last.high, newOpen, newClose + 0.006).toFixed(4));
-  const newLow = Number(Math.min(last.low, newOpen, newClose - 0.006).toFixed(4));
+  const newHigh = Number(Math.max(last.high, newOpen, newClose + (baseTargetPrice * 0.001)).toFixed(4));
+  const newLow = Number(Math.min(last.low, newOpen, newClose - (baseTargetPrice * 0.001)).toFixed(4));
   const newIsGreen = !isClaim;
 
   const existingEvents = last.events ? [...last.events] : [];
   existingEvents.push(event);
 
-  const newVolume = last.volume + (isClaim ? 9000 : 16000);
+  const newVolume = last.volume + (isClaim ? 8000 : 15000);
 
   const haClose = Number(((newOpen + newHigh + newLow + newClose) / 4).toFixed(4));
   const haOpen = Number(((last.haOpen + last.haClose) / 2).toFixed(4));
@@ -282,7 +280,7 @@ export function appendEcosystemEventToCandles(
     isGreen: newIsGreen,
     volume: newVolume,
     volumeUsd: Math.round(newVolume * newClose),
-    intensity: Math.min(1, newVolume / 28000),
+    intensity: Math.min(1, newVolume / 30000),
     events: existingEvents,
     haOpen,
     haHigh,

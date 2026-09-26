@@ -11,7 +11,8 @@ import {
   TickerMetrics 
 } from './types';
 import { 
-  generateCandlesForTimeframe 
+  generateCandlesForTimeframe,
+  DEFAULT_TARGET_LAUNCH_PRICE 
 } from './chartDataGenerator';
 import { ChartMetricsBar } from './ChartMetricsBar';
 import { ChartControls } from './ChartControls';
@@ -47,14 +48,14 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     grid: true,
   });
 
-  // Candles data
+  // Candles data - Anchored strictly to Targeted Launching Price ($3.50)
   const [candles, setCandles] = useState<TradingCandle[]>(() => 
-    generateCandlesForTimeframe('1D', activities)
+    generateCandlesForTimeframe('1D', activities, DEFAULT_TARGET_LAUNCH_PRICE)
   );
 
-  // Regenerate when timeframe or activities changes
+  // Dynamic regenerate when timeframe or activities changes
   useEffect(() => {
-    setCandles(generateCandlesForTimeframe(timeframe, activities));
+    setCandles(generateCandlesForTimeframe(timeframe, activities, DEFAULT_TARGET_LAUNCH_PRICE));
   }, [timeframe, activities]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,18 +71,18 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     setIndicators((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Compute metrics
+  // Compute metrics anchored to $3.50 target
   const latestCandle = candles[candles.length - 1] || null;
   const firstCandle = candles[0] || null;
 
   const tickerMetrics: TickerMetrics = useMemo(() => {
-    const currentPrice = latestCandle ? latestCandle.close : 1.50;
-    const baseOpen = firstCandle ? firstCandle.open : 1.48;
+    const currentPrice = latestCandle ? latestCandle.close : DEFAULT_TARGET_LAUNCH_PRICE;
+    const baseOpen = firstCandle ? firstCandle.open : DEFAULT_TARGET_LAUNCH_PRICE;
     const priceChange24h = Number((currentPrice - baseOpen).toFixed(4));
     const priceChangePercent24h = Number(((priceChange24h / baseOpen) * 100).toFixed(2));
     
-    const high24h = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 1.528;
-    const low24h = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 1.478;
+    const high24h = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : DEFAULT_TARGET_LAUNCH_PRICE + 0.02;
+    const low24h = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : DEFAULT_TARGET_LAUNCH_PRICE - 0.02;
     const volume24h = candles.reduce((sum, c) => sum + c.volume, 0);
     const totalEvents = candles.reduce((count, c) => count + (c.events?.length || 0), 0);
 
@@ -113,19 +114,24 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   const volumeHeight = 55;
   const pricePlotHeight = plotHeight - (indicators.volume ? volumeHeight : 0);
 
-  // Min and Max prices for scaling
+  // Dynamic Min and Max prices scaling around Targeted Launching Price ($3.50)
   const { minPrice, maxPrice, maxVolume, baselinePrice } = useMemo(() => {
+    const baseP = DEFAULT_TARGET_LAUNCH_PRICE;
     if (candles.length === 0) {
-      return { minPrice: 1.45, maxPrice: 1.55, maxVolume: 50000, baselinePrice: 1.50 };
+      return { 
+        minPrice: Number((baseP * 0.98).toFixed(4)), 
+        maxPrice: Number((baseP * 1.02).toFixed(4)), 
+        maxVolume: 50000, 
+        baselinePrice: baseP 
+      };
     }
     const highs = candles.map((c) => chartType === 'Heikin Ashi' ? c.haHigh : c.high);
     const lows = candles.map((c) => chartType === 'Heikin Ashi' ? c.haLow : c.low);
     const vols = candles.map((c) => c.volume);
 
-    const minP = Math.min(...lows) * 0.996;
-    const maxP = Math.max(...highs) * 1.004;
+    const minP = Math.min(...lows) * 0.998;
+    const maxP = Math.max(...highs) * 1.002;
     const maxV = Math.max(...vols, 1000);
-    const baseP = (minP + maxP) / 2;
 
     return { minPrice: minP, maxPrice: maxP, maxVolume: maxV, baselinePrice: baseP };
   }, [candles, chartType]);
@@ -153,7 +159,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       ticks.push({ price, y: getY(price) });
     }
     return ticks;
-  }, [minPrice, priceRange]);
+  }, [minPrice, priceRange, getY]);
 
   // SVG Paths for Line, Area, and Baseline
   const linePath = useMemo(() => {
@@ -163,7 +169,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       const y = getY(chartType === 'Heikin Ashi' ? c.haClose : c.close);
       return i === 0 ? `M ${x},${y}` : `${acc} L ${x},${y}`;
     }, '');
-  }, [candles, chartType]);
+  }, [candles, chartType, getX, getY]);
 
   const areaPath = useMemo(() => {
     if (!linePath || candles.length === 0) return '';
@@ -171,7 +177,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     const firstX = getX(0);
     const lastX = getX(candles.length - 1);
     return `${linePath} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
-  }, [linePath, candles]);
+  }, [linePath, candles, getX, padTop, pricePlotHeight]);
 
   // MA lines paths
   const ma7Path = useMemo(() => {
@@ -185,7 +191,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       }
     });
     return path;
-  }, [indicators.ma, candles]);
+  }, [indicators.ma, candles, getX, getY]);
 
   const ma25Path = useMemo(() => {
     if (!indicators.ma || candles.length < 25) return '';
@@ -198,7 +204,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       }
     });
     return path;
-  }, [indicators.ma, candles]);
+  }, [indicators.ma, candles, getX, getY]);
 
   return (
     <div
@@ -368,7 +374,60 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 3. Candlesticks */}
+          {/* 3. Line & Area Chart */}
+          {chartType === 'Line' && (
+            <path
+              d={linePath}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#emeraldGlow)"
+            />
+          )}
+
+          {(chartType === 'Area' || chartType === 'Baseline') && (
+            <g>
+              <path d={areaPath} fill="url(#terminalAreaGradient)" />
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          )}
+
+          {/* 4. Bar & OHLC Chart (BUG FIXED: Full Bar Visibility) */}
+          {(chartType === 'Bar' || chartType === 'OHLC') && (
+            <g className="ohlc-bars">
+              {candles.map((c, i) => {
+                const x = getX(i);
+                const yHigh = getY(c.high);
+                const yLow = getY(c.low);
+                const yOpen = getY(c.open);
+                const yClose = getY(c.close);
+                const tickLen = Math.max(3, candleBodyWidth / 2);
+                const color = c.isGreen ? '#10b981' : '#ef4444';
+
+                return (
+                  <g key={`bar-${i}`}>
+                    {/* Spine */}
+                    <line x1={x} y1={yHigh} x2={x} y2={yLow} stroke={color} strokeWidth="2" />
+                    {/* Left tick: Open */}
+                    <line x1={x - tickLen} y1={yOpen} x2={x} y2={yOpen} stroke={color} strokeWidth="2" />
+                    {/* Right tick: Close */}
+                    <line x1={x} y1={yClose} x2={x + tickLen} y2={yClose} stroke={color} strokeWidth="2" />
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* 5. Candlesticks, Heikin Ashi, & Hollow Candles */}
           {(chartType === 'Candlestick' || chartType === 'Heikin Ashi' || chartType === 'Hollow Candles') && (
             <g className="candles">
               {candles.map((c, i) => {
@@ -388,7 +447,9 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                 const bodyTop = Math.min(yOpen, yClose);
                 const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
 
+                const isHollow = chartType === 'Hollow Candles';
                 const candleColor = isGreen ? '#10b981' : '#ef4444';
+                const fillColor = isHollow ? (isGreen ? 'transparent' : candleColor) : candleColor;
 
                 return (
                   <g key={`candle-${i}`}>
@@ -416,9 +477,9 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                       y={bodyTop}
                       width={candleBodyWidth}
                       height={bodyHeight}
-                      fill={candleColor}
+                      fill={fillColor}
                       stroke={candleColor}
-                      strokeWidth={1}
+                      strokeWidth={isHollow && isGreen ? 1.5 : 1}
                       rx="1"
                     />
                   </g>
@@ -427,7 +488,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 4. Moving Averages Curves */}
+          {/* 6. Moving Averages Curves */}
           {indicators.ma && (
             <g className="moving-averages">
               {ma7Path && (
@@ -451,7 +512,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 5. Minimal Event Markers (Above/Below Candles) */}
+          {/* 7. Minimal Event Markers (Above/Below Candles) */}
           {indicators.events && (
             <g className="ecosystem-events">
               {candles.map((c, i) => {
@@ -491,7 +552,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 6. Right Y-Axis Price Scale */}
+          {/* 8. Right Y-Axis Price Scale */}
           <g className="y-axis-labels">
             {priceTicks.map((tick, i) => (
               <text
@@ -507,7 +568,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             ))}
           </g>
 
-          {/* 7. Bottom X-Axis Timeline Labels */}
+          {/* 9. Bottom X-Axis Timeline Labels */}
           <g className="x-axis-labels">
             {candles.map((c, i) => {
               if (i % 6 !== 0 && i !== candles.length - 1) return null;
