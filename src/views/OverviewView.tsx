@@ -24,6 +24,7 @@ import {
   NavPage 
 } from '../types';
 import { MbttcCoin3D } from '../components/MbttcCoin3D';
+import { MdefiTradingTerminalChart } from '../components/TradingChart/MdefiTradingTerminal';
 import { CommunityActivityFeed } from '../components/CommunityActivityFeed';
 import { CommunityRatingSection } from '../components/CommunityRatingSection';
 import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
@@ -570,125 +571,15 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
         </div>
       </div>
 
-      {/* 4. TOTAL REWARDS PORTFOLIO (BUG 5 FIXED: Global Rewards & Neon Area Chart) */}
-      <div className="relative rounded-3xl bg-gradient-to-b from-[#0c1611] via-[#08120d] to-[#060a08] border border-emerald-500/25 p-4 sm:p-8 shadow-[0_0_50px_rgba(16,185,129,0.08)] overflow-hidden backdrop-blur-xl">
-        <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6 pb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-300 font-mono block">
-                TOTAL MDEFI REWARDS
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono">
-                Community Pool
-              </span>
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight font-mono">
-              {displayGlobalRewards.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
-              <span className="text-2xl sm:text-3xl text-emerald-400 font-bold">MBTTC</span>
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-950/90 border border-zinc-800">
-            {(['7D', '30D', 'ALL'] as const).map((tf) => (
-              <button
-                key={tf}
-                onClick={() => setChartTimeframe(tf)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer ${
-                  chartTimeframe === tf 
-                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-bold shadow-[0_0_12px_rgba(16,185,129,0.2)]' 
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Dynamic Neon Web3 Glow Chart */}
-        <div className="relative mt-6 pt-4 border-t border-zinc-900/90">
-          {hoveredPoint && (
-            <div className="absolute top-2 right-4 px-3 py-1.5 rounded-xl bg-zinc-950 border border-emerald-500/40 text-xs font-mono flex items-center gap-2 shadow-lg animate-in fade-in">
-              <span className="text-zinc-400">{hoveredPoint.label}:</span>
-              <span className="text-emerald-400 font-bold">{hoveredPoint.value}</span>
-            </div>
-          )}
-          <div className="h-44 w-full relative">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 800 130" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="neonEmeraldGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.38" />
-                  <stop offset="65%" stopColor="#10b981" stopOpacity="0.08" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
-                </linearGradient>
-                <linearGradient id="neonLineGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#059669" />
-                  <stop offset="50%" stopColor="#10b981" />
-                  <stop offset="100%" stopColor="#34d399" />
-                </linearGradient>
-                <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-
-              {/* Background Grid Lines */}
-              <line x1="0" y1="35" x2="800" y2="35" stroke="#27272a" strokeWidth="0.7" strokeDasharray="4 4" opacity="0.4" />
-              <line x1="0" y1="75" x2="800" y2="75" stroke="#27272a" strokeWidth="0.7" strokeDasharray="4 4" opacity="0.4" />
-              <line x1="0" y1="115" x2="800" y2="115" stroke="#27272a" strokeWidth="0.7" strokeDasharray="4 4" opacity="0.4" />
-
-              {/* Glowing Area Fill */}
-              <path d={svgAreaPath} fill="url(#neonEmeraldGlow)" />
-
-              {/* Neon Glow Line */}
-              <path
-                d={`M ${currentPoints[0].x},${currentPoints[0].y} ` + currentPoints.map((p) => `L ${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke="url(#neonLineGradient)"
-                strokeWidth="3.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#glowEffect)"
-              />
-
-              {/* Data Nodes with Glow on Hover */}
-              {currentPoints.map((pt, idx) => {
-                const isHovered = hoveredPoint?.index === idx;
-                return (
-                  <g key={idx}>
-                    {isHovered && (
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={10}
-                        fill="#10b981"
-                        fillOpacity="0.25"
-                        className="animate-ping"
-                      />
-                    )}
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={isHovered ? 6 : 4}
-                      fill={isHovered ? '#34d399' : '#10b981'}
-                      stroke="#05140d"
-                      strokeWidth="2.5"
-                      className="cursor-pointer transition-all duration-150"
-                      onMouseEnter={() => setHoveredPoint({ 
-                        index: idx, 
-                        label: pt.label, 
-                        value: `${pt.val.toLocaleString('en-US', { maximumFractionDigits: 2 })} MBTTC` 
-                      })}
-                      onMouseLeave={() => setHoveredPoint(null)}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-        </div>
-      </div>
-
+      {/* 4. TOTAL MDEFI REWARDS & TRADING TERMINAL */}
+      <MdefiTradingTerminalChart 
+        totalRewardsMbttc={displayGlobalRewards.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        totalRewardsUsd={(displayGlobalRewards * 1.5).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        activities={activities}
+        onOpenClaimModal={onOpenClaimModal}
+        onOpenMatrixModal={onOpenMatrixModal}
+        onNavigateHub={() => onNavigate('hub')}
+      />
       {/* 5. OPEN HUB BANNER */}
       <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#041a10] via-[#062416] to-[#04140d] border border-emerald-500/35 backdrop-blur-xl shadow-[0_0_35px_rgba(16,185,129,0.14)] flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 w-full sm:w-auto">
