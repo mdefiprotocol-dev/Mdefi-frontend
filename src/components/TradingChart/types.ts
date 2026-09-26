@@ -43,7 +43,7 @@ export interface ChartEcosystemEvent {
   details: string;
   timestamp: number;
   formattedTime: string;
-  isOutgoing: boolean; // true = red (outgoing/claim), false = green (incoming/growth)
+  isOutgoing: boolean; // true = red (claim), false = green/gold (incoming)
   badge: string;
   color: 'emerald' | 'red' | 'amber' | 'purple' | 'cyan' | 'blue';
   txHash?: string;
@@ -61,6 +61,7 @@ export interface TradingCandle {
   volume: number; // Volume in MBTTC
   volumeUsd: number;
   isGreen: boolean;
+  isGold?: boolean; // Registration Flag (Gold Candle)
   events?: ChartEcosystemEvent[];
   intensity: number; // 0 to 1 activity intensity
   // Heikin Ashi values
@@ -69,6 +70,7 @@ export interface TradingCandle {
   haLow: number;
   haClose: number;
   haIsGreen: boolean;
+  haIsGold?: boolean;
   // Moving averages
   ma7?: number;
   ma25?: number;

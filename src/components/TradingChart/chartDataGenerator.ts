@@ -6,7 +6,7 @@ import {
 } from './types';
 import { ActivityItem } from '../../types';
 
-// Default Target Launching Price (Configurable dynamically)
+// Default Target Launching Price
 export const DEFAULT_TARGET_LAUNCH_PRICE = 3.50;
 
 /**
@@ -15,14 +15,14 @@ export const DEFAULT_TARGET_LAUNCH_PRICE = 3.50;
 export function mapActivityToEventType(typeStr: string): EcosystemEventType {
   const lower = (typeStr || '').toLowerCase();
   if (lower.includes('claim')) return 'Claim';
-  if (lower.includes('referral') || lower.includes('partner')) return 'Referral';
-  if (lower.includes('package') || lower.includes('node') || lower.includes('prime') || lower.includes('buy')) return 'Package Activation';
   if (lower.includes('register') || lower.includes('registration')) return 'Registration';
+  if (lower.includes('package') || lower.includes('node') || lower.includes('prime') || lower.includes('buy')) return 'Package Activation';
+  if (lower.includes('referral') || lower.includes('partner')) return 'Referral';
   return 'Referral';
 }
 
 /**
- * Creates clean on-chain chart event (Mint vs Claim)
+ * Creates clean on-chain chart event
  */
 export function createChartEvent(
   type: EcosystemEventType,
@@ -32,9 +32,11 @@ export function createChartEvent(
   timestamp: number = Date.now(),
   txHash: string = ''
 ): ChartEcosystemEvent {
-  const isOutgoing = type === 'Claim';
-  const color = isOutgoing ? 'red' : 'emerald';
-  const badge = isOutgoing ? 'CLAIM' : 'MINT';
+  const isClaim = type === 'Claim';
+  const isRegistration = type === 'Registration';
+
+  const color = isRegistration ? 'amber' : isClaim ? 'red' : 'emerald';
+  const badge = isRegistration ? 'REG' : isClaim ? 'CLAIM' : 'BUY';
 
   const d = new Date(timestamp);
   const formattedTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
@@ -48,7 +50,7 @@ export function createChartEvent(
     details,
     timestamp,
     formattedTime,
-    isOutgoing,
+    isOutgoing: isClaim,
     badge,
     color,
     txHash: txHash || '0x...',
@@ -57,10 +59,10 @@ export function createChartEvent(
 }
 
 /**
- * Generates Candlesticks Dynamically:
- * @param timeframe - Selected timeframe (1m, 5m, 1D, etc.)
- * @param activities - Live on-chain activities from Hub Contract
- * @param baseTargetPrice - Dynamic targeted price (Defaults to 3.50, but can accept live contract price)
+ * Generates Candlesticks Dynamically with 3-Color Engine:
+ * - 🟡 Gold: User Registration
+ * - 🟢 Green: Package Activation ($10 / $25) & Referral Mint
+ * - 🔴 Red: Reward Claim (Vault to Wallet)
  */
 export function generateCandlesForTimeframe(
   timeframe: TradingTimeframe,
@@ -78,9 +80,9 @@ export function generateCandlesForTimeframe(
       onChainEvents.push(
         createChartEvent(
           eventType,
-          act.title || (eventType === 'Claim' ? 'Reward Claimed' : 'Token Minted'),
+          act.title || (eventType === 'Registration' ? 'New Registration' : eventType === 'Claim' ? 'Reward Claimed' : 'Package Activated'),
           act.amount || '',
-          act.details || (eventType === 'Claim' ? 'Withdrawn to Wallet' : 'Minted to Ecosystem'),
+          act.details || '',
           actTs,
           act.txHash
         )
@@ -130,8 +132,7 @@ export function generateCandlesForTimeframe(
   const candles: TradingCandle[] = [];
   const startTs = now - (count - 1) * stepMs;
 
-  // Percentage-based dynamic step (0.2% - 0.4% ratio) so it scales with ANY price
-  const microDelta = baseTargetPrice * 0.0025; // Dynamic relative delta
+  const microDelta = baseTargetPrice * 0.0025;
   let currentOpen = baseTargetPrice - (timeframe === 'ALL' ? microDelta * 5 : microDelta);
   let haPrevOpen = currentOpen;
   let haPrevClose = currentOpen;
@@ -144,45 +145,64 @@ export function generateCandlesForTimeframe(
       ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    // Filter events belonging to this timeframe window
     const candleEvents = onChainEvents.filter(
       (ev) => Math.abs(ev.timestamp - candleTs) <= Math.max(stepMs, 60000)
     );
 
     const hasClaim = candleEvents.some((e) => e.type === 'Claim');
-    const hasMint = candleEvents.some(
-      (e) => e.type === 'Referral' || e.type === 'Package Activation' || e.type === 'Registration'
+    const hasRegistration = candleEvents.some((e) => e.type === 'Registration');
+    const hasPackage = candleEvents.some(
+      (e) => e.type === 'Referral' || e.type === 'Package Activation'
     );
 
     let isGreen = true;
+    let isGold = false;
     let spreadRatio = 0.002;
 
-    if (hasClaim && !hasMint) {
+    if (hasRegistration) {
+      // 🟡 1. User Registration -> GOLD CANDLE
+      isGold = true;
       isGreen = false;
       spreadRatio = 0.0035;
-    } else if (hasMint) {
+    } else if (hasClaim && !hasPackage) {
+      // 🔴 2. Reward Claim -> RED CANDLE
+      isGreen = false;
+      isGold = false;
+      spreadRatio = 0.003;
+    } else if (hasPackage) {
+      // 🟢 3. Package Activation -> GREEN CANDLE
       isGreen = true;
+      isGold = false;
       spreadRatio = 0.004;
     } else {
-      const periodicClaimDip = (i % 4 === 1 || i % 6 === 0);
-      isGreen = !periodicClaimDip;
+      // Natural cycle
+      const isRegDay = (i % 7 === 2);
+      const isClaimDay = (i % 5 === 1);
+      if (isRegDay) {
+        isGold = true;
+        isGreen = false;
+      } else if (isClaimDay) {
+        isGreen = false;
+        isGold = false;
+      } else {
+        isGreen = true;
+        isGold = false;
+      }
       spreadRatio = 0.0018 + Math.abs(Math.sin(i * 0.7)) * 0.0012;
     }
 
     const dynamicSpread = Number((baseTargetPrice * spreadRatio).toFixed(4));
     const open = Number(currentOpen.toFixed(4));
-    const close = isGreen 
-      ? Number((open + dynamicSpread).toFixed(4))
-      : Number((open - dynamicSpread).toFixed(4));
+    const close = !isGreen && !isGold
+      ? Number((open - dynamicSpread).toFixed(4))
+      : Number((open + dynamicSpread).toFixed(4));
 
-    // Dynamic wicks proportional to price
     const wickOffset = baseTargetPrice * 0.001;
     const high = Number((Math.max(open, close) + wickOffset).toFixed(4));
     const low = Number((Math.min(open, close) - wickOffset).toFixed(4));
 
-    // Proportional volume
-    const baseVol = isGreen ? 16000 : 9000;
-    const volume = Math.round(baseVol + Math.abs(Math.sin(i * 2.1)) * 12000 + (candleEvents.length * 6000));
+    const baseVol = isGold ? 18000 : isGreen ? 15000 : 8500;
+    const volume = Math.round(baseVol + Math.abs(Math.sin(i * 2.1)) * 11000 + (candleEvents.length * 6000));
     const volumeUsd = Math.round(volume * close);
 
     currentOpen = close;
@@ -194,7 +214,8 @@ export function generateCandlesForTimeframe(
       : Number(((haPrevOpen + haPrevClose) / 2).toFixed(4));
     const haHigh = Number(Math.max(high, haOpen, haClose).toFixed(4));
     const haLow = Number(Math.min(low, haOpen, haClose).toFixed(4));
-    const haIsGreen = haClose >= haOpen;
+    const haIsGreen = isGreen;
+    const haIsGold = isGold;
 
     haPrevOpen = haOpen;
     haPrevClose = haClose;
@@ -210,6 +231,7 @@ export function generateCandlesForTimeframe(
       volume,
       volumeUsd,
       isGreen,
+      isGold,
       events: candleEvents.length > 0 ? candleEvents : undefined,
       intensity: Math.min(1, volume / 30000),
       haOpen,
@@ -217,6 +239,7 @@ export function generateCandlesForTimeframe(
       haLow,
       haClose,
       haIsGreen,
+      haIsGold,
     });
   }
 
@@ -252,6 +275,8 @@ export function appendEcosystemEventToCandles(
   const last = updated[lastIndex];
 
   const isClaim = event.type === 'Claim';
+  const isReg = event.type === 'Registration';
+
   const priceDelta = isClaim 
     ? -(baseTargetPrice * 0.0035) 
     : (baseTargetPrice * 0.0045);
@@ -260,12 +285,11 @@ export function appendEcosystemEventToCandles(
   const newClose = Number((newOpen + priceDelta).toFixed(4));
   const newHigh = Number(Math.max(last.high, newOpen, newClose + (baseTargetPrice * 0.001)).toFixed(4));
   const newLow = Number(Math.min(last.low, newOpen, newClose - (baseTargetPrice * 0.001)).toFixed(4));
-  const newIsGreen = !isClaim;
 
   const existingEvents = last.events ? [...last.events] : [];
   existingEvents.push(event);
 
-  const newVolume = last.volume + (isClaim ? 8000 : 15000);
+  const newVolume = last.volume + (isReg ? 18000 : isClaim ? 8000 : 15000);
 
   const haClose = Number(((newOpen + newHigh + newLow + newClose) / 4).toFixed(4));
   const haOpen = Number(((last.haOpen + last.haClose) / 2).toFixed(4));
@@ -277,7 +301,8 @@ export function appendEcosystemEventToCandles(
     close: newClose,
     high: newHigh,
     low: newLow,
-    isGreen: newIsGreen,
+    isGreen: !isClaim && !isReg,
+    isGold: isReg,
     volume: newVolume,
     volumeUsd: Math.round(newVolume * newClose),
     intensity: Math.min(1, newVolume / 30000),
@@ -286,7 +311,8 @@ export function appendEcosystemEventToCandles(
     haHigh,
     haLow,
     haClose,
-    haIsGreen: haClose >= haOpen,
+    haIsGreen: !isClaim && !isReg,
+    haIsGold: isReg,
   };
 
   return updated;

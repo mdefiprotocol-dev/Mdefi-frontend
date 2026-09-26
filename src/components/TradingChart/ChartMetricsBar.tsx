@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio } from 'lucide-react';
+import { Radio, Zap } from 'lucide-react';
 import { TradingCandle, TickerMetrics, EcosystemEventType } from './types';
 
 interface ChartMetricsBarProps {
@@ -17,6 +17,12 @@ export const ChartMetricsBar: React.FC<ChartMetricsBarProps> = ({
   latestCandle,
 }) => {
   const activeCandle = hoveredCandle || latestCandle;
+  // 3-Color dynamic indicator text color
+  const closeColorClass = activeCandle?.isGold
+    ? 'text-amber-400 font-bold'
+    : activeCandle?.isGreen
+    ? 'text-emerald-400 font-bold'
+    : 'text-red-400 font-bold';
 
   return (
     <div className="space-y-2 pb-2.5 border-b border-zinc-800/80">
@@ -30,6 +36,13 @@ export const ChartMetricsBar: React.FC<ChartMetricsBarProps> = ({
           <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-semibold">
             LIVE SYNC
           </span>
+          {/* FOMO HIGHLIGHTER BADGE: TARGET LAUNCH $3.50 · 2M CAP */}
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-teal-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold shadow-[0_0_12px_rgba(245,158,11,0.2)] animate-pulse">
+            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            <span>TARGET LAUNCH: $3.50</span>
+            <span className="text-zinc-500">|</span>
+            <span className="text-emerald-300">2M CAP LIMIT</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono border bg-emerald-950/50 border-emerald-500/30 text-emerald-300">
@@ -60,7 +73,7 @@ export const ChartMetricsBar: React.FC<ChartMetricsBarProps> = ({
           </div>
           <div className="flex items-center gap-1">
             <span className="text-zinc-500 font-bold">C:</span>
-            <span className={activeCandle?.isGreen ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+            <span className={closeColorClass}>
               {activeCandle?.close.toFixed(4) || '—'}
             </span>
           </div>
