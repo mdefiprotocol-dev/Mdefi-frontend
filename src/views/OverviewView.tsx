@@ -558,15 +558,46 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4 shrink-0">
-            <MbttcCoin3D size="hero" interactive={true} autoRotate={true} glow={true} />
-            <button
-              onClick={() => onNavigate('mbttc')}
-              className="web3-btn-primary py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white font-extrabold text-xs tracking-wide transition-all border border-emerald-400/50 shadow-[0_0_24px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span>{t('overview_view_token', 'View MBTTC')}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+         {/* Phase 1: 3D MBTTC Coin & Button - 100% Centered on Mobile, Unchanged on PC */}
+          <div className="flex flex-col items-center justify-center w-full md:w-auto shrink-0 mx-auto md:mx-0 pt-6 md:pt-0">
+            
+            {/* Cyber Ring Animation Behind Coin */}
+            <div className="relative flex items-center justify-center w-full py-2">
+              {/* Soft Pulsing Ambient Green Core */}
+              <div 
+                aria-hidden="true" 
+                className="absolute w-48 h-48 sm:w-56 sm:h-56 bg-emerald-500/20 rounded-full blur-2xl animate-pulse pointer-events-none" 
+              />
+
+              {/* Outer Clockwise Rotating Dashed Neon Ring */}
+              <div 
+                aria-hidden="true" 
+                className="absolute w-44 h-44 sm:w-52 sm:h-52 rounded-full border border-dashed border-emerald-500/35 animate-[spin_20s_linear_infinite] pointer-events-none" 
+              />
+
+              {/* Inner Counter-Clockwise Rotating Teal Tech Ring */}
+              <div 
+                aria-hidden="true" 
+                className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-teal-400/25 animate-[spin_12s_linear_infinite_reverse] pointer-events-none shadow-[0_0_15px_rgba(52,211,153,0.2)]" 
+              />
+
+              {/* Centered 3D Spinning Coin */}
+              <div className="relative z-10 flex items-center justify-center">
+                <MbttcCoin3D size="hero" interactive={true} autoRotate={true} glow={true} />
+              </div>
+            </div>
+
+            {/* Balanced Centered Button on Mobile */}
+            <div className="w-full flex items-center justify-center mt-3 z-10">
+              <button
+                onClick={() => onNavigate('mbttc')}
+                className="web3-btn-primary w-[220px] sm:w-[240px] md:w-auto py-3 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white font-extrabold text-xs tracking-wide transition-all border border-emerald-400/50 shadow-[0_0_24px_rgba(16,185,129,0.35)] flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              >
+                <span>{t('overview_view_token', 'View MBTTC')}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
           </div>
         </div>
       </div>

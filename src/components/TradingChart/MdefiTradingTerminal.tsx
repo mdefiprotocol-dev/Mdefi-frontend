@@ -1,41 +1,20 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, 
-  TrendingDown, 
-  Sparkles, 
-  Activity, 
-  Layers, 
-  Users, 
-  Zap, 
-  Repeat, 
-  Gift,
-  ShieldCheck,
-  Maximize2,
-  Minimize2,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Sliders,
-  Clock,
-  ChevronDown
+  Gift
 } from 'lucide-react';
 import { 
   TradingChartType, 
   TradingTimeframe, 
   TradingCandle, 
   ChartIndicatorSettings, 
-  TickerMetrics, 
-  ChartEcosystemEvent, 
-  EcosystemEventType 
+  TickerMetrics 
 } from './types';
 import { 
-  generateCandlesForTimeframe, 
-  appendEcosystemEventToCandles, 
-  createChartEvent 
+  generateCandlesForTimeframe 
 } from './chartDataGenerator';
 import { ChartMetricsBar } from './ChartMetricsBar';
 import { ChartControls } from './ChartControls';
-import { ChartTooltip } from './ChartTooltip';
 import { ActivityItem } from '../../types';
 
 interface MdefiTradingTerminalChartProps {
@@ -48,19 +27,16 @@ interface MdefiTradingTerminalChartProps {
 }
 
 export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps> = ({
-  totalRewardsMbttc = '1,284.50',
-  totalRewardsUsd = '2,595.00',
+  totalRewardsMbttc = '0.00',
+  totalRewardsUsd = '0.00',
   activities = [],
   onOpenClaimModal,
-  onOpenMatrixModal,
-  onNavigateHub,
 }) => {
   // Chart state
   const [chartType, setChartType] = useState<TradingChartType>('Candlestick');
   const [timeframe, setTimeframe] = useState<TradingTimeframe>('1D');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-  const [isLivePulseActive, setIsLivePulseActive] = useState<boolean>(true);
 
   // Indicators toggle
   const [indicators, setIndicators] = useState<ChartIndicatorSettings>({
@@ -76,49 +52,11 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     generateCandlesForTimeframe('1D', activities)
   );
 
-  // Regenerate when timeframe changes
+  // Regenerate when timeframe or activities changes
   useEffect(() => {
     setCandles(generateCandlesForTimeframe(timeframe, activities));
-    setHoveredCandle(null);
-  }, [timeframe]);
+  }, [timeframe, activities]);
 
-  // Real-time activity pulse simulator (gives genuine trading terminal feel)
-  useEffect(() => {
-    if (!isLivePulseActive) return;
-
-    const interval = setInterval(() => {
-      setCandles((prev) => {
-        if (prev.length === 0) return prev;
-        const lastIdx = prev.length - 1;
-        const last = prev[lastIdx];
-        // Micro fluctuation (+- 0.0008)
-        const delta = (Math.random() - 0.48) * 0.0016;
-        const newClose = Number((last.close + delta).toFixed(4));
-        const newHigh = Number(Math.max(last.high, newClose).toFixed(4));
-        const newLow = Number(Math.min(last.low, newClose).toFixed(4));
-        const newIsGreen = newClose >= last.open;
-        const newVolume = last.volume + Math.floor(Math.random() * 45);
-
-        const updated = [...prev];
-        updated[lastIdx] = {
-          ...last,
-          close: newClose,
-          high: newHigh,
-          low: newLow,
-          isGreen: newIsGreen,
-          volume: newVolume,
-          volumeUsd: Math.round(newVolume * newClose),
-        };
-        return updated;
-      });
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, [isLivePulseActive]);
-
-  // Interaction state
-  const [hoveredCandle, setHoveredCandle] = useState<TradingCandle | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Zoom handlers
@@ -126,45 +64,11 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 0.25, 0.75));
   const handleResetZoom = () => {
     setZoomLevel(1);
-    setHoveredCandle(null);
-    setMousePos(null);
   };
 
   const handleToggleIndicator = (key: keyof ChartIndicatorSettings) => {
     setIndicators((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
-  // Quick simulation trigger for testing and visual reaction
-  const handleSimulateEvent = useCallback((type: EcosystemEventType) => {
-    let title = 'Ecosystem Event';
-    let amount = '+25.00 MBTTC';
-    let details = 'Simulated node activity event';
-
-    if (type === 'Claim') {
-      title = 'Reward Claim';
-      amount = '−85.00 MBTTC';
-      details = 'Simulated reward withdrawal to connected wallet';
-    } else if (type === 'Referral') {
-      title = 'Direct Referral Bonus';
-      amount = '+45.00 MBTTC';
-      details = 'Frontline referral partner registered';
-    } else if (type === 'Package Activation') {
-      title = 'Package Activation';
-      amount = '+$120.00 USDT';
-      details = 'Package: Nexus Prime (Simulated Node)';
-    } else if (type === 'Matrix Income') {
-      title = 'S4 Matrix Spillover';
-      amount = '+30.00 MBTTC';
-      details = 'Senior Node 2x2 matrix level 2 cycle yield';
-    } else if (type === 'Recycle') {
-      title = 'Cycle Recycle';
-      amount = 'Cycle Complete';
-      details = 'Matrix position completed & recycled';
-    }
-
-    const newEvent = createChartEvent(type, title, amount, details);
-    setCandles((prev) => appendEcosystemEventToCandles(prev, newEvent));
-  }, []);
 
   // Compute metrics
   const latestCandle = candles[candles.length - 1] || null;
@@ -179,35 +83,34 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     const high24h = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : 1.528;
     const low24h = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : 1.478;
     const volume24h = candles.reduce((sum, c) => sum + c.volume, 0);
-
     const totalEvents = candles.reduce((count, c) => count + (c.events?.length || 0), 0);
 
     return {
       currentPrice,
       priceChange24h,
-      priceChangePercent24h: isNaN(priceChangePercent24h) ? 14.8 : priceChangePercent24h,
+      priceChangePercent24h: isNaN(priceChangePercent24h) ? 0 : priceChangePercent24h,
       high24h,
       low24h,
       volume24h,
       totalRewardsMbttc,
       totalRewardsUsd,
       activeEventsCount: totalEvents,
-      modeLabel: 'SIMULATED ENGINE',
-      isSimulated: true,
+      modeLabel: 'LIVE TELEMETRY',
+      isSimulated: false,
     };
   }, [candles, latestCandle, firstCandle, totalRewardsMbttc, totalRewardsUsd]);
 
   // Coordinate geometry & scales
   const svgWidth = 900;
-  const svgHeight = 400;
+  const svgHeight = 360;
   const padLeft = 20;
   const padRight = 65; // Price scale
-  const padTop = 30;
-  const padBottom = 55; // Timeline and volume scale
+  const padTop = 20;
+  const padBottom = 40; // Timeline and volume scale
 
   const plotWidth = svgWidth - padLeft - padRight;
   const plotHeight = svgHeight - padTop - padBottom;
-  const volumeHeight = 65;
+  const volumeHeight = 55;
   const pricePlotHeight = plotHeight - (indicators.volume ? volumeHeight : 0);
 
   // Min and Max prices for scaling
@@ -230,40 +133,15 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   const priceRange = maxPrice - minPrice || 0.01;
 
   // Coordinate mapping functions
-  const getY = useCallback((price: number) => {
+  const getY = (price: number) => {
     return padTop + pricePlotHeight - ((price - minPrice) / priceRange) * pricePlotHeight;
-  }, [padTop, pricePlotHeight, minPrice, priceRange]);
+  };
 
   const candleSpacing = plotWidth / (candles.length || 1);
   const candleBodyWidth = Math.max(3, Math.min(candleSpacing * 0.65 * zoomLevel, 24));
 
-  const getX = useCallback((index: number) => {
+  const getX = (index: number) => {
     return padLeft + index * candleSpacing + candleSpacing / 2;
-  }, [padLeft, candleSpacing]);
-
-  // Handle pointer tracking
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Convert mouseX to nearest candle index
-    const scaleFactor = rect.width / svgWidth;
-    const scaledX = mouseX / scaleFactor;
-
-    const relativeX = scaledX - padLeft;
-    const idx = Math.floor(relativeX / candleSpacing);
-
-    if (idx >= 0 && idx < candles.length) {
-      setHoveredCandle(candles[idx]);
-      setMousePos({ x: mouseX, y: mouseY });
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredCandle(null);
-    setMousePos(null);
   };
 
   // Price axis tick levels
@@ -275,7 +153,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       ticks.push({ price, y: getY(price) });
     }
     return ticks;
-  }, [minPrice, priceRange, getY]);
+  }, [minPrice, priceRange]);
 
   // SVG Paths for Line, Area, and Baseline
   const linePath = useMemo(() => {
@@ -285,7 +163,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       const y = getY(chartType === 'Heikin Ashi' ? c.haClose : c.close);
       return i === 0 ? `M ${x},${y}` : `${acc} L ${x},${y}`;
     }, '');
-  }, [candles, getX, getY, chartType]);
+  }, [candles, chartType]);
 
   const areaPath = useMemo(() => {
     if (!linePath || candles.length === 0) return '';
@@ -293,7 +171,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     const firstX = getX(0);
     const lastX = getX(candles.length - 1);
     return `${linePath} L ${lastX},${bottomY} L ${firstX},${bottomY} Z`;
-  }, [linePath, candles, getX, padTop, pricePlotHeight]);
+  }, [linePath, candles]);
 
   // MA lines paths
   const ma7Path = useMemo(() => {
@@ -307,7 +185,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       }
     });
     return path;
-  }, [indicators.ma, candles, getX, getY]);
+  }, [indicators.ma, candles]);
 
   const ma25Path = useMemo(() => {
     if (!indicators.ma || candles.length < 25) return '';
@@ -320,7 +198,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       }
     });
     return path;
-  }, [indicators.ma, candles, getX, getY]);
+  }, [indicators.ma, candles]);
 
   return (
     <div
@@ -338,15 +216,12 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
         className="pointer-events-none absolute -bottom-20 -left-20 w-80 h-80 bg-teal-500/8 rounded-full blur-[90px]" 
       />
 
-      {/* TOP SECTION: Financial Overview & Total Rewards */}
-      <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6 pb-4">
+      {/* TOP SECTION: Clean Header & Live Total Rewards */}
+      <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-4">
         <div>
-          <div className="flex items-center gap-2 text-zinc-400 mb-2">
+          <div className="flex items-center gap-2 text-zinc-400 mb-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300 font-mono">
               TOTAL MDEFI REWARDS & ACTIVITY TERMINAL
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-emerald-400 text-[10px] font-mono font-semibold">
-              DEMO SIMULATION
             </span>
           </div>
 
@@ -355,54 +230,31 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
               {totalRewardsMbttc} <span className="text-2xl sm:text-3xl text-emerald-400 font-bold">MBTTC</span>
             </h1>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            <span className="text-base text-zinc-300 font-mono font-semibold">
-              ≈ ${totalRewardsUsd} USD
-            </span>
-            <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-              <TrendingUp className="w-3 h-3" />
-              +14.8% this cycle
-            </span>
-            <span className="text-xs text-zinc-400 font-mono">
-              PRO TRADING TERMINAL · SIMULATED ENGINE
-            </span>
-          </div>
         </div>
 
-        {/* Claim & Quick Hub Links */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Claim Yields Button Only */}
+        <div className="flex items-center gap-2">
           {onOpenClaimModal && (
             <button
               type="button"
               onClick={() => onOpenClaimModal('Referral')}
-              className="px-4 py-2 rounded-xl bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="px-5 py-2.5 rounded-xl bg-emerald-900/50 hover:bg-emerald-800/60 border border-emerald-500/50 text-emerald-300 text-xs font-mono font-bold transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer flex items-center gap-2 active:scale-95"
             >
-              <Gift className="w-3.5 h-3.5 text-emerald-400" />
+              <Gift className="w-4 h-4 text-emerald-400" />
               <span>Claim Yields</span>
-            </button>
-          )}
-          {onOpenMatrixModal && (
-            <button
-              type="button"
-              onClick={onOpenMatrixModal}
-              className="px-4 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span>S4 Matrix</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* PROFESSIONAL METRICS BAR (OHLC, Ticker, Quick Simulators) */}
+      {/* PROFESSIONAL METRICS BAR (OHLC & Telemetry) */}
       <ChartMetricsBar
         metrics={tickerMetrics}
-        hoveredCandle={hoveredCandle}
+        hoveredCandle={null}
         latestCandle={latestCandle}
-        onSimulateEvent={handleSimulateEvent}
-        isLivePulseActive={isLivePulseActive}
-        onToggleLivePulse={() => setIsLivePulseActive((p) => !p)}
+        onSimulateEvent={() => {}}
+        isLivePulseActive={false}
+        onToggleLivePulse={() => {}}
       />
 
       {/* CHART CONTROLS (Chart Type, Timeframes, Indicators, Zoom) */}
@@ -420,29 +272,16 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
         onToggleFullscreen={() => setIsFullscreen((prev) => !prev)}
       />
 
-      {/* MAIN TRADING VIEWPORT CONTAINER */}
+      {/* MAIN TRADING VIEWPORT CONTAINER (Fixed Compact Height - Zero Extra Black Space) */}
       <div 
         ref={containerRef}
-        className="relative w-full rounded-2xl bg-[#040907]/90 border border-emerald-500/20 overflow-hidden shadow-inner cursor-crosshair select-none my-2"
-        style={{ minHeight: isFullscreen ? '520px' : '380px' }}
+        className="relative w-full rounded-2xl bg-[#040907]/90 border border-emerald-500/20 overflow-hidden shadow-inner select-none my-2 h-[260px] sm:h-[320px]"
       >
-        {/* Floating Tooltip */}
-        {hoveredCandle && mousePos && (
-          <ChartTooltip
-            candle={hoveredCandle}
-            x={mousePos.x}
-            y={mousePos.y}
-            containerWidth={containerRef.current ? containerRef.current.clientWidth : 800}
-          />
-        )}
-
         {/* SVG Drawing Canvas */}
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full h-full overflow-visible"
+          className="w-full h-full block"
           preserveAspectRatio="none"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
         >
           <defs>
             {/* Area Gradient */}
@@ -452,18 +291,6 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
               <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
             </linearGradient>
 
-            {/* Baseline positive gradient */}
-            <linearGradient id="baselineGreenGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-            </linearGradient>
-
-            {/* Baseline negative gradient */}
-            <linearGradient id="baselineRedGradient" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
-            </linearGradient>
-
             {/* Candle glow filter */}
             <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3" result="blur" />
@@ -471,10 +298,9 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </filter>
           </defs>
 
-          {/* 1. Subtle Grid Lines */}
+          {/* 1. Grid Lines */}
           {indicators.grid && (
-            <g className="grid-lines opacity-40">
-              {/* Horizontal grid lines */}
+            <g className="grid-lines opacity-30">
               {priceTicks.map((tick, i) => (
                 <line
                   key={`h-grid-${i}`}
@@ -489,7 +315,6 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                 />
               ))}
 
-              {/* Vertical timeline grid lines */}
               {candles.map((c, i) => {
                 if (i % 6 !== 0) return null;
                 const x = getX(i);
@@ -510,33 +335,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 2. Baseline reference line (when Baseline chart type is active) */}
-          {chartType === 'Baseline' && (
-            <g>
-              <line
-                x1={padLeft}
-                y1={getY(baselinePrice)}
-                x2={svgWidth - padRight}
-                y2={getY(baselinePrice)}
-                stroke="#6ee7b7"
-                strokeWidth="1.2"
-                strokeDasharray="4 2"
-                opacity="0.6"
-              />
-              <text
-                x={padLeft + 5}
-                y={getY(baselinePrice) - 4}
-                fill="#6ee7b7"
-                fontSize="10"
-                fontFamily="monospace"
-                opacity="0.8"
-              >
-                Baseline: ${baselinePrice.toFixed(4)}
-              </text>
-            </g>
-          )}
-
-          {/* 3. Volume Histogram (Bottom 20%) */}
+          {/* 2. Volume Histogram */}
           {indicators.volume && (
             <g className="volume-bars">
               <line
@@ -549,7 +348,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
               />
               {candles.map((c, i) => {
                 const x = getX(i);
-                const volHeight = Math.max(3, (c.volume / maxVolume) * (volumeHeight - 12));
+                const volHeight = Math.max(3, (c.volume / maxVolume) * (volumeHeight - 10));
                 const y = padTop + plotHeight - volHeight;
                 const barWidth = Math.max(2, candleBodyWidth * 0.85);
 
@@ -561,7 +360,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                     width={barWidth}
                     height={volHeight}
                     fill={c.isGreen ? '#10b981' : '#ef4444'}
-                    opacity={hoveredCandle?.id === c.id ? 0.85 : 0.35}
+                    opacity={0.4}
                     rx="1"
                   />
                 );
@@ -569,101 +368,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 4. Chart Content by Selected Type */}
-
-          {/* A. Area Chart */}
-          {chartType === 'Area' && (
-            <g>
-              <path d={areaPath} fill="url(#terminalAreaGradient)" />
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#emeraldGlow)"
-              />
-            </g>
-          )}
-
-          {/* B. Line Chart */}
-          {chartType === 'Line' && (
-            <g>
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#emeraldGlow)"
-              />
-            </g>
-          )}
-
-          {/* C. Baseline Chart */}
-          {chartType === 'Baseline' && (
-            <g>
-              <path d={areaPath} fill="url(#terminalAreaGradient)" />
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#34d399"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-              />
-            </g>
-          )}
-
-          {/* D. Bar & OHLC Chart */}
-          {(chartType === 'Bar' || chartType === 'OHLC') && (
-            <g className="ohlc-bars">
-              {candles.map((c, i) => {
-                const x = getX(i);
-                const yHigh = getY(c.high);
-                const yLow = getY(c.low);
-                const yOpen = getY(c.open);
-                const yClose = getY(c.close);
-                const tickLen = Math.max(3, candleBodyWidth / 2);
-                const color = c.isGreen ? '#10b981' : '#ef4444';
-
-                return (
-                  <g key={`bar-${i}`}>
-                    {/* Vertical spine (High to Low) */}
-                    <line
-                      x1={x}
-                      y1={yHigh}
-                      x2={x}
-                      y2={yLow}
-                      stroke={color}
-                      strokeWidth="1.8"
-                    />
-                    {/* Left tick: Open */}
-                    <line
-                      x1={x - tickLen}
-                      y1={yOpen}
-                      x2={x}
-                      y2={yOpen}
-                      stroke={color}
-                      strokeWidth="1.8"
-                    />
-                    {/* Right tick: Close */}
-                    <line
-                      x1={x}
-                      y1={yClose}
-                      x2={x + tickLen}
-                      y2={yClose}
-                      stroke={color}
-                      strokeWidth="1.8"
-                    />
-                  </g>
-                );
-              })}
-            </g>
-          )}
-
-          {/* E. Candlestick, Heikin Ashi, and Hollow Candles */}
+          {/* 3. Candlesticks */}
           {(chartType === 'Candlestick' || chartType === 'Heikin Ashi' || chartType === 'Hollow Candles') && (
             <g className="candles">
               {candles.map((c, i) => {
@@ -683,16 +388,10 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                 const bodyTop = Math.min(yOpen, yClose);
                 const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
 
-                const isHollow = chartType === 'Hollow Candles';
                 const candleColor = isGreen ? '#10b981' : '#ef4444';
-                const fillColor = isHollow 
-                  ? (isGreen ? 'transparent' : candleColor) 
-                  : candleColor;
-
-                const isHovered = hoveredCandle?.id === c.id;
 
                 return (
-                  <g key={`candle-${i}`} className="transition-opacity">
+                  <g key={`candle-${i}`}>
                     {/* Upper Wick */}
                     <line
                       x1={x}
@@ -717,12 +416,10 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                       y={bodyTop}
                       width={candleBodyWidth}
                       height={bodyHeight}
-                      fill={fillColor}
+                      fill={candleColor}
                       stroke={candleColor}
-                      strokeWidth={isHollow && isGreen ? 1.8 : 1}
+                      strokeWidth={1}
                       rx="1"
-                      className="transition-all"
-                      filter={isHovered ? 'url(#emeraldGlow)' : undefined}
                     />
                   </g>
                 );
@@ -730,7 +427,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 5. Moving Averages Curves */}
+          {/* 4. Moving Averages Curves */}
           {indicators.ma && (
             <g className="moving-averages">
               {ma7Path && (
@@ -739,7 +436,6 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                   fill="none"
                   stroke="#38bdf8"
                   strokeWidth="1.6"
-                  strokeDasharray="none"
                   opacity="0.85"
                 />
               )}
@@ -749,150 +445,45 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                   fill="none"
                   stroke="#f59e0b"
                   strokeWidth="1.6"
-                  strokeDasharray="none"
                   opacity="0.85"
                 />
               )}
             </g>
           )}
 
-          {/* 6. CANDLE EVENT SYSTEM (Visual Markers on Candles) */}
+          {/* 5. Minimal Event Markers (Above/Below Candles) */}
           {indicators.events && (
             <g className="ecosystem-events">
               {candles.map((c, i) => {
                 if (!c.events || c.events.length === 0) return null;
                 const x = getX(i);
                 const hasClaim = c.events.some((e) => e.type === 'Claim');
-                const hasPackage = c.events.some((e) => e.type === 'Package Activation');
-                const hasReferral = c.events.some((e) => e.type === 'Referral');
-                const hasMatrix = c.events.some((e) => e.type === 'Matrix Income');
-                const hasRecycle = c.events.some((e) => e.type === 'Recycle');
+                const hasPackageOrRef = c.events.some((e) => e.type === 'Package Activation' || e.type === 'Referral');
 
-                // Determine position: Claims below candle low, Earnings/Packages above candle high
                 const yHigh = getY(c.high);
                 const yLow = getY(c.low);
 
                 return (
-                  <g key={`evt-marker-${i}`} className="cursor-pointer">
-                    {/* Outgoing Claim marker below candle */}
+                  <g key={`evt-marker-${i}`}>
                     {hasClaim && (
-                      <g transform={`translate(${x}, ${yLow + 14})`}>
-                        <circle
-                          r="7.5"
-                          fill="#ef4444"
-                          stroke="#7f1d1d"
-                          strokeWidth="1.5"
-                          className="animate-pulse"
-                        />
-                        <text
-                          y="3"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="9"
-                          fontWeight="bold"
-                          fontFamily="monospace"
-                        >
-                          −
-                        </text>
-                        {/* Connecting dotted stem */}
-                        <line
-                          x1="0"
-                          y1="-14"
-                          x2="0"
-                          y2="-7.5"
-                          stroke="#ef4444"
-                          strokeWidth="1"
-                          strokeDasharray="2 2"
-                        />
-                      </g>
+                      <circle
+                        cx={x}
+                        cy={yLow + 10}
+                        r="3.5"
+                        fill="#ef4444"
+                        stroke="#7f1d1d"
+                        strokeWidth="1"
+                      />
                     )}
-
-                    {/* Package Activation marker above candle (Strong node badge) */}
-                    {hasPackage && (
-                      <g transform={`translate(${x}, ${yHigh - 16})`}>
-                        <rect
-                          x="-14"
-                          y="-9"
-                          width="28"
-                          height="18"
-                          rx="4"
-                          fill="#064e3b"
-                          stroke="#34d399"
-                          strokeWidth="1.6"
-                          filter="url(#emeraldGlow)"
-                        />
-                        <text
-                          y="3"
-                          textAnchor="middle"
-                          fill="#a7f3d0"
-                          fontSize="8"
-                          fontWeight="bold"
-                          fontFamily="monospace"
-                        >
-                          NODE
-                        </text>
-                        <line
-                          x1="0"
-                          y1="9"
-                          x2="0"
-                          y2="16"
-                          stroke="#34d399"
-                          strokeWidth="1.2"
-                        />
-                      </g>
-                    )}
-
-                    {/* Referral bonus marker above candle */}
-                    {hasReferral && !hasPackage && (
-                      <g transform={`translate(${x}, ${yHigh - 14})`}>
-                        <circle
-                          r="7.5"
-                          fill="#10b981"
-                          stroke="#064e3b"
-                          strokeWidth="1.5"
-                        />
-                        <text
-                          y="3"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="9"
-                          fontWeight="bold"
-                          fontFamily="monospace"
-                        >
-                          +
-                        </text>
-                        <line
-                          x1="0"
-                          y1="7.5"
-                          x2="0"
-                          y2="14"
-                          stroke="#10b981"
-                          strokeWidth="1"
-                          strokeDasharray="2 2"
-                        />
-                      </g>
-                    )}
-
-                    {/* Matrix / Recycle marker */}
-                    {(hasMatrix || hasRecycle) && !hasPackage && !hasReferral && (
-                      <g transform={`translate(${x}, ${yHigh - 14})`}>
-                        <circle
-                          r="7"
-                          fill={hasMatrix ? '#0891b2' : '#9333ea'}
-                          stroke={hasMatrix ? '#164e63' : '#581c87'}
-                          strokeWidth="1.5"
-                        />
-                        <text
-                          y="3"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="8"
-                          fontWeight="bold"
-                          fontFamily="monospace"
-                        >
-                          {hasMatrix ? 'M' : 'R'}
-                        </text>
-                      </g>
+                    {hasPackageOrRef && (
+                      <circle
+                        cx={x}
+                        cy={yHigh - 10}
+                        r="3.5"
+                        fill="#10b981"
+                        stroke="#064e3b"
+                        strokeWidth="1"
+                      />
                     )}
                   </g>
                 );
@@ -900,80 +491,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 7. Interactive Crosshair Lines (when hovering) */}
-          {hoveredCandle && (
-            <g className="crosshair-guides pointer-events-none">
-              {/* Vertical Crosshair Line */}
-              <line
-                x1={getX(candles.indexOf(hoveredCandle))}
-                y1={padTop}
-                x2={getX(candles.indexOf(hoveredCandle))}
-                y2={padTop + plotHeight}
-                stroke="#6ee7b7"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.75"
-              />
-              {/* Horizontal Crosshair Line */}
-              <line
-                x1={padLeft}
-                y1={getY(hoveredCandle.close)}
-                x2={svgWidth - padRight}
-                y2={getY(hoveredCandle.close)}
-                stroke="#6ee7b7"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.75"
-              />
-
-              {/* Price badge on Y-Axis */}
-              <g transform={`translate(${svgWidth - padRight + 2}, ${getY(hoveredCandle.close) - 9})`}>
-                <rect
-                  width="58"
-                  height="18"
-                  rx="3"
-                  fill="#064e3b"
-                  stroke="#34d399"
-                  strokeWidth="1"
-                />
-                <text
-                  x="29"
-                  y="12"
-                  textAnchor="middle"
-                  fill="#a7f3d0"
-                  fontSize="10"
-                  fontWeight="bold"
-                  fontFamily="monospace"
-                >
-                  ${hoveredCandle.close.toFixed(4)}
-                </text>
-              </g>
-
-              {/* Time badge on X-Axis */}
-              <g transform={`translate(${getX(candles.indexOf(hoveredCandle)) - 32}, ${padTop + plotHeight + 4})`}>
-                <rect
-                  width="64"
-                  height="16"
-                  rx="3"
-                  fill="#18181b"
-                  stroke="#3f3f46"
-                  strokeWidth="1"
-                />
-                <text
-                  x="32"
-                  y="11"
-                  textAnchor="middle"
-                  fill="#e4e4e7"
-                  fontSize="9"
-                  fontFamily="monospace"
-                >
-                  {hoveredCandle.time}
-                </text>
-              </g>
-            </g>
-          )}
-
-          {/* 8. Right Y-Axis Price Scale */}
+          {/* 6. Right Y-Axis Price Scale */}
           <g className="y-axis-labels">
             {priceTicks.map((tick, i) => (
               <text
@@ -989,7 +507,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             ))}
           </g>
 
-          {/* 9. Bottom X-Axis Timeline Labels */}
+          {/* 7. Bottom X-Axis Timeline Labels */}
           <g className="x-axis-labels">
             {candles.map((c, i) => {
               if (i % 6 !== 0 && i !== candles.length - 1) return null;
@@ -998,7 +516,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                 <text
                   key={`time-lbl-${i}`}
                   x={x}
-                  y={padTop + plotHeight + 18}
+                  y={padTop + plotHeight + 16}
                   textAnchor="middle"
                   fill="#71717a"
                   fontSize="10"
@@ -1012,7 +530,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
         </svg>
       </div>
 
-      {/* FOOTER BAR: Legend, Indicators & Ecosystem Status */}
+      {/* FOOTER BAR: Clean Indicators & Ecosystem Legend */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-900/90 text-xs font-mono">
         {/* Left: MA & Events Legend */}
         <div className="flex items-center gap-4 flex-wrap text-[11px] text-zinc-400">
@@ -1030,22 +548,20 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
           )}
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Referral / Node</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Mint (Referral / Node)</span>
             </span>
             <span className="flex items-center gap-1 text-red-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="w-2 h-2 rounded-full bg-red-400" />
               <span>Claim</span>
             </span>
           </div>
         </div>
 
-        {/* Right: Sandbox Telemetry Status */}
+        {/* Right: Real Protocol Status */}
         <div className="flex items-center gap-2 text-[11px] text-zinc-400">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Simulated Activity Engine</span>
-          <span className="text-zinc-400">·</span>
-          <span className="text-zinc-400">BSC Latency: 24ms</span>
+          <span>MDeFi Activity Engine · BSC Connected</span>
         </div>
       </div>
     </div>
