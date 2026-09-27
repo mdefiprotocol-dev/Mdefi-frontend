@@ -7,10 +7,11 @@
  */
 
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESSES, HUB_ABI, NETWORK_CONFIG } from '../config/contractConfig';
+import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 import { ChartEcosystemEvent, HubCandleActionCategory } from '../components/TradingChart/types';
 
-const BSC_TESTNET_RPC = NETWORK_CONFIG?.rpcUrl || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+// Fast, non-rate-limited RPC verified directly on terminal for getLogs
+const VERIFIED_FAST_RPC = 'https://bsc-testnet.publicnode.com';
 const processedTxMap = new Map<string, ChartEcosystemEvent>();
 
 function parseHubLog(log: any, blockTimestampSec: number): ChartEcosystemEvent | null {
@@ -120,55 +121,62 @@ export class ChartHubEventService {
   private isListening = false;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC);
+    this.provider = new ethers.JsonRpcProvider(VERIFIED_FAST_RPC, undefined, { staticNetwork: true });
     const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
     if (hubAddress && ethers.isAddress(hubAddress)) {
       this.hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, this.provider);
     }
   }
 
-  public async fetchHistoricalHubEvents(blockRange: number = 5000): Promise<ChartEcosystemEvent[]> {
+  public async fetchHistoricalHubEvents(blockRange: number = 100000): Promise<ChartEcosystemEvent[]> {
     if (!this.hubContract) return [];
 
     try {
       const currentBlock = await this.provider.getBlockNumber();
-      const fromBlock = Math.max(0, currentBlock - blockRange);
-
-      const filter = {
-        address: await this.hubContract.getAddress(),
-        fromBlock,
-        toBlock: currentBlock,
-      };
-
-      const rawLogs = await this.provider.getLogs(filter);
+      const startBlock = Math.max(0, currentBlock - blockRange);
+      const CHUNK_SIZE = 9500;
+      const hubAddr = await this.hubContract.getAddress();
       const parsedEvents: ChartEcosystemEvent[] = [];
 
-      for (const log of rawLogs) {
+      for (let from = startBlock; from <= currentBlock; from += CHUNK_SIZE) {
+        const to = Math.min(from + CHUNK_SIZE - 1, currentBlock);
         try {
-          const parsed = this.hubContract.interface.parseLog({
-            topics: log.topics as string[],
-            data: log.data,
+          const rawLogs = await this.provider.getLogs({
+            address: hubAddr,
+            fromBlock: from,
+            toBlock: to,
           });
 
-          if (!parsed) continue;
+          for (const log of rawLogs) {
+            try {
+              const parsed = this.hubContract.interface.parseLog({
+                topics: log.topics as string[],
+                data: log.data,
+              });
 
-          const txKey = `${log.transactionHash}-${log.index}`;
-          if (processedTxMap.has(txKey)) {
-            parsedEvents.push(processedTxMap.get(txKey)!);
-            continue;
-          }
+              if (!parsed) continue;
 
-          const block = await this.provider.getBlock(log.blockNumber);
-          const blockTs = block?.timestamp || Math.floor(Date.now() / 1000);
+              const txKey = `${log.transactionHash}-${log.index}`;
+              if (processedTxMap.has(txKey)) {
+                parsedEvents.push(processedTxMap.get(txKey)!);
+                continue;
+              }
 
-          const eventItem = parseHubLog(
-            { ...parsed, transactionHash: log.transactionHash, blockNumber: log.blockNumber, index: log.index },
-            blockTs
-          );
+              const block = await this.provider.getBlock(log.blockNumber);
+              const blockTs = block?.timestamp || Math.floor(Date.now() / 1000);
 
-          if (eventItem) {
-            processedTxMap.set(txKey, eventItem);
-            parsedEvents.push(eventItem);
+              const eventItem = parseHubLog(
+                { ...parsed, transactionHash: log.transactionHash, blockNumber: log.blockNumber, index: log.index },
+                blockTs
+              );
+
+              if (eventItem) {
+                processedTxMap.set(txKey, eventItem);
+                parsedEvents.push(eventItem);
+              }
+            } catch {
+              continue;
+            }
           }
         } catch {
           continue;
