@@ -6,8 +6,12 @@ import {
 } from './types';
 import { ActivityItem } from '../../types';
 
+// Official Target Launching Price
 export const DEFAULT_TARGET_LAUNCH_PRICE = 3.50;
 
+/**
+ * Maps on-chain Hub Contract activities directly to chart events
+ */
 export function mapActivityToEventType(typeStr: string): EcosystemEventType {
   const lower = (typeStr || '').toLowerCase();
   if (lower.includes('claim')) return 'Claim';
@@ -95,7 +99,16 @@ export function generateCandlesForTimeframe(
     case '4H': stepMs = 4 * 3600 * 1000; timeFormat = 'time'; break;
     case '1D': stepMs = 24 * 3600 * 1000; timeFormat = 'day'; break;
     case '1W': stepMs = 7 * 24 * 3600 * 1000; timeFormat = 'date'; break;
-    case 'ALL': stepMs = 12 * 24 * 3600 * 1000; timeFormat = 'date'; break;
+    case 'ALL': {
+      // ALL timeframe stretches back to cover all historical on-chain events
+      const earliestTs = onChainEvents.length > 0 
+        ? Math.min(...onChainEvents.map(e => e.timestamp)) 
+        : (now - 30 * 24 * 3600 * 1000);
+      const totalSpan = Math.max(now - earliestTs, 7 * 24 * 3600 * 1000);
+      stepMs = Math.ceil(totalSpan / count);
+      timeFormat = 'date';
+      break;
+    }
   }
 
   const candles: TradingCandle[] = [];
@@ -113,7 +126,7 @@ export function generateCandlesForTimeframe(
       ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    // Strict bucket filter: avoids overlap
+    // Events matching inside this timeframe candle bucket
     const candleEvents = onChainEvents.filter(
       (ev) => ev.timestamp >= candleTs && ev.timestamp < candleTs + stepMs
     );
@@ -150,7 +163,7 @@ export function generateCandlesForTimeframe(
         priceShift = -0.0020;
       }
     } else {
-      // 0 Real Events: Exactly 0 Volume, flat baseline at $3.50
+      // 0 Real Events: Flat zero-drift line
       candleVolume = 0;
       isGreen = true; 
       isGold = false;
@@ -160,7 +173,6 @@ export function generateCandlesForTimeframe(
     const open = Number(currentPrice.toFixed(4));
     const close = Number((open + priceShift).toFixed(4));
 
-    // Zero-volume candles have a flat hairline wick, not big fake bodies
     const wickDelta = candleVolume > 0 ? 0.0008 : 0.0001;
     const high = Number((Math.max(open, close) + wickDelta).toFixed(4));
     const low = Number((Math.min(open, close) - wickDelta).toFixed(4));

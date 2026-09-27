@@ -36,7 +36,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
 }) => {
   // Chart Controls State
   const [chartType, setChartType] = useState<TradingChartType>('Candlestick');
-  const [timeframe, setTimeframe] = useState<TradingTimeframe>('1D');
+  const [timeframe, setTimeframe] = useState<TradingTimeframe>('ALL');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [hoveredCandle, setHoveredCandle] = useState<TradingCandle | null>(null);
@@ -58,14 +58,14 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   useEffect(() => {
     let isMounted = true;
 
-    // Fetch historical on-chain events from BSC Testnet
-    chartHubEventService.fetchHistoricalHubEvents(3000).then((events: ChartEcosystemEvent[]) => {
-      if (isMounted && events.length > 0) {
+    // Fetch full on-chain history across chunks
+    chartHubEventService.fetchHistoricalHubEvents().then((events: ChartEcosystemEvent[]) => {
+      if (isMounted && Array.isArray(events) && events.length > 0) {
         setOnChainHubEvents(events);
       }
     });
 
-    // Real-time listener for new Hub events
+    // Real-time listener for live block mints/claims
     const unsubscribe = chartHubEventService.subscribeToRealtimeHubEvents((newEvent: ChartEcosystemEvent) => {
       if (!isMounted) return;
       setOnChainHubEvents((prev) => {
@@ -80,9 +80,9 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     };
   }, []);
 
-  // 2. RAW ON-CHAIN EVENT PARSER & DEDUPLICATION ENGINE
-  const normalizedEvents = useMemo<ChartEcosystemEvent[]>(() => {
-    const combinedList = [
+  // 2. Event Deduplication & Master Aggregator
+  const allRawActivities = useMemo<any[]>(() => {
+    const combined: any[] = [
       ...activities,
       ...onChainHubEvents.map((evt) => ({
         id: evt.id,
@@ -95,53 +95,25 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       })),
     ];
 
-    if (combinedList.length === 0) return [];
+    const seen = new Set<string>();
+    const deduplicated: any[] = [];
 
-    const seenTxHashes = new Set<string>();
-    const events: ChartEcosystemEvent[] = [];
-
-    combinedList.forEach((act) => {
-      const txKey = act.txHash && act.txHash !== '0x...' 
+    combined.forEach((act) => {
+      const key = act.txHash && act.txHash !== '0x...' 
         ? act.txHash 
-        : `${act.type}-${act.timestamp || Date.now()}`;
-
-      if (seenTxHashes.has(txKey)) return;
-      seenTxHashes.add(txKey);
-
-      const actTs = act.timestamp || Date.now();
-      const eventType = mapActivityToEventType(act.type);
-
-      events.push(
-        createChartEvent(
-          eventType,
-          act.title || (eventType === 'Registration' ? 'New Registration' : eventType === 'Claim' ? 'Reward Claimed' : 'Package Activated'),
-          act.amount || '',
-          act.details || '',
-          actTs,
-          act.txHash
-        )
-      );
+        : `${act.type}-${act.timestamp}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      deduplicated.push(act);
     });
 
-    return events.sort((a, b) => a.timestamp - b.timestamp);
+    return deduplicated;
   }, [activities, onChainHubEvents]);
 
-  // 3. TIMEFRAME CANDLE AGGREGATION (Pure On-Chain Event Driven)
+  // 3. CANDLE ENGINE (Pure On-Chain Event Driven)
   const candles = useMemo<TradingCandle[]>(() => {
-    const combinedList = [
-      ...activities,
-      ...onChainHubEvents.map((evt) => ({
-        id: evt.id,
-        type: evt.type,
-        title: evt.title,
-        amount: evt.amount,
-        details: evt.details,
-        timestamp: evt.timestamp,
-        txHash: evt.txHash,
-      })),
-    ];
-    return generateCandlesForTimeframe(timeframe, combinedList as any, DEFAULT_TARGET_LAUNCH_PRICE);
-  }, [timeframe, activities, onChainHubEvents]);
+    return generateCandlesForTimeframe(timeframe, allRawActivities, DEFAULT_TARGET_LAUNCH_PRICE);
+  }, [timeframe, allRawActivities]);
 
   // Reset hover state when timeframe changes
   useEffect(() => {
@@ -167,10 +139,17 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     const priceChange24h = Number((currentPrice - baseOpen).toFixed(4));
     const priceChangePercent24h = Number(((priceChange24h / baseOpen) * 100).toFixed(2));
     
-    const high24h = candles.length > 0 ? Math.max(...candles.map((c) => c.high)) : DEFAULT_TARGET_LAUNCH_PRICE + 0.02;
-    const low24h = candles.length > 0 ? Math.min(...candles.map((c) => c.low)) : DEFAULT_TARGET_LAUNCH_PRICE - 0.02;
-    const volume24h = candles.reduce((sum, c) => sum + c.volume, 0);
-    const totalEvents = candles.reduce((count, c) => count + (c.events?.length || 0), 0);
+    const highs = candles.map((c) => c.high);
+    const lows = candles.map((c) => c.low);
+    const high24h = highs.length > 0 ? Math.max(...highs) : DEFAULT_TARGET_LAUNCH_PRICE + 0.02;
+    const low24h = lows.length > 0 ? Math.min(...lows) : DEFAULT_TARGET_LAUNCH_PRICE - 0.02;
+
+    // Total minted/claimed tokens across the entire history
+    const totalCirculatingVolume = allRawActivities.reduce((acc, act) => {
+      const cleaned = (act.amount || '').replace(/[^0-9.]/g, '');
+      const parsed = parseFloat(cleaned);
+      return acc + (isNaN(parsed) ? 0 : parsed);
+    }, 0);
 
     return {
       currentPrice,
@@ -178,14 +157,14 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
       priceChangePercent24h: isNaN(priceChangePercent24h) ? 0 : priceChangePercent24h,
       high24h,
       low24h,
-      volume24h,
+      volume24h: totalCirculatingVolume,
       totalRewardsMbttc,
       totalRewardsUsd,
-      activeEventsCount: totalEvents > 0 ? totalEvents : normalizedEvents.length,
+      activeEventsCount: allRawActivities.length,
       modeLabel: 'LIVE TELEMETRY',
       isSimulated: false,
     };
-  }, [candles, latestCandle, firstCandle, totalRewardsMbttc, totalRewardsUsd, normalizedEvents]);
+  }, [candles, latestCandle, firstCandle, totalRewardsMbttc, totalRewardsUsd, allRawActivities]);
 
   // Coordinate Geometry & Scales
   const svgWidth = 900;
@@ -216,7 +195,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
 
     const minP = Math.min(...lows) * 0.998;
     const maxP = Math.max(...highs) * 1.002;
-    const maxV = Math.max(...vols, 1000);
+    const maxV = Math.max(...vols, 100);
 
     return { minPrice: minP, maxPrice: maxP, maxVolume: maxV };
   }, [candles, chartType]);
@@ -441,6 +420,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                 strokeWidth="1"
               />
               {candles.map((c, i) => {
+                if (c.volume <= 0) return null;
                 const x = getX(i);
                 const volHeight = Math.max(3, (c.volume / maxVolume) * (volumeHeight - 10));
                 const y = padTop + plotHeight - volHeight;
@@ -455,7 +435,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                     width={barWidth}
                     height={volHeight}
                     fill={barColor}
-                    opacity={0.4}
+                    opacity={0.6}
                     rx="1"
                   />
                 );
@@ -490,7 +470,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 4. Bar & OHLC Chart (3-Color Supported) */}
+          {/* 4. Bar & OHLC Chart */}
           {(chartType === 'Bar' || chartType === 'OHLC') && (
             <g className="ohlc-bars">
               {candles.map((c, i) => {
@@ -517,7 +497,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
             </g>
           )}
 
-          {/* 5. Candlesticks, Heikin Ashi, & Hollow Candles (Full 3-Color Engine) */}
+          {/* 5. Candlesticks, Heikin Ashi, & Hollow Candles */}
           {(chartType === 'Candlestick' || chartType === 'Heikin Ashi' || chartType === 'Hollow Candles') && (
             <g className="candles">
               {candles.map((c, i) => {
