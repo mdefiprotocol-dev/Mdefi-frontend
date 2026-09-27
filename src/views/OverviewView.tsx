@@ -605,7 +605,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
       {/* 4. TOTAL MDEFI REWARDS & TRADING TERMINAL */}
       <MdefiTradingTerminalChart 
         totalRewardsMbttc={displayGlobalRewards.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        totalRewardsUsd={(displayGlobalRewards * 1.5).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        totalRewardsUsd={(displayGlobalRewards * 3.5).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         activities={activities}
         onOpenClaimModal={onOpenClaimModal}
         onOpenMatrixModal={onOpenMatrixModal}

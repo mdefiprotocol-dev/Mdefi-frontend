@@ -1,5 +1,7 @@
 /**
  * Types and interfaces for the MDeFi Professional Trading Terminal Chart
+ * Hub Contract On-Chain Telemetry & Event-Driven Candlestick Engine
+ * Non-DEX Activity Architecture (100% On-Chain Traceable)
  */
 
 export type TradingChartType = 
@@ -22,17 +24,19 @@ export type TradingTimeframe =
   | '1W' 
   | 'ALL';
 
+// On-Chain Hub Contract Action Categories
+export type HubCandleActionCategory = 
+  | 'REGISTRATION'  // GOLD: New User / Genesis Mint (#f59e0b)
+  | 'PACKAGE_BUY'   // GREEN: buyPackageOnHub $10/$25 (#10b981)
+  | 'REWARD_CLAIM';  // RED: claimReferralReward / claimPackageReward (#ef4444)
+
 export type EcosystemEventType = 
-  | 'Claim' 
-  | 'Referral' 
-  | 'Package Activation' 
-  | 'Registration' 
-  | 'Matrix Income' 
-  | 'Weekly Reward' 
-  | 'Token Claim' 
-  | 'Swap' 
-  | 'Recycle' 
-  | 'Liquidity Event';
+  | 'Registration'
+  | 'Package Activation'
+  | 'Referral'
+  | 'Claim'
+  | 'Matrix Income'
+  | 'Weekly Reward';
 
 export interface ChartEcosystemEvent {
   id: string;
@@ -43,27 +47,37 @@ export interface ChartEcosystemEvent {
   details: string;
   timestamp: number;
   formattedTime: string;
-  isOutgoing: boolean; // true = red (claim), false = green/gold (incoming)
-  badge: string;
-  color: 'emerald' | 'red' | 'amber' | 'purple' | 'cyan' | 'blue';
+  isOutgoing: boolean; // true = red (claim withdrawal), false = incoming (mint)
+  badge: 'REG' | 'BUY' | 'CLAIM' | 'MINT';
+  color: 'amber' | 'emerald' | 'red';
   txHash?: string;
-  status: 'Simulated' | 'Confirmed';
+  blockNumber?: number;
+  walletAddress?: string;
+  candleActionCategory?: HubCandleActionCategory;
+  status: 'Confirmed';
 }
 
 export interface TradingCandle {
   id: string;
   time: string;
   timestamp: number;
+  // Derived relative OHLC around $3.50 target launching price
   open: number;
   high: number;
   low: number;
   close: number;
-  volume: number; // Volume in MBTTC
+  volume: number; // Volume in MBTTC tokens
   volumeUsd: number;
+  
+  // 3-Color Candle Determinants
   isGreen: boolean;
-  isGold?: boolean; // Registration Flag (Gold Candle)
+  isGold?: boolean;
+  dominantAction?: HubCandleActionCategory;
+  
+  // Attached real on-chain events inside this timeframe window
   events?: ChartEcosystemEvent[];
-  intensity: number; // 0 to 1 activity intensity
+  intensity: number; // 0 to 1 activity intensity based on volume
+  
   // Heikin Ashi values
   haOpen: number;
   haHigh: number;
@@ -71,6 +85,7 @@ export interface TradingCandle {
   haClose: number;
   haIsGreen: boolean;
   haIsGold?: boolean;
+  
   // Moving averages
   ma7?: number;
   ma25?: number;
