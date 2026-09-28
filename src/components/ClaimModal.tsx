@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, ArrowRight, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { MbttcCoin3D } from './MbttcCoin3D';
 import { unlockAudioContext, playClaimSuccessSound } from '../utils/successSound';
 
@@ -169,9 +169,12 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
               <div className="text-3xl sm:text-4xl font-extrabold text-white font-mono mt-1 tracking-tight">
                 {(activeAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-emerald-400 font-bold">MBTTC</span>
               </div>
-              <span className="text-xs text-zinc-400 font-mono mt-1 block">
-                ≈ ${((activeAmount ?? 0) * 1.5).toFixed(2)} USD (Benchmark)
-              </span>
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                <span className="text-[11px] font-mono font-bold text-emerald-300 uppercase tracking-wider">
+                  LAUNCHING BENCHMARK: 3.50 USDT
+                </span>
+              </div>
             </div>
 
             {/* Breakdown table showing Reward Type, Amount, Demo Network Fee, Total */}
@@ -184,10 +187,7 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
                 <span>Claim Amount:</span>
                 <span className="text-emerald-400 font-bold">{activeAmount ?? 0} MBTTC</span>
               </div>
-              <div className="flex items-center justify-between text-zinc-400">
-                <span>Network Fee:</span>
-                <span className="text-zinc-300">~0.00045 BNB</span>
-              </div>
+              
               <div className="pt-2 border-t border-zinc-800 flex items-center justify-between font-bold">
                 <span className="text-zinc-200">Total Payout:</span>
                 <span className="text-emerald-300 text-sm">+{activeAmount ?? 0} MBTTC</span>
@@ -203,6 +203,21 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
                 </p>
               </div>
             )}
+
+           {/* 4-Hour Vesting Pool Highlighter Card */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-zinc-950/90 to-emerald-950/70 border border-emerald-500/35 shadow-[0_0_15px_rgba(16,185,129,0.15)] flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0 border border-emerald-500/30">
+                <Clock className="w-4 h-4 animate-pulse text-emerald-400" />
+              </div>
+              <div className="text-left font-mono">
+                <span className="text-xs font-bold text-emerald-300 block uppercase tracking-wide">
+                  {activeRewardType === 'Referral' ? '2% Referral Vesting Pool' : '3% Package Vesting Pool'}
+                </span>
+                <p className="text-[11px] text-zinc-300 mt-0.5 leading-snug">
+                  Claim every 4 hours directly from your on-chain {activeRewardType === 'Referral' ? 'referral' : 'package'} vesting pool.
+                </p>
+              </div>
+            </div>
 
             {/* Vault Protocol notice */}
             <div className="flex items-start gap-2 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 text-xs">
