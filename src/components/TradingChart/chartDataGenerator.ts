@@ -64,11 +64,11 @@ export function generateCandlesForTimeframe(
   activities: ActivityItem[] = [],
   baseTargetPrice: number = DEFAULT_TARGET_LAUNCH_PRICE
 ): TradingCandle[] {
-  const count = timeframe === '1m' || timeframe === '5m' ? 36 : 30;
+  const count = timeframe === '1m' || timeframe === '5m' ? 40 : 32;
   const onChainEvents: ChartEcosystemEvent[] = [];
 
   if (Array.isArray(activities) && activities.length > 0) {
-    activities.forEach((act) => {
+    activities.forEach((act: ActivityItem) => {
       const actTs = act.timestamp || (act.createdAt ? Number(act.createdAt) : Date.now());
       const eventType = mapActivityToEventType(act.type);
       onChainEvents.push(
@@ -84,7 +84,7 @@ export function generateCandlesForTimeframe(
     });
   }
 
-  // Pure sort by true blockchain timestamp
+  // Pure chronological sort: Earliest -> Latest
   onChainEvents.sort((a, b) => a.timestamp - b.timestamp);
 
   const now = Date.now();
@@ -104,8 +104,8 @@ export function generateCandlesForTimeframe(
         ? onChainEvents[0].timestamp 
         : (now - 3 * 24 * 3600 * 1000);
       const totalSpan = Math.max(now - earliestTs, 3600 * 1000);
-      stepMs = Math.max(Math.ceil(totalSpan / (count - 2)), 60 * 1000);
-      timeFormat = 'date';
+      stepMs = Math.max(Math.ceil(totalSpan / Math.max(count - 4, 1)), 60 * 1000);
+      timeFormat = totalSpan > 3 * 24 * 3600 * 1000 ? 'date' : 'day';
       break;
     }
   }
@@ -133,6 +133,7 @@ export function generateCandlesForTimeframe(
 
     let isGreen = false;
     let isGold = false;
+    let isRed = false;
     let candleVolume = 0;
     let totalMintedAmount = 0;
     let totalClaimedAmount = 0;
@@ -161,10 +162,13 @@ export function generateCandlesForTimeframe(
       if (hasReg) {
         isGold = true;
         isGreen = false;
+        isRed = false;
       } else if (hasPkg) {
         isGreen = true;
         isGold = false;
-      } else if (hasClaim) {
+        isRed = false;
+      } else if (hasClaim && !hasReg && !hasPkg) {
+        isRed = true;
         isGreen = false;
         isGold = false;
       }
@@ -176,13 +180,19 @@ export function generateCandlesForTimeframe(
     // Body height: Derived purely from the difference of on-chain minted vs claimed tokens
     if (candleVolume > 0) {
       const netTokenFlow = totalMintedAmount - totalClaimedAmount;
-      // Proportional ratio based on standard token issuance scale
-      const delta = netTokenFlow !== 0 ? (netTokenFlow / 10000) : (isGold ? 0.001 : 0.0005);
-      close = Number((open + delta).toFixed(4));
+      if (netTokenFlow > 0) {
+        const delta = Math.min(netTokenFlow / 15000, 0.0035);
+        close = Number((open + Math.max(delta, 0.0004)).toFixed(4));
+      } else if (netTokenFlow < 0) {
+        const delta = Math.min(Math.abs(netTokenFlow) / 15000, 0.0035);
+        close = Number((open - Math.max(delta, 0.0004)).toFixed(4));
+      } else {
+        close = Number((open + (isGold ? 0.0006 : 0.0003)).toFixed(4));
+      }
     }
 
     // Wick size scales strictly with transaction volume
-    const wickDelta = candleVolume > 0 ? Number((Math.min(candleVolume / 2000, 0.002)).toFixed(4)) : 0;
+    const wickDelta = candleVolume > 0 ? Number((Math.min(candleVolume / 2500, 0.0018)).toFixed(4)) : 0;
     const high = Number((Math.max(open, close) + wickDelta).toFixed(4));
     const low = Number((Math.min(open, close) - wickDelta).toFixed(4));
 
@@ -198,6 +208,8 @@ export function generateCandlesForTimeframe(
     haPrevOpen = haOpen;
     haPrevClose = haClose;
 
+    const candleIsGreen = candleVolume > 0 ? (!isRed) : true;
+
     candles.push({
       id: `candle-${timeframe}-${i}-${candleTs}`,
       time: timeLabel,
@@ -208,7 +220,7 @@ export function generateCandlesForTimeframe(
       close,
       volume: Number(candleVolume.toFixed(2)),
       volumeUsd: Number((candleVolume * close).toFixed(2)),
-      isGreen: candleVolume > 0 ? (isGreen || isGold) : true,
+      isGreen: candleIsGreen,
       isGold,
       events: candleEvents.length > 0 ? candleEvents : undefined,
       intensity: candleVolume > 0 ? Math.min(1, candleVolume / 500) : 0,
@@ -216,12 +228,12 @@ export function generateCandlesForTimeframe(
       haHigh,
       haLow,
       haClose,
-      haIsGreen: isGreen || isGold,
+      haIsGreen: candleIsGreen,
       haIsGold: isGold,
     });
   }
 
-  // Moving Averages
+  // Moving Averages (MA7 & MA25)
   for (let i = 0; i < candles.length; i++) {
     if (i >= 6) {
       const slice7 = candles.slice(i - 6, i + 1);
