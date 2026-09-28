@@ -401,7 +401,8 @@ function MainApp() {
 
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [claimModalType, setClaimModalType] = useState<'Registration' | 'Referral' | 'Package'>('Referral');
-  
+  const [claimModalAmount, setClaimModalAmount] = useState<number>(0);
+
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [matrixModalOpen, setMatrixModalOpen] = useState(false);
   const [packageModalOpen, setPackageModalOpen] = useState(false);
@@ -460,8 +461,12 @@ function MainApp() {
     };
   }, [user.walletAddress, syncLiveOnChainUser]);
 
-  const handleOpenClaimModal = (type: 'Registration' | 'Referral' | 'Package') => {
+  const handleOpenClaimModal = (type: 'Registration' | 'Referral' | 'Package', liveAmount?: number) => {
     setClaimModalType(type);
+    const resolvedAmount = typeof liveAmount === 'number' && liveAmount >= 0
+      ? liveAmount
+      : (type === 'Referral' ? (rewards.referralClaimable || 0) : (rewards.packageClaimable || 0));
+    setClaimModalAmount(resolvedAmount);
     setClaimModalOpen(true);
   };
 
@@ -987,20 +992,8 @@ function MainApp() {
         onClose={() => setClaimModalOpen(false)}
         rewardType={claimModalType}
         type={claimModalType}
-        amount={
-          claimModalType === 'Referral'
-            ? rewards.referralClaimable
-            : claimModalType === 'Package'
-            ? rewards.packageClaimable
-            : 0
-        }
-        claimableAmount={
-          claimModalType === 'Referral'
-            ? rewards.referralClaimable
-            : claimModalType === 'Package'
-            ? rewards.packageClaimable
-            : 0
-        }
+        amount={claimModalAmount}
+        claimableAmount={claimModalAmount}
         onConfirm={handleExecuteClaim}
         onConfirmClaim={handleExecuteClaim}
       />

@@ -50,7 +50,7 @@ interface OverviewViewProps {
   activities: ActivityItem[];
   mintingTelemetry?: TokenMintingTelemetry;
   onNavigate: (page: NavPage) => void;
-  onOpenClaimModal: (type: 'Registration' | 'Referral' | 'Package') => void;
+onOpenClaimModal: (type: 'Registration' | 'Referral' | 'Package', liveAmount?: number) => void;
   onOpenMatrixModal: () => void;
   onTriggerRewardPopup?: (amount: number, type: string) => void;
 }
@@ -820,7 +820,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
 
             <div className="mt-5 pt-3 border-t border-zinc-800">
               <button
-                onClick={() => onOpenClaimModal('Referral')}
+               onClick={() => onOpenClaimModal('Referral', liveRefClaimable)}
                 disabled={liveRefClaimable <= 0 || (refCooldown.hasClaimedBefore && refCooldown.remaining > 0)}
                 className="web3-btn-primary w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-extrabold text-xs transition-all shadow-[0_0_18px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
@@ -876,7 +876,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
 
             <div className="mt-5 pt-3 border-t border-zinc-800">
               <button
-                onClick={() => onOpenClaimModal('Package')}
+                onClick={() => onOpenClaimModal('Package', livePkgClaimable)}
                 disabled={livePkgClaimable <= 0 || (pkgCooldown.hasClaimedBefore && pkgCooldown.remaining > 0)}
                 className="web3-btn-primary w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-extrabold text-xs transition-all shadow-[0_0_18px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
