@@ -6,12 +6,8 @@ import {
 } from './types';
 import { ActivityItem } from '../../types';
 
-// Official Target Launching Base Price
 export const DEFAULT_TARGET_LAUNCH_PRICE = 3.50;
 
-/**
- * Maps on-chain Hub Contract activities directly to chart event types
- */
 export function mapActivityToEventType(typeStr: string): EcosystemEventType {
   const lower = (typeStr || '').toLowerCase();
   if (lower.includes('claim')) return 'Claim';
@@ -88,7 +84,7 @@ export function generateCandlesForTimeframe(
     });
   }
 
-  // Sort strictly by blockchain event timestamp
+  // Pure sort by true blockchain timestamp
   onChainEvents.sort((a, b) => a.timestamp - b.timestamp);
 
   const now = Date.now();
@@ -106,8 +102,8 @@ export function generateCandlesForTimeframe(
     case 'ALL': {
       const earliestTs = onChainEvents.length > 0 
         ? onChainEvents[0].timestamp 
-        : (now - 14 * 24 * 3600 * 1000);
-      const totalSpan = Math.max(now - earliestTs, 24 * 3600 * 1000);
+        : (now - 3 * 24 * 3600 * 1000);
+      const totalSpan = Math.max(now - earliestTs, 3600 * 1000);
       stepMs = Math.max(Math.ceil(totalSpan / (count - 2)), 60 * 1000);
       timeFormat = 'date';
       break;
@@ -128,11 +124,9 @@ export function generateCandlesForTimeframe(
 
     const timeLabel = timeFormat === 'time'
       ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : timeFormat === 'day'
-      ? dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' })
       : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    // Events falling strictly inside this timeframe slice
+    // Filter events occurring strictly within this exact time bucket
     const candleEvents = onChainEvents.filter(
       (ev) => ev.timestamp >= candleTs && ev.timestamp < nextCandleTs
     );
@@ -140,8 +134,8 @@ export function generateCandlesForTimeframe(
     let isGreen = false;
     let isGold = false;
     let candleVolume = 0;
-    let mintImpactSum = 0;
-    let claimImpactSum = 0;
+    let totalMintedAmount = 0;
+    let totalClaimedAmount = 0;
 
     let hasReg = false;
     let hasPkg = false;
@@ -154,14 +148,13 @@ export function generateCandlesForTimeframe(
 
         if (ev.type === 'Registration') {
           hasReg = true;
-          // Impact dynamically derived from actual token mint size
-          mintImpactSum += (amt > 0 ? amt : 30) * 0.00012;
+          totalMintedAmount += amt;
         } else if (ev.type === 'Package Activation') {
           hasPkg = true;
-          mintImpactSum += (amt > 0 ? amt : 10) * 0.00018;
+          totalMintedAmount += amt;
         } else if (ev.type === 'Claim') {
           hasClaim = true;
-          claimImpactSum += amt * 0.00010;
+          totalClaimedAmount += amt;
         }
       });
 
@@ -177,24 +170,24 @@ export function generateCandlesForTimeframe(
       }
     }
 
-    const netImpact = mintImpactSum - claimImpactSum;
     const open = Number(currentPrice.toFixed(4));
-    
-    // Candle body height scales directly with volume
-    const close = Number(
-      candleVolume > 0 
-        ? (open + (netImpact !== 0 ? netImpact : (isGold ? 0.002 : isGreen ? 0.003 : -0.002))).toFixed(4)
-        : open.toFixed(4)
-    );
+    let close = open;
 
-    // Wick size scales with actual volume activity
-    const volumeWickScale = candleVolume > 0 ? Math.min(0.0025, (candleVolume / 200) * 0.001) : 0.0001;
-    const high = Number((Math.max(open, close) + volumeWickScale).toFixed(4));
-    const low = Number((Math.min(open, close) - (candleVolume > 0 ? volumeWickScale * 0.8 : volumeWickScale)).toFixed(4));
+    // Body height: Derived purely from the difference of on-chain minted vs claimed tokens
+    if (candleVolume > 0) {
+      const netTokenFlow = totalMintedAmount - totalClaimedAmount;
+      // Proportional ratio based on standard token issuance scale
+      const delta = netTokenFlow !== 0 ? (netTokenFlow / 10000) : (isGold ? 0.001 : 0.0005);
+      close = Number((open + delta).toFixed(4));
+    }
+
+    // Wick size scales strictly with transaction volume
+    const wickDelta = candleVolume > 0 ? Number((Math.min(candleVolume / 2000, 0.002)).toFixed(4)) : 0;
+    const high = Number((Math.max(open, close) + wickDelta).toFixed(4));
+    const low = Number((Math.min(open, close) - wickDelta).toFixed(4));
 
     currentPrice = close;
 
-    // Heikin Ashi values
     const haClose = Number(((open + high + low + close) / 4).toFixed(4));
     const haOpen = i === 0 
       ? Number(((open + close) / 2).toFixed(4)) 
@@ -228,7 +221,7 @@ export function generateCandlesForTimeframe(
     });
   }
 
-  // 7 & 25 Moving Averages calculation
+  // Moving Averages
   for (let i = 0; i < candles.length; i++) {
     if (i >= 6) {
       const slice7 = candles.slice(i - 6, i + 1);
