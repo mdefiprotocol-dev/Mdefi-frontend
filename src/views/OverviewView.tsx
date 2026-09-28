@@ -83,6 +83,10 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
   const [onChainCirculatingMinted, setOnChainCirculatingMinted] = useState<number>(0);
   const [globalEcosystemRewards, setGlobalEcosystemRewards] = useState<number>(0);
   const [userTotalClaimedMbttc, setUserTotalClaimedMbttc] = useState<number>(0);
+  const [liveRefClaimed, setLiveRefClaimed] = useState<number>(0);
+  const [liveRefClaimable, setLiveRefClaimable] = useState<number>(0);
+  const [livePkgClaimed, setLivePkgClaimed] = useState<number>(0);
+  const [livePkgClaimable, setLivePkgClaimable] = useState<number>(0);
 
   // Live On-Chain Phase Rewards
   const [phaseRewards, setPhaseRewards] = useState<IOnChainPhaseRewards>({
@@ -155,6 +159,10 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
             // Bug 1 Live Sync: Profile की तरह Hub Contract का एक्टिव Vault Balance (Remaining)
             const remainingRefVault = Math.max(0, refEarned - refClaimed);
             const remainingPkgVault = Math.max(0, pkgEarned - pkgClaimed);
+            setLiveRefClaimed(refClaimed);
+            setLiveRefClaimable(remainingRefVault);
+            setLivePkgClaimed(pkgClaimed);
+            setLivePkgClaimable(remainingPkgVault);
             setLiveVaultMbttc(remainingRefVault + remainingPkgVault);
 
             // Bug 6: User actual claimed reward
@@ -781,11 +789,11 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
               <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
                 <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
                   <span className="text-[10px] text-zinc-400 block mb-0.5">Total Claimed</span>
-                  <span className="font-mono font-bold text-zinc-300">{rewards.referralClaimed} MBTTC</span>
+                  <span className="font-mono font-bold text-zinc-300">{liveRefClaimed.toFixed(2)} MBTTC</span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40">
                   <span className="text-[10px] text-emerald-400 block mb-0.5 font-bold">Claimable</span>
-                  <span className="font-mono font-bold text-emerald-300 text-sm">{rewards.referralClaimable} MBTTC</span>
+                  <span className="font-mono font-bold text-emerald-300 text-sm">{liveRefClaimable.toFixed(2)} MBTTC</span>
                 </div>
               </div>
 
@@ -813,10 +821,10 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
             <div className="mt-5 pt-3 border-t border-zinc-800">
               <button
                 onClick={() => onOpenClaimModal('Referral')}
-                disabled={rewards.referralClaimable <= 0 || (refCooldown.hasClaimedBefore && refCooldown.remaining > 0)}
+                disabled={liveRefClaimable <= 0 || (refCooldown.hasClaimedBefore && refCooldown.remaining > 0)}
                 className="web3-btn-primary w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-extrabold text-xs transition-all shadow-[0_0_18px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>CLAIM ({rewards.referralClaimable} MBTTC)</span>
+                <span>CLAIM ({liveRefClaimable.toFixed(2)} MBTTC)</span>
               </button>
             </div>
           </div>
@@ -837,11 +845,11 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
               <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
                 <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
                   <span className="text-[10px] text-zinc-400 block mb-0.5">Total Claimed</span>
-                  <span className="font-mono font-bold text-zinc-300">{rewards.packageClaimed} MBTTC</span>
+                  <span className="font-mono font-bold text-zinc-300">{livePkgClaimed.toFixed(2)} MBTTC</span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40">
                   <span className="text-[10px] text-emerald-400 block mb-0.5 font-bold">Claimable</span>
-                  <span className="font-mono font-bold text-emerald-300 text-sm">{rewards.packageClaimable} MBTTC</span>
+                  <span className="font-mono font-bold text-emerald-300 text-sm">{livePkgClaimable.toFixed(2)} MBTTC</span>
                 </div>
               </div>
 
@@ -869,10 +877,10 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
             <div className="mt-5 pt-3 border-t border-zinc-800">
               <button
                 onClick={() => onOpenClaimModal('Package')}
-                disabled={rewards.packageClaimable <= 0 || (pkgCooldown.hasClaimedBefore && pkgCooldown.remaining > 0)}
+                disabled={livePkgClaimable <= 0 || (pkgCooldown.hasClaimedBefore && pkgCooldown.remaining > 0)}
                 className="web3-btn-primary w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-extrabold text-xs transition-all shadow-[0_0_18px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>CLAIM ({rewards.packageClaimable} MBTTC)</span>
+                <span>CLAIM ({livePkgClaimable.toFixed(2)} MBTTC)</span>
               </button>
             </div>
           </div>
