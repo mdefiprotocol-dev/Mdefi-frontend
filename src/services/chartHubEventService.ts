@@ -127,13 +127,13 @@ export class ChartHubEventService {
     }
   }
 
-  public async fetchHistoricalHubEvents(blockRange: number = 50000): Promise<ChartEcosystemEvent[]> {
-    if (!this.hubContract) return [];
+public async fetchHistoricalHubEvents(blockRange: number = 400000): Promise<ChartEcosystemEvent[]> {
+  if (!this.hubContract) return [];
 
     try {
       const currentBlock = await this.provider.getBlockNumber();
       const startBlock = Math.max(0, currentBlock - blockRange);
-      const CHUNK_SIZE = 4500;
+      const CHUNK_SIZE = 9500;
       const hubAddr = await this.hubContract.getAddress();
       const parsedEvents: ChartEcosystemEvent[] = [];
 
