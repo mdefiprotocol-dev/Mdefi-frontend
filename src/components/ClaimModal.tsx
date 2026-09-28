@@ -39,8 +39,13 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const activeRewardType = rewardType || type || null;
-  const activeAmount = typeof amount === 'number' ? amount : (typeof claimableAmount === 'number' ? claimableAmount : 0);
+  const poolBalance = typeof amount === 'number' ? amount : (typeof claimableAmount === 'number' ? claimableAmount : 0);
   const executeConfirm = onConfirm || onConfirmClaim;
+
+  // Smart Contract Rules: Referral = 2%, Package = 3%
+  const claimRate = activeRewardType === 'Referral' ? 0.02 : activeRewardType === 'Package' ? 0.03 : 1.0;
+  const actualClaimPayout = poolBalance > 0 ? Number((poolBalance * claimRate).toFixed(4)) : 0;
+  const remainingAfterClaim = Math.max(0, poolBalance - actualClaimPayout);
 
   if (!isOpen || !activeRewardType) return null;
 
@@ -74,7 +79,7 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
 
       // Trigger celebration pop-up if provided
       if (onTriggerRewardPopup) {
-        onTriggerRewardPopup(activeAmount, `${activeRewardType} Reward Claim`);
+        onTriggerRewardPopup(actualClaimPayout, `${activeRewardType} Reward Claim`);
       }
     } catch (err: any) {
       setIsSubmitting(false);
@@ -132,7 +137,7 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
             <div>
               <h4 className="text-xl font-bold text-white">Reward Claimed Successfully!</h4>
               <p className="text-xs text-zinc-300 mt-1 max-w-xs mx-auto">
-                <strong className="text-emerald-300 font-mono">+{activeAmount} MBTTC</strong> has been credited to your balance.
+                <strong className="text-emerald-300 font-mono">+{actualClaimPayout.toFixed(2)} MBTTC</strong> has been credited to your balance.
               </p>
             </div>
             <div className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-left font-mono text-xs space-y-1.5">
@@ -164,10 +169,10 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
             {/* Amount card */}
             <div className="p-5 rounded-2xl bg-gradient-to-b from-zinc-900/90 to-zinc-950 border border-emerald-500/25 text-center relative overflow-hidden">
               <span className="text-xs uppercase tracking-wider text-zinc-400 font-semibold block">
-                Claimable Reward Amount
+                {activeRewardType === 'Referral' ? '2% Referral Yield Payout' : '3% Package Yield Payout'}
               </span>
               <div className="text-3xl sm:text-4xl font-extrabold text-white font-mono mt-1 tracking-tight">
-                {(activeAmount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} <span className="text-emerald-400 font-bold">MBTTC</span>
+                {actualClaimPayout.toFixed(2)} <span className="text-emerald-400 font-bold">MBTTC</span>
               </div>
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
@@ -177,20 +182,26 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
               </div>
             </div>
 
-            {/* Breakdown table showing Reward Type, Amount, Demo Network Fee, Total */}
+            {/* Breakdown table */}
             <div className="space-y-2 p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 text-xs font-mono">
               <div className="flex items-center justify-between text-zinc-400">
-                <span>Reward Type:</span>
-                <span className="text-white font-semibold">{activeRewardType} Reward</span>
+                <span>Vesting Pool Balance:</span>
+                <span className="text-zinc-200 font-semibold">{poolBalance.toFixed(3)} MBTTC</span>
               </div>
               <div className="flex items-center justify-between text-zinc-400">
-                <span>Claim Amount:</span>
-                <span className="text-emerald-400 font-bold">{activeAmount ?? 0} MBTTC</span>
+                <span>Claim Cycle Rate:</span>
+                <span className="text-amber-400 font-semibold">
+                  {activeRewardType === 'Referral' ? '2% (Every 4 Hours)' : '3% (Every 4 Hours)'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-400">
+                <span>Est. Remaining in Pool:</span>
+                <span className="text-zinc-400 font-medium">{remainingAfterClaim.toFixed(3)} MBTTC</span>
               </div>
               
               <div className="pt-2 border-t border-zinc-800 flex items-center justify-between font-bold">
-                <span className="text-zinc-200">Total Payout:</span>
-                <span className="text-emerald-300 text-sm">+{activeAmount ?? 0} MBTTC</span>
+                <span className="text-zinc-200">Total Net Payout:</span>
+                <span className="text-emerald-300 text-sm">+{actualClaimPayout.toFixed(2)} MBTTC</span>
               </div>
             </div>
 
@@ -240,7 +251,7 @@ export const ClaimModal: React.FC<ClaimModalProps> = ({
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={isSubmitting || activeAmount <= 0}
+                disabled={isSubmitting || actualClaimPayout <= 0}
                 className={`web3-btn-primary ${isSubmitting ? 'web3-btn-loading' : ''} py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-bold text-sm transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer`}
               >
                 {isSubmitting ? (
