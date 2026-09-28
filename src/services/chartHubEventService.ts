@@ -118,7 +118,6 @@ function parseHubLog(log: any, blockTimestampSec: number): ChartEcosystemEvent |
 export class ChartHubEventService {
   private provider: ethers.JsonRpcProvider;
   private hubContract: ethers.Contract | null = null;
-  private isListening = false;
 
   constructor() {
     this.provider = new ethers.JsonRpcProvider(VERIFIED_FAST_RPC, undefined, { staticNetwork: true });
@@ -128,13 +127,13 @@ export class ChartHubEventService {
     }
   }
 
-  public async fetchHistoricalHubEvents(blockRange: number = 100000): Promise<ChartEcosystemEvent[]> {
+  public async fetchHistoricalHubEvents(blockRange: number = 50000): Promise<ChartEcosystemEvent[]> {
     if (!this.hubContract) return [];
 
     try {
       const currentBlock = await this.provider.getBlockNumber();
       const startBlock = Math.max(0, currentBlock - blockRange);
-      const CHUNK_SIZE = 9500;
+      const CHUNK_SIZE = 4500;
       const hubAddr = await this.hubContract.getAddress();
       const parsedEvents: ChartEcosystemEvent[] = [];
 
@@ -190,51 +189,9 @@ export class ChartHubEventService {
     }
   }
 
+  // Live filter crash hatane ke liye empty safe callback rakha hai
   public subscribeToRealtimeHubEvents(onNewEvent: (event: ChartEcosystemEvent) => void): () => void {
-    if (!this.hubContract || this.isListening) return () => {};
-    this.isListening = true;
-
-    const listener = async (...argsWithEvent: any[]) => {
-      try {
-        const payload = argsWithEvent[argsWithEvent.length - 1];
-        const log = payload?.log || payload;
-        if (!log || !log.transactionHash) return;
-
-        const txKey = `${log.transactionHash}-${log.index ?? 0}`;
-        if (processedTxMap.has(txKey)) return;
-
-        const block = await this.provider.getBlock(log.blockNumber);
-        const blockTs = block?.timestamp || Math.floor(Date.now() / 1000);
-
-        const parsed = this.hubContract!.interface.parseLog({
-          topics: log.topics as string[],
-          data: log.data,
-        });
-
-        if (!parsed) return;
-
-        const eventItem = parseHubLog(
-          { ...parsed, transactionHash: log.transactionHash, blockNumber: log.blockNumber, index: log.index },
-          blockTs
-        );
-
-        if (eventItem) {
-          processedTxMap.set(txKey, eventItem);
-          onNewEvent(eventItem);
-        }
-      } catch (err) {
-        console.error('[ChartHubEventService] Error processing live block event:', err);
-      }
-    };
-
-    this.hubContract.on('*', listener);
-
-    return () => {
-      if (this.hubContract) {
-        this.hubContract.off('*', listener);
-      }
-      this.isListening = false;
-    };
+    return () => {};
   }
 }
 
