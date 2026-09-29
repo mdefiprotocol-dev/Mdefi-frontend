@@ -49,10 +49,23 @@ export interface IMDefiHubService {
 
 export class MDefiHubMockService implements IMDefiHubService {
   private currentRewardBalances: RewardBalances = { ...initialRewardBalances };
-  private activeWalletAddress: string = '0x71C839Fa24e93C298B321f8a84620a3b221B389';
+  private activeWalletAddress: string = '';
+
+private getEffectiveWallet(override?: string): string {
+  if (override && override.startsWith('0x') && override.length === 42) {
+    return override;
+  }
+  if (this.activeWalletAddress && this.activeWalletAddress.startsWith('0x') && this.activeWalletAddress.length === 42) {
+    return this.activeWalletAddress;
+  }
+  if (typeof window !== 'undefined' && (window as any).ethereum?.selectedAddress) {
+    return (window as any).ethereum.selectedAddress;
+  }
+  return '';
+}
 
   async getUserProfile(walletAddress?: string): Promise<UserProfile> {
-    const targetWallet = walletAddress || this.activeWalletAddress;
+    const targetWallet = this.getEffectiveWallet(walletAddress);
     
     // Check if on-chain user data is available from deployed contract
     const onChainData = await contractAdapter.getHubUserData(targetWallet);
@@ -118,7 +131,7 @@ export class MDefiHubMockService implements IMDefiHubService {
     isRealData: boolean;
     transactions: TeamTransactionRecord[];
   }> {
-    const targetWallet = walletAddress || this.activeWalletAddress;
+    const targetWallet = this.getEffectiveWallet(walletAddress);
 
     try {
       const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
@@ -243,7 +256,7 @@ export class MDefiHubMockService implements IMDefiHubService {
     type: 'Registration' | 'Referral' | 'Package',
     walletAddress?: string
   ): Promise<{ success: boolean; txHash: string; claimedAmount: number; message?: string }> {
-    const targetWallet = walletAddress || this.activeWalletAddress;
+    const targetWallet = this.getEffectiveWallet(walletAddress);
 
     // Execute through Contract Adapter
     const result = await contractAdapter.executeClaim({

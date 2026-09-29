@@ -245,39 +245,47 @@ export const TeamActivitiesFeed: React.FC<TeamActivitiesFeedProps> = ({
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // Fetch real team data if on-chain service is active
+  // Fetch real team data with window.ethereum fallback for live on-chain data
   useEffect(() => {
     let isMounted = true;
-    mdefiService.getTeamTransactions(user.walletAddress).then((res) => {
+    const activeAddress = user?.walletAddress || 
+      (typeof window !== 'undefined' && (window as any).ethereum?.selectedAddress) ||
+      '';
+
+    if (!activeAddress) return;
+
+    mdefiService.getTeamTransactions(activeAddress).then((res) => {
       if (!isMounted) return;
       if (res.isRealData && res.transactions.length > 0) {
         setIsLive(true);
-        // Map real transactions to TeamActivityRecord without fabrication
-        const mapped: TeamActivityRecord[] = res.transactions.map((tx) => ({
-          id: tx.id,
-          category: 'INCOME',
-          categoryLabel: 'TEAM ACTIVITY',
-          title: tx.activityType,
-          description: tx.packageDetails || tx.activityType,
-          memberIdentifier: tx.memberWallet 
-            ? `${tx.memberWallet.slice(0, 6)}...${tx.memberWallet.slice(-4)}`
-            : 'Team Member',
-          amount: tx.amount,
-          timestamp: tx.timestamp,
-          status: 'Confirmed',
-          isProfit: tx.amount.includes('+') || !tx.amount.includes('-'),
-          icon: Users,
-          iconBg: 'bg-emerald-950/80',
-          iconBorder: 'border-emerald-500/40',
-          iconColor: 'text-emerald-400',
-          ringColor: 'border-emerald-400/40',
-          badgeBg: 'bg-emerald-950/70',
-          badgeText: 'text-emerald-300',
-          badgeBorder: 'border-emerald-500/30',
-        }));
+        const mapped: TeamActivityRecord[] = res.transactions.map((tx) => {
+          const isReg = tx.activityType.toLowerCase().includes('registration');
+          const isPkg = tx.activityType.toLowerCase().includes('package');
+
+          return {
+            id: tx.id,
+            category: isReg ? 'REGISTRATION' : isPkg ? 'PACKAGE' : 'INCOME',
+            categoryLabel: isReg ? 'REGISTRATION' : isPkg ? 'PACKAGE ACTIVATION' : 'TEAM INCOME',
+            title: tx.activityType,
+            description: tx.details || tx.packageName || tx.activityType,
+            memberIdentifier: tx.memberWallet 
+              ? `${tx.memberWallet.slice(0, 6)}...${tx.memberWallet.slice(-4)}`
+              : tx.userId || 'Team Member',
+            amount: tx.amount,
+            timestamp: tx.timestamp || 'Confirmed',
+            status: 'Confirmed',
+            isProfit: tx.amount.includes('+') || !tx.amount.includes('-'),
+            icon: isReg ? UserPlus : isPkg ? Package : Users,
+            iconBg: isReg ? 'bg-emerald-950/80' : isPkg ? 'bg-teal-950/80' : 'bg-emerald-950/80',
+            iconBorder: isReg ? 'border-emerald-500/40' : isPkg ? 'border-teal-500/40' : 'border-emerald-500/40',
+            iconColor: isReg ? 'text-emerald-400' : isPkg ? 'text-teal-300' : 'text-emerald-400',
+            ringColor: isReg ? 'border-emerald-400/40' : isPkg ? 'border-teal-400/40' : 'border-emerald-400/40',
+            badgeBg: isReg ? 'bg-emerald-950/70' : isPkg ? 'bg-teal-950/70' : 'bg-emerald-950/70',
+            badgeText: isReg ? 'text-emerald-300' : isPkg ? 'text-teal-300' : 'text-emerald-300',
+            badgeBorder: isReg ? 'border-emerald-500/30' : isPkg ? 'border-teal-500/30' : 'border-emerald-500/30',
+          };
+        });
         setLiveTeamRecords(mapped);
-      } else {
-        setIsLive(false);
       }
     }).catch(() => {
       if (isMounted) setIsLive(false);
@@ -286,7 +294,7 @@ export const TeamActivitiesFeed: React.FC<TeamActivitiesFeedProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [user.walletAddress]);
+  }, [user?.walletAddress]);
 
   // Subscribe to Central Event Sync for instant reactive team event reflection
   useEffect(() => {
@@ -307,7 +315,7 @@ export const TeamActivitiesFeed: React.FC<TeamActivitiesFeedProps> = ({
             category,
             categoryLabel: tx.activityType.toUpperCase(),
             title: tx.activityType,
-            description: tx.details || tx.packageName,
+            description: tx.details || tx.packageName || tx.activityType || '',
             memberIdentifier: tx.memberWallet 
               ? `${tx.memberWallet.slice(0, 6)}...${tx.memberWallet.slice(-4)}`
               : tx.userId || 'Team Member',
@@ -337,12 +345,10 @@ export const TeamActivitiesFeed: React.FC<TeamActivitiesFeedProps> = ({
     return unsubscribe;
   }, []);
 
-  // Determine active records: in DEMO mode, use DEMO_TEAM_RECORDS merged with synced; in LIVE mode, use verified records
+  // In LIVE mode, strictly display genuine on-chain records (no demo mixture)
   const records = useMemo(() => {
     if (liveTeamRecords.length > 0) {
-      const liveIds = new Set(liveTeamRecords.map((r) => r.id));
-      const remainingDemo = DEMO_TEAM_RECORDS.filter((d) => !liveIds.has(d.id));
-      return [...liveTeamRecords, ...remainingDemo];
+      return liveTeamRecords;
     }
     return DEMO_TEAM_RECORDS;
   }, [liveTeamRecords]);
