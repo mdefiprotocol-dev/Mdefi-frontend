@@ -760,7 +760,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
                 </span>
               </div>
               <p className="text-xs text-zinc-300 mt-4 leading-relaxed">
-                Registration rewards are minted directly into your wallet by the Hub contract upon verified account creation[cite: 7].
+                Registration rewards are minted directly into your wallet by the Hub contract upon verified account creation.
               </p>
             </div>
             <div className="mt-5 pt-3 border-t border-zinc-800">
@@ -782,7 +782,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
                   <h3 className="font-bold text-white text-sm">REFERRAL REWARD</h3>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                  2% Vesting (200 BPS)[cite: 7]
+                  2% Vesting (200 BPS)
                 </span>
               </div>
 
@@ -838,7 +838,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
                   <h3 className="font-bold text-white text-sm">PACKAGE REWARD</h3>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                  3% Vesting (300 BPS)[cite: 7]
+                  3% Vesting (300 BPS)
                 </span>
               </div>
 
