@@ -193,8 +193,12 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
     const lows = candles.map((c) => chartType === 'Heikin Ashi' ? c.haLow : c.low);
     const vols = candles.map((c) => c.volume);
 
-    const minP = Math.min(...lows) * 0.998;
-    const maxP = Math.max(...highs) * 1.002;
+    const trueMin = Math.min(...lows);
+    const trueMax = Math.max(...highs);
+    const spread = Math.max(trueMax - trueMin, 0.015);
+    // Binance standard: 18% top/bottom headroom prevents steep artificial staircase
+    const minP = trueMin - (spread * 0.18);
+    const maxP = trueMax + (spread * 0.18);
     const maxV = Math.max(...vols, 100);
 
     return { minPrice: minP, maxPrice: maxP, maxVolume: maxV };
@@ -207,7 +211,7 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
   };
 
   const candleSpacing = plotWidth / (candles.length || 1);
-  const candleBodyWidth = Math.max(6, Math.min(candleSpacing * 0.75 * zoomLevel, 22));
+  const candleBodyWidth = Math.max(5, Math.min(candleSpacing * 0.52 * zoomLevel, 12));
 
   const getX = (index: number) => {
     return padLeft + index * candleSpacing + candleSpacing / 2;
@@ -398,9 +402,9 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                     y1={padTop}
                     x2={x}
                     y2={padTop + pricePlotHeight}
-                    stroke="#10b981"
+                    stroke="#1e2329"
                     strokeWidth="0.75"
-                    strokeDasharray="3 3"
+                    strokeDasharray="none"
                     strokeOpacity="0.12"
                   />
                 );
@@ -527,34 +531,35 @@ export const MdefiTradingTerminalChart: React.FC<MdefiTradingTerminalChartProps>
                     className="cursor-pointer"
                     onMouseEnter={() => setHoveredCandle(c)}
                   >
-                    {/* Upper Wick */}
+                    {/* Upper Wick - Hairline Sharp */}
                     <line
                       x1={x}
                       y1={yHigh}
                       x2={x}
                       y2={bodyTop}
                       stroke={candleColor}
-                      strokeWidth="1.5"
+                      strokeWidth="1"
+                      opacity="0.9"
                     />
-                    {/* Lower Wick */}
+                    {/* Lower Wick - Hairline Sharp */}
                     <line
                       x1={x}
                       y1={bodyTop + bodyHeight}
                       x2={x}
                       y2={yLow}
                       stroke={candleColor}
-                      strokeWidth="1.5"
+                      strokeWidth="1"
+                      opacity="0.9"
                     />
-                    {/* Candle Body */}
+                    {/* Candle Body - Crisp Pro Box */}
                     <rect
                       x={x - candleBodyWidth / 2}
                       y={bodyTop}
                       width={candleBodyWidth}
-                      height={bodyHeight}
+                      height={Math.max(bodyHeight, 1.5)}
                       fill={fillColor}
                       stroke={candleColor}
-                      strokeWidth={isHollow && isGreenOrGold ? 1.5 : 1}
-                      rx="1"
+                      strokeWidth="0.8"
                     />
                   </g>
                 );
