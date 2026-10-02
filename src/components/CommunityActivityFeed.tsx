@@ -606,10 +606,22 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                       </div>
                     </div>
 
-                    {/* MIDDLE ROW: Activity Details / Partner ID Link */}
+                    {/* MIDDLE ROW: Activity Details with Bold Highlighted MDF IDs */}
                     <div className="mt-1.5 sm:mt-1 pl-9 sm:pl-11">
-                      <p className="text-[11px] sm:text-xs text-zinc-400 leading-normal line-clamp-2">
-                        {act.details || `Team activity confirmed on protocol smart contract.`}
+                      <p className="text-[11px] sm:text-xs text-zinc-300 leading-normal line-clamp-2">
+                        {act.details ? (
+                          act.details.split(/(MDF-\d+)/g).map((part, pIdx) =>
+                            part.startsWith('MDF-') ? (
+                              <span key={pIdx} className="font-mono font-bold text-emerald-400 px-1 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/30">
+                                {part}
+                              </span>
+                            ) : (
+                              part
+                            )
+                          )
+                        ) : (
+                          'Team activity confirmed on protocol smart contract.'
+                        )}
                       </p>
                     </div>
 

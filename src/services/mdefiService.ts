@@ -137,6 +137,7 @@ export class MDefiHubMockService implements IMDefiHubService {
 
   /**
    * Retrieves Team & Referral Network transaction history directly from On-Chain Hub Contract.
+   * - Traverses both direct team and sub-tier downline to reflect all network members.
    * - REGISTRATIONS: Strict registration events (Node Registered with sponsor linkage & member ID).
    * - MBTTC TOKENS: Real airdrop welcome reward (+30 MBTTC), referral pool yield, sponsor invite bonus, and claimed rewards.
    * - DIRECT INCOME: Real USDT referral income generated upon partner node packages.
@@ -173,7 +174,7 @@ export class MDefiHubMockService implements IMDefiHubService {
           return `${date} · ${time}`;
         };
 
-        // 1. Fetch Logged-in User's Account Dashboard
+        // 1. Fetch Logged-in User Dashboard
         const selfDash = await hubContract.getUserDashboard(targetWallet).catch(() => null);
         const selfRegSec = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) : 0;
         const selfNumericId = selfDash?.userId ? Number(selfDash.userId.toString()) : 0;
@@ -184,7 +185,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         const selfPkgClaimed = selfDash?.packageTotalClaimed ? Number(ethers.formatUnits(selfDash.packageTotalClaimed.toString(), 18)) : 0;
 
         if (selfRegSec > 0) {
-          // A. REGISTRATIONS TAB: Pure Registration Card
+          // A. REGISTRATIONS TAB: Self Registration Card
           realTransactions.push({
             id: `self-reg-${targetWallet}`,
             memberWallet: targetWallet,
@@ -195,13 +196,13 @@ export class MDefiHubMockService implements IMDefiHubService {
             txHash: `0xreg${targetWallet.slice(2, 10)}`,
             date: formattedSelfTime,
             activityType: 'Your Account Registration',
-            details: `Protocol node established (${selfId}) • 30 MBTTC airdrop minted`,
+            details: `Protocol node established (${selfId})`,
             timestamp: formattedSelfTime,
             isRealData: true,
             rawTime: selfRegSec,
           });
 
-          // B. MBTTC TOKENS TAB: Welcome Airdrop (+30 MBTTC)
+          // B. MBTTC TOKENS TAB: Self Welcome Airdrop (+30 MBTTC)
           realTransactions.push({
             id: `self-mbttc-airdrop-${targetWallet}`,
             memberWallet: targetWallet,
@@ -218,7 +219,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawTime: selfRegSec + 1,
           });
 
-          // MBTTC TOKENS TAB: Self Claimed Referral Yield (if any on-chain)
+          // MBTTC TOKENS TAB: Real Claimed Referral Pool Rewards (Only if > 0)
           if (selfRefClaimed > 0) {
             realTransactions.push({
               id: `self-claim-ref-${targetWallet}`,
@@ -237,7 +238,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             });
           }
 
-          // MBTTC TOKENS TAB: Self Claimed Package Yield (if any on-chain)
+          // MBTTC TOKENS TAB: Real Claimed Package Pool Rewards (Only if > 0)
           if (selfPkgClaimed > 0) {
             realTransactions.push({
               id: `self-claim-pkg-${targetWallet}`,
@@ -257,14 +258,38 @@ export class MDefiHubMockService implements IMDefiHubService {
           }
         }
 
-        // 2. Fetch Direct Team Nodes via getUserNode
+        // 2. Fetch Direct & Downline Network (Multi-tier tree covering all 15 members)
         const userNode = await hubContract.getUserNode(targetWallet).catch(() => null);
         const directWallets: string[] = userNode?.directTeam ? Array.from(userNode.directTeam) : [];
 
-        for (let i = 0; i < directWallets.length; i++) {
-          const memberAddr = directWallets[i];
-          if (!ethers.isAddress(memberAddr)) continue;
+        // Track member metadata: sponsor ID & direct relationship
+        const teamMap = new Map<string, { sponsorId: string; isDirect: boolean }>();
+        directWallets.forEach((addr) => {
+          if (ethers.isAddress(addr)) {
+            teamMap.set(addr.toLowerCase(), { sponsorId: selfId, isDirect: true });
+          }
+        });
 
+        // Loop over direct members to discover 2nd tier team members
+        for (const dirAddr of directWallets) {
+          if (!ethers.isAddress(dirAddr)) continue;
+          try {
+            const subNode = await hubContract.getUserNode(dirAddr).catch(() => null);
+            const subDirects: string[] = subNode?.directTeam ? Array.from(subNode.directTeam) : [];
+            const subDash = await hubContract.getUserDashboard(dirAddr).catch(() => null);
+            const subNumericId = subDash?.userId ? Number(subDash.userId.toString()) : 0;
+            const parentId = subNumericId > 0 ? toHumanFacingId(subNumericId) : selfId;
+
+            subDirects.forEach((subAddr) => {
+              if (ethers.isAddress(subAddr) && !teamMap.has(subAddr.toLowerCase()) && subAddr.toLowerCase() !== targetWallet.toLowerCase()) {
+                teamMap.set(subAddr.toLowerCase(), { sponsorId: parentId, isDirect: false });
+              }
+            });
+          } catch {}
+        }
+
+        // 3. Process All Network Members
+        for (const [memberAddr, meta] of teamMap.entries()) {
           try {
             const memberDash = await hubContract.getUserDashboard(memberAddr).catch(() => null);
             const regSec = memberDash?.registrationTime ? Number(memberDash.registrationTime.toString()) : 0;
@@ -278,8 +303,9 @@ export class MDefiHubMockService implements IMDefiHubService {
             const pkgClaimed = memberDash?.packageTotalClaimed ? Number(ethers.formatUnits(memberDash.packageTotalClaimed.toString(), 18)) : 0;
 
             const timeStr = formatPremiumDate(regSec);
+            const teamLabel = meta.isDirect ? 'Direct partner' : 'Team member';
 
-            // A. REGISTRATIONS TAB: Direct Partner Registration Event
+            // A. REGISTRATIONS TAB: Member Registration Event
             realTransactions.push({
               id: `team-member-reg-${memberAddr}`,
               memberWallet: memberAddr,
@@ -290,13 +316,13 @@ export class MDefiHubMockService implements IMDefiHubService {
               txHash: `0xnode${memberAddr.slice(2, 10)}`,
               date: timeStr,
               activityType: 'Team Member Registration',
-              details: `Direct partner ${mId} joined under sponsor ${selfId}`,
+              details: `${teamLabel} ${mId} registered under sponsor ${meta.sponsorId}`,
               timestamp: timeStr,
               isRealData: true,
               rawTime: regSec,
             });
 
-            // B. MBTTC TOKENS TAB: Partner's Genesis 30 MBTTC Token Mint
+            // B. MBTTC TOKENS TAB: Member's Genesis 30 MBTTC Token Mint
             realTransactions.push({
               id: `team-member-airdrop-${memberAddr}`,
               memberWallet: memberAddr,
@@ -314,21 +340,23 @@ export class MDefiHubMockService implements IMDefiHubService {
             });
 
             // C. MBTTC TOKENS TAB: Sponsor Direct Referral Pool Addition (+20 MBTTC)
-            realTransactions.push({
-              id: `team-sponsor-ref-pool-${memberAddr}`,
-              memberWallet: targetWallet,
-              userId: selfId,
-              packageAmount: '+20.00 MBTTC',
-              amount: '+20.00 MBTTC',
-              status: 'Confirmed',
-              txHash: `0xrefbonus${memberAddr.slice(2, 10)}`,
-              date: timeStr,
-              activityType: 'MBTTC Referral Pool Addition',
-              details: `Direct invite reward +20 MBTTC added to referral pool (${mId})`,
-              timestamp: timeStr,
-              isRealData: true,
-              rawTime: regSec + 2,
-            });
+            if (meta.isDirect) {
+              realTransactions.push({
+                id: `team-sponsor-ref-pool-${memberAddr}`,
+                memberWallet: targetWallet,
+                userId: selfId,
+                packageAmount: '+20.00 MBTTC',
+                amount: '+20.00 MBTTC',
+                status: 'Confirmed',
+                txHash: `0xrefbonus${memberAddr.slice(2, 10)}`,
+                date: timeStr,
+                activityType: 'MBTTC Referral Pool Addition',
+                details: `Direct invite reward +20 MBTTC added to referral pool (${mId})`,
+                timestamp: timeStr,
+                isRealData: true,
+                rawTime: regSec + 2,
+              });
+            }
 
             // D. PACKAGES & DIRECT INCOME TAB (Real USDT)
             if (activePkgs > 0) {
@@ -355,21 +383,23 @@ export class MDefiHubMockService implements IMDefiHubService {
               });
 
               // Direct Income Card (Pure USDT)
-              realTransactions.push({
-                id: `team-member-income-${memberAddr}`,
-                memberWallet: memberAddr,
-                userId: mId,
-                packageAmount: `+$${directIncomeUsdt} USDT`,
-                amount: `+$${directIncomeUsdt} USDT`,
-                status: 'Confirmed',
-                txHash: `0xincome${memberAddr.slice(2, 10)}`,
-                date: timeStr,
-                activityType: 'Direct Referral Income',
-                details: `10% direct commission in USDT from partner ${mId}`,
-                timestamp: timeStr,
-                isRealData: true,
-                rawTime: regSec + 130,
-              });
+              if (meta.isDirect) {
+                realTransactions.push({
+                  id: `team-member-income-${memberAddr}`,
+                  memberWallet: memberAddr,
+                  userId: mId,
+                  packageAmount: `+$${directIncomeUsdt} USDT`,
+                  amount: `+$${directIncomeUsdt} USDT`,
+                  status: 'Confirmed',
+                  txHash: `0xincome${memberAddr.slice(2, 10)}`,
+                  date: timeStr,
+                  activityType: 'Direct Referral Income',
+                  details: `10% direct commission in USDT from partner ${mId}`,
+                  timestamp: timeStr,
+                  isRealData: true,
+                  rawTime: regSec + 130,
+                });
+              }
 
               // Package Vesting Reward Addition (+50 MBTTC)
               realTransactions.push({
@@ -427,7 +457,7 @@ export class MDefiHubMockService implements IMDefiHubService {
               });
             }
 
-            // G. MBTTC TOKENS TAB: Claimed Referral Vesting Reward
+            // G. MBTTC TOKENS TAB: Real Claimed Referral Vesting Reward
             if (refClaimed > 0) {
               realTransactions.push({
                 id: `team-member-ref-claimed-${memberAddr}`,
@@ -446,7 +476,7 @@ export class MDefiHubMockService implements IMDefiHubService {
               });
             }
 
-            // H. MBTTC TOKENS TAB: Claimed Package Vesting Reward
+            // H. MBTTC TOKENS TAB: Real Claimed Package Vesting Reward
             if (pkgClaimed > 0) {
               realTransactions.push({
                 id: `team-member-pkg-claimed-${memberAddr}`,
