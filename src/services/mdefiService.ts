@@ -139,15 +139,26 @@ private getEffectiveWallet(override?: string): string {
         const provider = new ethers.JsonRpcProvider(VERIFIED_FAST_RPC, undefined, { staticNetwork: true });
         const hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
 
-        const realTransactions: TeamTransactionRecord[] = [];
+        const realTransactions: (TeamTransactionRecord & { rawTime: number })[] = [];
 
-        // 1. Fetch User's Own Account Registration Record
+        // Helper: Premium Dynamic Date Formatting (e.g. Sep 24, 2026 · 08:53 AM)
+        const formatPremiumDate = (sec: number) => {
+          if (!sec || sec <= 0) return 'Just now';
+          const d = new Date(sec * 1000);
+          const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+          return `${date} · ${time}`;
+        };
+
+        // 1. Fetch User's Own Account Dashboard
         const selfDash = await hubContract.getUserDashboard(targetWallet).catch(() => null);
-        const selfRegTs = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) * 1000 : 0;
-        const selfId = selfDash?.userId ? `MDF-${selfDash.userId.toString()}` : 'Your Account';
+        const selfRegSec = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) : 0;
+        const selfNumericId = selfDash?.userId ? Number(selfDash.userId.toString()) : 0;
+        const selfId = selfNumericId > 0 ? `MDF-${selfNumericId}` : 'Your Account';
+        const formattedSelfTime = formatPremiumDate(selfRegSec);
 
-        if (selfRegTs > 0) {
-          const d = new Date(selfRegTs);
+        // Fix 4 & 3: Self Registration Card (+30 MBTTC Credited with Self ID)
+        if (selfRegSec > 0) {
           realTransactions.push({
             id: `self-reg-${targetWallet}`,
             memberWallet: targetWallet,
@@ -156,11 +167,29 @@ private getEffectiveWallet(override?: string): string {
             amount: '+30 MBTTC',
             status: 'Confirmed',
             txHash: `0xreg${targetWallet.slice(2, 10)}`,
-            date: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+            date: formattedSelfTime,
             activityType: 'Your Account Registration',
-            details: 'Protocol node established & 30 MBTTC minted',
-            timestamp: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+            details: `Protocol node established & 30 MBTTC minted (${selfId})`,
+            timestamp: formattedSelfTime,
             isRealData: true,
+            rawTime: selfRegSec,
+          });
+
+          // MBTTC Token Tab Entry for Registration Bonus
+          realTransactions.push({
+            id: `self-mbttc-mint-${targetWallet}`,
+            memberWallet: targetWallet,
+            userId: selfId,
+            packageAmount: '+30 MBTTC',
+            amount: '+30 MBTTC',
+            status: 'Confirmed',
+            txHash: `0xmint${targetWallet.slice(2, 10)}`,
+            date: formattedSelfTime,
+            activityType: 'MBTTC Genesis Mint',
+            details: `Genesis welcome reward credited to vault (${selfId})`,
+            timestamp: formattedSelfTime,
+            isRealData: true,
+            rawTime: selfRegSec + 1,
           });
         }
 
@@ -174,15 +203,17 @@ private getEffectiveWallet(override?: string): string {
 
           try {
             const memberDash = await hubContract.getUserDashboard(memberAddr).catch(() => null);
-            const regTs = memberDash?.registrationTime ? Number(memberDash.registrationTime.toString()) * 1000 : 0;
-            const mId = memberDash?.userId ? `MDF-${memberDash.userId.toString()}` : `Team Member #${i + 1}`;
+            const regSec = memberDash?.registrationTime ? Number(memberDash.registrationTime.toString()) : 0;
+            const mNumericId = memberDash?.userId ? Number(memberDash.userId.toString()) : 0;
+            
+            // Fix 3: Direct member ka real unique ID (Not hardcoded MDF-1)
+            const mId = mNumericId > 0 ? `MDF-${mNumericId}` : `Member ••••${memberAddr.slice(-4)}`;
             const activePkgs = memberDash?.activePackageCount ? Number(memberDash.activePackageCount.toString()) : 0;
+            const refEarned = memberDash?.referralTotalEarned ? Number(ethers.formatUnits(memberDash.referralTotalEarned.toString(), 18)) : 0;
 
-            const timeStr = regTs > 0 
-              ? new Date(regTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(regTs).toLocaleDateString([], { month: 'short', day: 'numeric' })
-              : 'Confirmed On-Chain';
+            const timeStr = formatPremiumDate(regSec);
 
-            // Direct Member Registration
+            // Direct Member Registration Record
             realTransactions.push({
               id: `team-member-reg-${memberAddr}`,
               memberWallet: memberAddr,
@@ -191,14 +222,15 @@ private getEffectiveWallet(override?: string): string {
               amount: 'New Member',
               status: 'Confirmed',
               txHash: `0xnode${memberAddr.slice(2, 10)}`,
-              date: regTs > 0 ? new Date(regTs).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'On-Chain',
+              date: timeStr,
               activityType: 'Team Member Registration',
-              details: `Direct partner joined under ${selfId}`,
+              details: `Direct partner joined protocol (${mId})`,
               timestamp: timeStr,
               isRealData: true,
+              rawTime: regSec,
             });
 
-            // Direct Member Package Activation
+            // Direct Member Package Activation Record (if active)
             if (activePkgs > 0) {
               realTransactions.push({
                 id: `team-member-pkg-${memberAddr}`,
@@ -210,11 +242,31 @@ private getEffectiveWallet(override?: string): string {
                 amount: '+$25 USDT',
                 status: 'Confirmed',
                 txHash: `0xpkg${memberAddr.slice(2, 10)}`,
-                date: regTs > 0 ? new Date(regTs).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'On-Chain',
+                date: timeStr,
                 activityType: 'Team Package Activation',
-                details: `Direct partner activated ecosystem staking node`,
+                details: `Partner ${mId} activated ecosystem node package`,
                 timestamp: timeStr,
                 isRealData: true,
+                rawTime: regSec + 120,
+              });
+            }
+
+            // Fix 4: MBTTC Tokens Tab Record (Referral Yield)
+            if (refEarned > 0) {
+              realTransactions.push({
+                id: `team-member-ref-${memberAddr}`,
+                memberWallet: memberAddr,
+                userId: mId,
+                packageAmount: `+${refEarned.toFixed(2)} MBTTC`,
+                amount: `+${refEarned.toFixed(2)} MBTTC`,
+                status: 'Confirmed',
+                txHash: `0xref${memberAddr.slice(2, 10)}`,
+                date: timeStr,
+                activityType: 'MBTTC Yield Credit',
+                details: `Direct referral yield credited from partner ${mId}`,
+                timestamp: timeStr,
+                isRealData: true,
+                rawTime: regSec + 240,
               });
             }
           } catch {
@@ -223,9 +275,12 @@ private getEffectiveWallet(override?: string): string {
         }
 
         if (realTransactions.length > 0) {
+          // Fix 2: DESCENDING SORT (Newest First: latest dates at top)
+          realTransactions.sort((a, b) => b.rawTime - a.rawTime);
+
           return {
             isRealData: true,
-            transactions: realTransactions,
+            transactions: realTransactions.map(({ rawTime, ...item }) => item),
           };
         }
       }
