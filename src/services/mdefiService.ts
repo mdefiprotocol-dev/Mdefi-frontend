@@ -26,6 +26,7 @@ import {
   teamRecentActivities
 } from '../data/mockData';
 import { contractAdapter } from './contractAdapter';
+import { toHumanFacingId } from '../utils/idConverter';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
@@ -141,7 +142,6 @@ private getEffectiveWallet(override?: string): string {
 
         const realTransactions: (TeamTransactionRecord & { rawTime: number })[] = [];
 
-        // Helper: Premium Dynamic Date Formatting (e.g. Sep 24, 2026 · 08:53 AM)
         const formatPremiumDate = (sec: number) => {
           if (!sec || sec <= 0) return 'Just now';
           const d = new Date(sec * 1000);
@@ -154,10 +154,9 @@ private getEffectiveWallet(override?: string): string {
         const selfDash = await hubContract.getUserDashboard(targetWallet).catch(() => null);
         const selfRegSec = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) : 0;
         const selfNumericId = selfDash?.userId ? Number(selfDash.userId.toString()) : 0;
-        const selfId = selfNumericId > 0 ? `MDF-${selfNumericId}` : 'Your Account';
+        const selfId = selfNumericId > 0 ? toHumanFacingId(selfNumericId) : 'Your Account';
         const formattedSelfTime = formatPremiumDate(selfRegSec);
 
-        // Fix 4 & 3: Self Registration Card (+30 MBTTC Credited with Self ID)
         if (selfRegSec > 0) {
           realTransactions.push({
             id: `self-reg-${targetWallet}`,
@@ -169,13 +168,12 @@ private getEffectiveWallet(override?: string): string {
             txHash: `0xreg${targetWallet.slice(2, 10)}`,
             date: formattedSelfTime,
             activityType: 'Your Account Registration',
-            details: `Protocol node established & 30 MBTTC minted (${selfId})`,
+            details: `Protocol node established & 30 MBTTC minted directly to wallet (${selfId})`,
             timestamp: formattedSelfTime,
             isRealData: true,
             rawTime: selfRegSec,
           });
 
-          // MBTTC Token Tab Entry for Registration Bonus
           realTransactions.push({
             id: `self-mbttc-mint-${targetWallet}`,
             memberWallet: targetWallet,
@@ -185,15 +183,15 @@ private getEffectiveWallet(override?: string): string {
             status: 'Confirmed',
             txHash: `0xmint${targetWallet.slice(2, 10)}`,
             date: formattedSelfTime,
-            activityType: 'MBTTC Genesis Mint',
-            details: `Genesis welcome reward credited to vault (${selfId})`,
+            activityType: 'MBTTC Credit',
+            details: `Genesis welcome reward credited to wallet (${selfId})`,
             timestamp: formattedSelfTime,
             isRealData: true,
             rawTime: selfRegSec + 1,
           });
         }
 
-        // 2. Fetch User's Direct Team On-Chain via getUserNode
+        // 2. Fetch Direct Team Nodes
         const userNode = await hubContract.getUserNode(targetWallet).catch(() => null);
         const directWallets: string[] = userNode?.directTeam ? Array.from(userNode.directTeam) : [];
 
@@ -205,15 +203,12 @@ private getEffectiveWallet(override?: string): string {
             const memberDash = await hubContract.getUserDashboard(memberAddr).catch(() => null);
             const regSec = memberDash?.registrationTime ? Number(memberDash.registrationTime.toString()) : 0;
             const mNumericId = memberDash?.userId ? Number(memberDash.userId.toString()) : 0;
-            
-            // Fix 3: Direct member ka real unique ID (Not hardcoded MDF-1)
-            const mId = mNumericId > 0 ? `MDF-${mNumericId}` : `Member ••••${memberAddr.slice(-4)}`;
+            const mId = mNumericId > 0 ? toHumanFacingId(mNumericId) : `Member ••••${memberAddr.slice(-4)}`;
             const activePkgs = memberDash?.activePackageCount ? Number(memberDash.activePackageCount.toString()) : 0;
             const refEarned = memberDash?.referralTotalEarned ? Number(ethers.formatUnits(memberDash.referralTotalEarned.toString(), 18)) : 0;
 
             const timeStr = formatPremiumDate(regSec);
 
-            // Direct Member Registration Record
             realTransactions.push({
               id: `team-member-reg-${memberAddr}`,
               memberWallet: memberAddr,
@@ -224,13 +219,12 @@ private getEffectiveWallet(override?: string): string {
               txHash: `0xnode${memberAddr.slice(2, 10)}`,
               date: timeStr,
               activityType: 'Team Member Registration',
-              details: `Direct partner joined protocol (${mId})`,
+              details: `Direct partner joined under ${selfId} (${mId})`,
               timestamp: timeStr,
               isRealData: true,
               rawTime: regSec,
             });
 
-            // Direct Member Package Activation Record (if active)
             if (activePkgs > 0) {
               realTransactions.push({
                 id: `team-member-pkg-${memberAddr}`,
@@ -244,14 +238,13 @@ private getEffectiveWallet(override?: string): string {
                 txHash: `0xpkg${memberAddr.slice(2, 10)}`,
                 date: timeStr,
                 activityType: 'Team Package Activation',
-                details: `Partner ${mId} activated ecosystem node package`,
+                details: `Partner ${mId} activated node (3% Daily Package Vault)`,
                 timestamp: timeStr,
                 isRealData: true,
                 rawTime: regSec + 120,
               });
             }
 
-            // Fix 4: MBTTC Tokens Tab Record (Referral Yield)
             if (refEarned > 0) {
               realTransactions.push({
                 id: `team-member-ref-${memberAddr}`,
@@ -262,8 +255,8 @@ private getEffectiveWallet(override?: string): string {
                 status: 'Confirmed',
                 txHash: `0xref${memberAddr.slice(2, 10)}`,
                 date: timeStr,
-                activityType: 'MBTTC Yield Credit',
-                details: `Direct referral yield credited from partner ${mId}`,
+                activityType: 'MBTTC Credit',
+                details: `Direct referral yield credited to vault from partner ${mId} (2% Pool)`,
                 timestamp: timeStr,
                 isRealData: true,
                 rawTime: regSec + 240,
@@ -275,7 +268,6 @@ private getEffectiveWallet(override?: string): string {
         }
 
         if (realTransactions.length > 0) {
-          // Fix 2: DESCENDING SORT (Newest First: latest dates at top)
           realTransactions.sort((a, b) => b.rawTime - a.rawTime);
 
           return {
