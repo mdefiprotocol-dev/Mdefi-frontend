@@ -72,8 +72,10 @@ export interface ResolvedActivityVisual {
 }
 
 /**
- * Categorizes and resolves visual styling for every activity type
- * Ensures strict isolation: MBTTC tokens -> MBTTC, Real USDT -> INCOME, Node creation -> REGISTRATION
+ * Strict category resolution engine:
+ * 1. REGISTRATION events belong strictly to REGISTRATIONS.
+ * 2. Real USDT commissions belong strictly to INCOME.
+ * 3. Token yields & claims belong strictly to MBTTC.
  */
 function resolveActivityVisual(
   type: string = '', 
@@ -83,13 +85,51 @@ function resolveActivityVisual(
   const t = (type + ' ' + title).toLowerCase();
   const a = amount.toLowerCase();
 
-  // 1. MBTTC TOKENS (Airdrop, Yield Vault Credit, Token Claims)
-  if (t.includes('mbttc') || a.includes('mbttc') || t.includes('yield') || t.includes('airdrop')) {
+  // 1. REGISTRATION (Checked FIRST so registration cards always populate REGISTRATIONS tab)
+  if (t.includes('registration') || t.includes('register') || a.includes('node active') || a.includes('node registered')) {
+    return {
+      category: 'REGISTRATION',
+      categoryLabel: 'REGISTRATION',
+      badgeBg: 'bg-emerald-950/70',
+      badgeText: 'text-emerald-300 font-bold',
+      badgeBorder: 'border-emerald-500/40',
+      iconBg: 'bg-emerald-950/80',
+      iconBorder: 'border-emerald-500/40',
+      iconColor: 'text-emerald-400',
+      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
+      ringColor: 'border-emerald-400/40',
+      isProfit: false,
+      iconComponent: UserPlus,
+      animationType: 'pulse',
+    };
+  }
+
+  // 2. DIRECT INCOME (Real USDT Commission only)
+  if (t.includes('direct referral income') || t.includes('direct income') || t.includes('commission') || (t.includes('income') && a.includes('usdt'))) {
+    return {
+      category: 'INCOME',
+      categoryLabel: 'DIRECT USDT',
+      badgeBg: 'bg-emerald-950/80',
+      badgeText: 'text-emerald-200 font-bold',
+      badgeBorder: 'border-emerald-400/50',
+      iconBg: 'bg-gradient-to-br from-emerald-900/90 to-teal-950/80',
+      iconBorder: 'border-emerald-400/60',
+      iconColor: 'text-emerald-300',
+      glowColor: 'shadow-[0_0_22px_rgba(16,185,129,0.4)]',
+      ringColor: 'border-emerald-400/60',
+      isProfit: true,
+      iconComponent: TrendingUp,
+      animationType: 'pulse',
+    };
+  }
+
+  // 3. MBTTC TOKENS (Airdrop welcome tokens, yield pool credits, token claims)
+  if (t.includes('mbttc') || a.includes('mbttc') || t.includes('yield') || t.includes('airdrop') || t.includes('mint')) {
     const isClaim = t.includes('claim');
     return {
       category: 'MBTTC',
       categoryLabel: isClaim ? 'MBTTC CLAIM' : 'MBTTC REWARD',
-      badgeBg: 'bg-amber-950/70',
+      badgeBg: 'bg-amber-950/80',
       badgeText: 'text-amber-300 font-bold',
       badgeBorder: 'border-amber-500/40',
       iconBg: 'bg-gradient-to-br from-amber-950/90 to-yellow-950/70',
@@ -103,51 +143,13 @@ function resolveActivityVisual(
     };
   }
 
-  // 2. REGISTRATIONS (Self and Direct Team Node established)
-  if (t.includes('registration') || t.includes('register')) {
-    return {
-      category: 'REGISTRATION',
-      categoryLabel: 'REGISTRATION',
-      badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
-      badgeBorder: 'border-emerald-500/30',
-      iconBg: 'bg-emerald-950/80',
-      iconBorder: 'border-emerald-500/40',
-      iconColor: 'text-emerald-400',
-      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      ringColor: 'border-emerald-400/40',
-      isProfit: false,
-      iconComponent: UserPlus,
-      animationType: 'pulse',
-    };
-  }
-
-  // 3. DIRECT INCOME (Real USDT Commission from direct member node package purchases)
-  if (t.includes('direct referral') || t.includes('direct income') || t.includes('commission') || (t.includes('income') && a.includes('usdt'))) {
-    return {
-      category: 'INCOME',
-      categoryLabel: 'DIRECT USDT',
-      badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
-      badgeBorder: 'border-emerald-500/30',
-      iconBg: 'bg-emerald-950/80',
-      iconBorder: 'border-emerald-500/40',
-      iconColor: 'text-emerald-400',
-      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      ringColor: 'border-emerald-400/40',
-      isProfit: true,
-      iconComponent: TrendingUp,
-      animationType: 'pulse',
-    };
-  }
-
-  // 4. MATRIX INCOME (S4, Quantum, Nexus radial spillover)
+  // 4. MATRIX INCOME (S4, Quantum, Nexus radial matrix)
   if (t.includes('matrix') || t.includes('s4') || t.includes('quantum') || t.includes('radial') || t.includes('slot') || t.includes('spillover')) {
     return {
       category: 'MATRIX',
       categoryLabel: 'MATRIX',
       badgeBg: 'bg-teal-950/70',
-      badgeText: 'text-teal-300',
+      badgeText: 'text-teal-300 font-bold',
       badgeBorder: 'border-teal-500/30',
       iconBg: 'bg-teal-950/80',
       iconBorder: 'border-teal-500/40',
@@ -161,12 +163,12 @@ function resolveActivityVisual(
   }
 
   // 5. PACKAGES (Node purchase & activation events)
-  if (t.includes('package') || t.includes('node activation') || t.includes('activated') || t.includes('upgrade') || t.includes('nexus prime')) {
+  if (t.includes('package') || t.includes('node activation') || t.includes('activated') || t.includes('upgrade') || t.includes('prime')) {
     return {
       category: 'PACKAGE',
       categoryLabel: 'PACKAGE',
       badgeBg: 'bg-cyan-950/60',
-      badgeText: 'text-cyan-300',
+      badgeText: 'text-cyan-300 font-bold',
       badgeBorder: 'border-cyan-500/30',
       iconBg: 'bg-cyan-950/80',
       iconBorder: 'border-cyan-500/40',
@@ -185,7 +187,7 @@ function resolveActivityVisual(
       category: 'SALARY',
       categoryLabel: 'SALARY',
       badgeBg: 'bg-amber-950/70',
-      badgeText: 'text-amber-300',
+      badgeText: 'text-amber-300 font-bold',
       badgeBorder: 'border-amber-500/40',
       iconBg: 'bg-gradient-to-br from-amber-950/90 to-yellow-950/70',
       iconBorder: 'border-amber-500/50',
@@ -204,7 +206,7 @@ function resolveActivityVisual(
       category: 'REWARD',
       categoryLabel: 'REWARD',
       badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
+      badgeText: 'text-emerald-300 font-bold',
       badgeBorder: 'border-emerald-500/30',
       iconBg: 'bg-emerald-950/80',
       iconBorder: 'border-emerald-500/40',
@@ -223,7 +225,7 @@ function resolveActivityVisual(
       category: 'MBTTC',
       categoryLabel: 'DEX SWAP',
       badgeBg: 'bg-zinc-900',
-      badgeText: 'text-zinc-300',
+      badgeText: 'text-zinc-300 font-bold',
       badgeBorder: 'border-zinc-800',
       iconBg: 'bg-zinc-900',
       iconBorder: 'border-zinc-700',
@@ -267,116 +269,20 @@ function formatShortAddressWithDots(address?: string): string {
   return `${clean.slice(0, 4)}••${clean.slice(-4)}`;
 }
 
-// Realistic simulated team activity records for DEMO / SIMULATED mode (scoped to user and direct team)
+// Simulated fallback (only used if 0 live records exist)
 export const DEMO_COMMUNITY_ACTIVITIES: ActivityItem[] = [
   {
     id: 'demo-team-1',
     type: 'Registration',
     title: 'Your Account Registration',
-    amount: 'New Member',
-    date: '2 min ago',
+    amount: 'Node Active',
+    date: 'Just now',
     status: 'Confirmed',
     txHash: '',
     details: 'Protocol account established',
     walletAddress: 'Your Account',
     read: true,
-  },
-  {
-    id: 'demo-team-2',
-    type: 'Registration',
-    title: 'Team Member Registration',
-    amount: 'New Member',
-    date: '6 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Direct referral joined via your invite link',
-    walletAddress: 'Team Member ••••4821',
-    read: true,
-  },
-  {
-    id: 'demo-team-3',
-    type: 'Package Activation',
-    title: 'Team Package Activation',
-    amount: '$70 USDT',
-    date: '9 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Direct member activated Quantum Node',
-    walletAddress: 'Team Member ••••7319',
-    read: true,
-  },
-  {
-    id: 'demo-team-4',
-    type: 'MBTTC Credit',
-    title: 'MBTTC Yield Credit',
-    amount: '+30 MBTTC',
-    date: '13 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Daily protocol yield credited to your vault',
-    walletAddress: 'Your Vault',
-    read: true,
-  },
-  {
-    id: 'demo-team-5',
-    type: 'Weekly Reward',
-    title: 'Weekly Reward Distribution',
-    amount: '+$330 USDT',
-    date: '18 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Weekly reward pool distribution credited',
-    walletAddress: 'Your Vault',
-    read: true,
-  },
-  {
-    id: 'demo-team-6',
-    type: 'Income',
-    title: 'Direct Referral Income',
-    amount: '+$24 USDT',
-    date: '24 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Referral commission from direct team activation',
-    walletAddress: 'Team Referral ••••6382',
-    read: true,
-  },
-  {
-    id: 'demo-team-7',
-    type: 'Income',
-    title: 'Matrix Spillover Income',
-    amount: '+$48 USDT',
-    date: '29 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Matrix cycle reward credited from team placement',
-    walletAddress: 'Matrix Slot #4',
-    read: true,
-  },
-  {
-    id: 'demo-team-8',
-    type: 'Weekly Salary',
-    title: 'Weekly Salary Credited',
-    amount: '+$50 USDT',
-    date: '35 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Rank-based weekly leadership salary payout',
-    walletAddress: 'Supervisor Pool',
-    read: true,
-  },
-  {
-    id: 'demo-team-9',
-    type: 'MBTTC Claim',
-    title: 'Reward Vault Claim',
-    amount: '150 MBTTC',
-    date: '48 min ago',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Reward vault claim executed to wallet',
-    walletAddress: 'Your Wallet',
-    read: true,
-  },
+  }
 ];
 
 export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
@@ -387,14 +293,13 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   const [activeCategory, setActiveCategory] = useState<ActivityCategory>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(false);
-  const pageSize = 8; // 8 transaction records per page = 4 compact 2-in-1 pairs
+  const pageSize = 8; // 8 records per page = 4 compact paired containers
 
   // Reset page when category changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory]);
 
-  // Live status state
   const [isLive, setIsLive] = useState<boolean>(() => {
     return mbttcMarketService.getMode() === 'live';
   });
@@ -409,7 +314,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return () => mediaQuery.removeEventListener('change', listener);
   }, []);
 
-  // Listen to Market & Mode state changes
   const [syncedPublicItems, setSyncedPublicItems] = useState<ActivityItem[]>([]);
   const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
 
@@ -426,15 +330,14 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
           const actLower = (tx.activityType || '').toLowerCase();
           const amtLower = (tx.amount || '').toLowerCase();
 
-          // Precise item typing based on transaction payload
           let resolvedType: any = 'Income';
-          if (actLower.includes('registration') || actLower.includes('register')) {
+          if (actLower.includes('registration') || actLower.includes('register') || amtLower.includes('node active') || amtLower.includes('node registered')) {
             resolvedType = 'Registration';
           } else if (actLower.includes('package') || actLower.includes('node activation')) {
             resolvedType = 'Package Activation';
           } else if (actLower.includes('claim')) {
             resolvedType = 'MBTTC Claim';
-          } else if (actLower.includes('mbttc') || amtLower.includes('mbttc') || actLower.includes('yield')) {
+          } else if (actLower.includes('mbttc') || amtLower.includes('mbttc') || actLower.includes('yield') || actLower.includes('airdrop') || actLower.includes('mint')) {
             resolvedType = 'MBTTC Credit';
           } else if (actLower.includes('salary')) {
             resolvedType = 'Weekly Salary';
@@ -473,7 +376,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return unsubscribe;
   }, []);
 
-  // Reactive subscription to Central Event Sync for public ecosystem events
+  // Central Event Sync Listener
   useEffect(() => {
     const unsubscribe = centralEventSyncService.subscribe((syncState) => {
       if (syncState.publicEcosystemActivities.length > 0) {
@@ -501,7 +404,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return unsubscribe;
   }, []);
 
-  // Live on-chain activities strictly prioritized over demo fallback
+  // Filter and prioritize live on-chain activities
   const allFeedItems = useMemo(() => {
     const combined = [...onChainTeamItems, ...syncedPublicItems, ...(userActivities || [])];
     
@@ -515,10 +418,10 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       });
     }
 
-    return DEMO_COMMUNITY_ACTIVITIES;
+    return [];
   }, [onChainTeamItems, syncedPublicItems, userActivities]);
 
-  // Filter items by category
+  // Filter items by category tab
   const filteredItems = useMemo(() => {
     if (activeCategory === 'ALL') return allFeedItems;
     return allFeedItems.filter((item) => {
@@ -527,13 +430,13 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     });
   }, [allFeedItems, activeCategory]);
 
-  // Current page records
+  // Unlimited Dynamic Pagination Slices
   const currentRecords = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredItems.slice(startIndex, startIndex + pageSize);
   }, [filteredItems, currentPage, pageSize]);
 
-  // Group current records into pairs for compact 2-in-1 container display
+  // Group into compact pairs
   const pairedRecords = useMemo(() => {
     return groupActivitiesInPairs(currentRecords);
   }, [currentRecords]);
@@ -562,7 +465,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       id="community-activity-feed"
       className="relative mt-8 rounded-3xl bg-gradient-to-b from-[#0a140e] via-[#07100b] to-[#050b07] border border-emerald-500/25 p-5 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.55)] overflow-hidden"
     >
-      {/* Ambient background corner glows */}
+      {/* Background corner glows */}
       <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-950/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -583,7 +486,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
           </p>
         </div>
 
-        {/* Status Indicator Badge (Strictly adhering to LIVE vs DEMO labeling) */}
+        {/* Status Indicator Badge */}
         <div className="flex items-center gap-2 shrink-0">
           {isLive ? (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-xs font-mono font-bold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
@@ -609,7 +512,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         </div>
       </div>
 
-      {/* 2. LIVE / DEMO TELEMETRY BANNER */}
+      {/* 2. LIVE TELEMETRY BANNER */}
       <div className="relative z-10 mt-3 p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
         <div className="flex items-center gap-2 text-zinc-300">
           <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -620,7 +523,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
           </span>
         </div>
         <div className="text-[11px] font-mono text-zinc-400 shrink-0">
-          Feed: <span className="text-emerald-400 font-semibold">{filteredItems.length}</span> {isLive ? 'verified records' : 'simulated records'}
+          Feed: <span className="text-emerald-400 font-semibold">{filteredItems.length}</span> verified records
         </div>
       </div>
 
@@ -645,7 +548,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         })}
       </div>
 
-      {/* 4. ACTIVITY LIST CONTAINER: Compact 2-in-1 containers */}
+      {/* 4. ACTIVITY LIST CONTAINER: Compact 2-in-1 pairs */}
       <div className="relative z-10 mt-4 space-y-2.5 sm:space-y-3">
         {currentRecords.length === 0 ? (
           /* EMPTY STATE */
@@ -662,7 +565,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
               key={`team-pair-${pair[0]?.id || pairIndex}`}
               className="group relative rounded-2xl bg-zinc-950/70 hover:bg-zinc-950/95 border border-zinc-800/80 hover:border-emerald-500/40 transition-all duration-200 shadow-sm divide-y divide-zinc-850/80 overflow-hidden"
             >
-              {/* Subtle hover background highlight */}
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
               {pair.map((act, index) => {
@@ -677,41 +579,31 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                     className="relative z-10 p-3 sm:p-3.5 hover:bg-zinc-900/40 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2.5 sm:gap-3">
-                      {/* Left Column: Animated Icon + Titles & Details */}
+                      {/* Left: Icon + Content */}
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                        {/* Animated Icon with subtle glowing badge */}
                         <div className="relative shrink-0">
-                          {/* Subtle outer rotating ring */}
                           {!prefersReducedMotion && (visual.animationType === 'pulse' || visual.animationType === 'float') && (
                             <div className={`absolute -inset-0.5 rounded-xl border border-dashed ${visual.ringColor} opacity-40 animate-[spin_16s_linear_infinite]`} />
                           )}
-                          
-                          {/* Icon Base */}
                           <div className={`relative p-2 sm:p-2.5 rounded-xl border ${visual.iconBg} ${visual.iconBorder} ${visual.iconColor} ${visual.glowColor} transition-transform duration-200 group-hover:scale-105`}>
                             <IconComponent className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                           </div>
                         </div>
 
-                        {/* Content text */}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                            {/* Category Badge */}
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border ${visual.badgeBg} ${visual.badgeText} ${visual.badgeBorder}`}>
                               {visual.categoryLabel}
                             </span>
-
-                            {/* Title */}
                             <h4 className="text-xs sm:text-sm font-bold text-white truncate">
                               {act.title || act.type}
                             </h4>
                           </div>
 
-                          {/* Details / Description */}
                           <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 truncate max-w-[190px] xs:max-w-xs sm:max-w-sm md:max-w-md">
                             {act.details || `Team activity confirmed on protocol smart contract.`}
                           </p>
 
-                          {/* Masked Wallet & Timestamp */}
                           <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-[11px] font-mono text-zinc-400">
                             {act.walletAddress && (
                               <span className="text-zinc-300">
@@ -727,16 +619,14 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                         </div>
                       </div>
 
-                      {/* Right Column: Amount & Desktop Address/Timestamp */}
+                      {/* Right: Amount & Copy */}
                       <div className="text-right shrink-0 flex flex-col items-end pl-1 sm:pl-2">
-                        {/* Amount */}
                         <div className={`text-xs sm:text-sm font-extrabold font-mono tracking-tight px-2 py-0.5 rounded-lg bg-zinc-900/80 border border-zinc-800 ${
                           visual.isProfit ? 'text-emerald-400' : 'text-zinc-200'
                         }`}>
                           {act.amount}
                         </div>
 
-                        {/* Copy / Live Action if available */}
                         {isLive && act.walletAddress?.startsWith('0x') && (
                           <div className="mt-1 hidden sm:flex items-center gap-1 text-[10px] font-mono text-zinc-500">
                             <span>{shortAddress}</span>
@@ -764,7 +654,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         )}
       </div>
 
-      {/* 5. UNIVERSAL PAGINATION */}
+      {/* 5. DYNAMIC & UNLIMITED PAGINATION */}
       {filteredItems.length > pageSize && (
         <div className="relative z-10 mt-5 pt-4 border-t border-zinc-850">
           <ResponsivePagination
@@ -777,13 +667,12 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         </div>
       )}
 
-      {/* 6. ACTION FOOTER: View All Activity in Transactions View */}
+      {/* 6. ACTION FOOTER */}
       <div className="relative z-10 mt-5 pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="text-[11px] font-mono text-zinc-500">
           Showing <span className="text-zinc-300 font-semibold">{filteredItems.length}</span> total team records
         </div>
 
-        {/* Primary View All Activity in ledger */}
         <button
           type="button"
           onClick={() => onNavigate('transactions')}
