@@ -269,7 +269,6 @@ function formatShortAddressWithDots(address?: string): string {
   return `${clean.slice(0, 4)}••${clean.slice(-4)}`;
 }
 
-// Simulated fallback (only used if 0 live records exist)
 export const DEMO_COMMUNITY_ACTIVITIES: ActivityItem[] = [
   {
     id: 'demo-team-1',
@@ -295,7 +294,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(false);
   const pageSize = 8; // 8 records per page = 4 compact paired containers
 
-  // Reset page when category changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory]);
@@ -304,7 +302,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return mbttcMarketService.getMode() === 'live';
   });
 
-  // Track system motion preference
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -376,7 +373,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return unsubscribe;
   }, []);
 
-  // Central Event Sync Listener
   useEffect(() => {
     const unsubscribe = centralEventSyncService.subscribe((syncState) => {
       if (syncState.publicEcosystemActivities.length > 0) {
@@ -404,7 +400,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return unsubscribe;
   }, []);
 
-  // Filter and prioritize live on-chain activities
   const allFeedItems = useMemo(() => {
     const combined = [...onChainTeamItems, ...syncedPublicItems, ...(userActivities || [])];
     
@@ -421,7 +416,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return [];
   }, [onChainTeamItems, syncedPublicItems, userActivities]);
 
-  // Filter items by category tab
   const filteredItems = useMemo(() => {
     if (activeCategory === 'ALL') return allFeedItems;
     return allFeedItems.filter((item) => {
@@ -430,13 +424,11 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     });
   }, [allFeedItems, activeCategory]);
 
-  // Unlimited Dynamic Pagination Slices
   const currentRecords = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredItems.slice(startIndex, startIndex + pageSize);
   }, [filteredItems, currentPage, pageSize]);
 
-  // Group into compact pairs
   const pairedRecords = useMemo(() => {
     return groupActivitiesInPairs(currentRecords);
   }, [currentRecords]);
@@ -463,7 +455,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   return (
     <div 
       id="community-activity-feed"
-      className="relative mt-8 rounded-3xl bg-gradient-to-b from-[#0a140e] via-[#07100b] to-[#050b07] border border-emerald-500/25 p-5 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.55)] overflow-hidden"
+      className="relative mt-8 rounded-3xl bg-gradient-to-b from-[#0a140e] via-[#07100b] to-[#050b07] border border-emerald-500/25 p-4 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.55)] overflow-hidden"
     >
       {/* Background corner glows */}
       <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -548,7 +540,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         })}
       </div>
 
-      {/* 4. ACTIVITY LIST CONTAINER: Compact 2-in-1 pairs */}
+      {/* 4. ACTIVITY LIST CONTAINER: Clean Responsive Card Layout */}
       <div className="relative z-10 mt-4 space-y-2.5 sm:space-y-3">
         {currentRecords.length === 0 ? (
           /* EMPTY STATE */
@@ -578,10 +570,11 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                     key={act.id || `feed-item-${index}`}
                     className="relative z-10 p-3 sm:p-3.5 hover:bg-zinc-900/40 transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2.5 sm:gap-3">
-                      {/* Left: Icon + Content */}
-                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                        <div className="relative shrink-0">
+                    {/* TOP ROW: Icon + Badges + Title on Left, Amount on Right */}
+                    <div className="flex items-start sm:items-center justify-between gap-2.5">
+                      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                        {/* Animated Icon */}
+                        <div className="relative shrink-0 mt-0.5 sm:mt-0">
                           {!prefersReducedMotion && (visual.animationType === 'pulse' || visual.animationType === 'float') && (
                             <div className={`absolute -inset-0.5 rounded-xl border border-dashed ${visual.ringColor} opacity-40 animate-[spin_16s_linear_infinite]`} />
                           )}
@@ -590,61 +583,67 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                           </div>
                         </div>
 
+                        {/* Title and Category Badge */}
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border ${visual.badgeBg} ${visual.badgeText} ${visual.badgeBorder}`}>
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border shrink-0 ${visual.badgeBg} ${visual.badgeText} ${visual.badgeBorder}`}>
                               {visual.categoryLabel}
                             </span>
-                            <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                            <h4 className="text-xs sm:text-sm font-bold text-white leading-tight break-words">
                               {act.title || act.type}
                             </h4>
-                          </div>
-
-                          <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 truncate max-w-[190px] xs:max-w-xs sm:max-w-sm md:max-w-md">
-                            {act.details || `Team activity confirmed on protocol smart contract.`}
-                          </p>
-
-                          <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-[11px] font-mono text-zinc-400">
-                            {act.walletAddress && (
-                              <span className="text-zinc-300">
-                                {act.walletAddress.startsWith('0x') ? shortAddress : act.walletAddress}
-                              </span>
-                            )}
-                            <span>&bull;</span>
-                            <span className="text-zinc-400 flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5 text-zinc-500" />
-                              <span>{act.date}</span>
-                            </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Right: Amount & Copy */}
-                      <div className="text-right shrink-0 flex flex-col items-end pl-1 sm:pl-2">
-                        <div className={`text-xs sm:text-sm font-extrabold font-mono tracking-tight px-2 py-0.5 rounded-lg bg-zinc-900/80 border border-zinc-800 ${
+                      {/* Right: Amount Badge (Never collapses or wraps awkwardly) */}
+                      <div className="shrink-0 text-right">
+                        <div className={`text-xs sm:text-sm font-extrabold font-mono tracking-tight px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800/90 whitespace-nowrap shadow-sm ${
                           visual.isProfit ? 'text-emerald-400' : 'text-zinc-200'
                         }`}>
                           {act.amount}
                         </div>
-
-                        {isLive && act.walletAddress?.startsWith('0x') && (
-                          <div className="mt-1 hidden sm:flex items-center gap-1 text-[10px] font-mono text-zinc-500">
-                            <span>{shortAddress}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(act.id, act.walletAddress || act.txHash || '')}
-                              className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
-                              title="Copy Address"
-                            >
-                              {isCopied ? (
-                                <Check className="w-3 h-3 text-emerald-400" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        )}
                       </div>
+                    </div>
+
+                    {/* MIDDLE ROW: Activity Details / Partner ID Link */}
+                    <div className="mt-1.5 sm:mt-1 pl-9 sm:pl-11">
+                      <p className="text-[11px] sm:text-xs text-zinc-400 leading-normal line-clamp-2">
+                        {act.details || `Team activity confirmed on protocol smart contract.`}
+                      </p>
+                    </div>
+
+                    {/* BOTTOM ROW: Address, Timestamp & Copy Action */}
+                    <div className="mt-2 pl-9 sm:pl-11 flex items-center justify-between gap-2 flex-wrap text-[10px] sm:text-[11px] font-mono text-zinc-500">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {act.walletAddress && (
+                          <span className="text-zinc-300 font-medium">
+                            {act.walletAddress.startsWith('0x') ? shortAddress : act.walletAddress}
+                          </span>
+                        )}
+                        <span>&bull;</span>
+                        <span className="text-zinc-400 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-zinc-500" />
+                          <span>{act.date}</span>
+                        </span>
+                      </div>
+
+                      {/* Copy Address Button */}
+                      {isLive && act.walletAddress?.startsWith('0x') && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(act.id, act.walletAddress || act.txHash || '')}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                          title="Copy Address"
+                        >
+                          <span className="text-[10px] hidden xs:inline">{shortAddress}</span>
+                          {isCopied ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
