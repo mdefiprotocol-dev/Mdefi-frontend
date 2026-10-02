@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useId } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   UserPlus,
   Users,
@@ -73,6 +73,7 @@ export interface ResolvedActivityVisual {
 
 /**
  * Categorizes and resolves visual styling for every activity type
+ * Ensures strict isolation: MBTTC tokens -> MBTTC, Real USDT -> INCOME, Node creation -> REGISTRATION
  */
 function resolveActivityVisual(
   type: string = '', 
@@ -82,8 +83,28 @@ function resolveActivityVisual(
   const t = (type + ' ' + title).toLowerCase();
   const a = amount.toLowerCase();
 
-  // 1. REGISTRATION
-  if (t.includes('registration') && !t.includes('reward')) {
+  // 1. MBTTC TOKENS (Airdrop, Yield Vault Credit, Token Claims)
+  if (t.includes('mbttc') || a.includes('mbttc') || t.includes('yield') || t.includes('airdrop')) {
+    const isClaim = t.includes('claim');
+    return {
+      category: 'MBTTC',
+      categoryLabel: isClaim ? 'MBTTC CLAIM' : 'MBTTC REWARD',
+      badgeBg: 'bg-amber-950/70',
+      badgeText: 'text-amber-300 font-bold',
+      badgeBorder: 'border-amber-500/40',
+      iconBg: 'bg-gradient-to-br from-amber-950/90 to-yellow-950/70',
+      iconBorder: 'border-amber-500/50',
+      iconColor: 'text-amber-300',
+      glowColor: 'shadow-[0_0_18px_rgba(245,158,11,0.3)]',
+      ringColor: 'border-amber-400/50',
+      isProfit: true,
+      iconComponent: isClaim ? CheckCircle2 : Coins,
+      animationType: 'sparkle',
+    };
+  }
+
+  // 2. REGISTRATIONS (Self and Direct Team Node established)
+  if (t.includes('registration') || t.includes('register')) {
     return {
       category: 'REGISTRATION',
       categoryLabel: 'REGISTRATION',
@@ -101,7 +122,64 @@ function resolveActivityVisual(
     };
   }
 
-  // 2. WEEKLY SALARY
+  // 3. DIRECT INCOME (Real USDT Commission from direct member node package purchases)
+  if (t.includes('direct referral') || t.includes('direct income') || t.includes('commission') || (t.includes('income') && a.includes('usdt'))) {
+    return {
+      category: 'INCOME',
+      categoryLabel: 'DIRECT USDT',
+      badgeBg: 'bg-emerald-950/70',
+      badgeText: 'text-emerald-300',
+      badgeBorder: 'border-emerald-500/30',
+      iconBg: 'bg-emerald-950/80',
+      iconBorder: 'border-emerald-500/40',
+      iconColor: 'text-emerald-400',
+      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
+      ringColor: 'border-emerald-400/40',
+      isProfit: true,
+      iconComponent: TrendingUp,
+      animationType: 'pulse',
+    };
+  }
+
+  // 4. MATRIX INCOME (S4, Quantum, Nexus radial spillover)
+  if (t.includes('matrix') || t.includes('s4') || t.includes('quantum') || t.includes('radial') || t.includes('slot') || t.includes('spillover')) {
+    return {
+      category: 'MATRIX',
+      categoryLabel: 'MATRIX',
+      badgeBg: 'bg-teal-950/70',
+      badgeText: 'text-teal-300',
+      badgeBorder: 'border-teal-500/30',
+      iconBg: 'bg-teal-950/80',
+      iconBorder: 'border-teal-500/40',
+      iconColor: 'text-teal-300',
+      glowColor: 'shadow-[0_0_15px_rgba(20,184,166,0.25)]',
+      ringColor: 'border-teal-400/40',
+      isProfit: true,
+      iconComponent: GitFork,
+      animationType: 'float',
+    };
+  }
+
+  // 5. PACKAGES (Node purchase & activation events)
+  if (t.includes('package') || t.includes('node activation') || t.includes('activated') || t.includes('upgrade') || t.includes('nexus prime')) {
+    return {
+      category: 'PACKAGE',
+      categoryLabel: 'PACKAGE',
+      badgeBg: 'bg-cyan-950/60',
+      badgeText: 'text-cyan-300',
+      badgeBorder: 'border-cyan-500/30',
+      iconBg: 'bg-cyan-950/80',
+      iconBorder: 'border-cyan-500/40',
+      iconColor: 'text-cyan-300',
+      glowColor: 'shadow-[0_0_15px_rgba(6,182,212,0.25)]',
+      ringColor: 'border-cyan-400/40',
+      isProfit: false,
+      iconComponent: Package,
+      animationType: 'float',
+    };
+  }
+
+  // 6. WEEKLY SALARY
   if (t.includes('salary') || t.includes('passive salary') || t.includes('supervisor')) {
     return {
       category: 'SALARY',
@@ -120,26 +198,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 3. MATRIX INCOME (S4, Quantum, Nexus Prime radial matrix)
-  if (t.includes('matrix') || t.includes('s4') || t.includes('quantum') || t.includes('radial') || t.includes('slot')) {
-    return {
-      category: 'MATRIX',
-      categoryLabel: 'MATRIX',
-      badgeBg: 'bg-teal-950/70',
-      badgeText: 'text-teal-300',
-      badgeBorder: 'border-teal-500/30',
-      iconBg: 'bg-teal-950/80',
-      iconBorder: 'border-teal-500/40',
-      iconColor: 'text-teal-300',
-      glowColor: 'shadow-[0_0_15px_rgba(20,184,166,0.25)]',
-      ringColor: 'border-teal-400/40',
-      isProfit: true,
-      iconComponent: GitFork,
-      animationType: 'float',
-    };
-  }
-
-  // 4. WEEKLY REWARDS (Starter / Premium 10% pools)
+  // 7. WEEKLY REWARDS (Pool distributions)
   if (t.includes('weekly reward') || t.includes('starter pool') || t.includes('premium pool') || t.includes('pool distribution')) {
     return {
       category: 'REWARD',
@@ -158,83 +217,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 5. PACKAGE PURCHASE / ACTIVATION
-  if (t.includes('package activation') || t.includes('node activation') || t.includes('activated') || t.includes('package upgrade') || t.includes('nexus prime')) {
-    return {
-      category: 'PACKAGE',
-      categoryLabel: 'PACKAGE',
-      badgeBg: 'bg-cyan-950/60',
-      badgeText: 'text-cyan-300',
-      badgeBorder: 'border-cyan-500/30',
-      iconBg: 'bg-cyan-950/80',
-      iconBorder: 'border-cyan-500/40',
-      iconColor: 'text-cyan-300',
-      glowColor: 'shadow-[0_0_15px_rgba(6,182,212,0.25)]',
-      ringColor: 'border-cyan-400/40',
-      isProfit: false,
-      iconComponent: Package,
-      animationType: 'float',
-    };
-  }
-
-  // 6. DIRECT REFERRAL / INCOME
-  if (t.includes('referral') || t.includes('direct') || t.includes('commission') || t.includes('frontline') || t.includes('income')) {
-    return {
-      category: 'INCOME',
-      categoryLabel: 'INCOME',
-      badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
-      badgeBorder: 'border-emerald-500/30',
-      iconBg: 'bg-emerald-950/80',
-      iconBorder: 'border-emerald-500/40',
-      iconColor: 'text-emerald-400',
-      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      ringColor: 'border-emerald-400/40',
-      isProfit: true,
-      iconComponent: TrendingUp,
-      animationType: 'pulse',
-    };
-  }
-
-  // 7. MBTTC CLAIM
-  if (t.includes('claim')) {
-    return {
-      category: 'MBTTC',
-      categoryLabel: 'MBTTC CLAIM',
-      badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
-      badgeBorder: 'border-emerald-500/30',
-      iconBg: 'bg-emerald-950/80',
-      iconBorder: 'border-emerald-500/40',
-      iconColor: 'text-emerald-300',
-      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      ringColor: 'border-emerald-400/40',
-      isProfit: true,
-      iconComponent: CheckCircle2,
-      animationType: 'glow',
-    };
-  }
-
-  // 8. MBTTC CREDIT (Registration Reward, Daily Package Yield)
-  if (t.includes('mbttc') || t.includes('registration reward') || t.includes('package reward') || t.includes('yield')) {
-    return {
-      category: 'MBTTC',
-      categoryLabel: 'MBTTC',
-      badgeBg: 'bg-emerald-950/70',
-      badgeText: 'text-emerald-300',
-      badgeBorder: 'border-emerald-500/30',
-      iconBg: 'bg-emerald-950/80',
-      iconBorder: 'border-emerald-500/40',
-      iconColor: 'text-emerald-400',
-      glowColor: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      ringColor: 'border-emerald-400/40',
-      isProfit: true,
-      iconComponent: Coins,
-      animationType: 'pulse',
-    };
-  }
-
-  // 9. OTHER (Token Swap, Approvals, System)
+  // 8. OTHER (Token Swap, Approvals, Generic)
   if (t.includes('swap')) {
     return {
       category: 'MBTTC',
@@ -428,7 +411,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
 
   // Listen to Market & Mode state changes
   const [syncedPublicItems, setSyncedPublicItems] = useState<ActivityItem[]>([]);
-const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
+  const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
 
   // Real On-Chain Direct Team & Self Activities Fetcher
   useEffect(() => {
@@ -439,22 +422,39 @@ const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
       if (!isMounted) return;
       if (res.isRealData && res.transactions.length > 0) {
         setIsLive(true);
-        const mapped: ActivityItem[] = res.transactions.map((tx) => ({
-          id: tx.id,
-          type: (tx.activityType.toLowerCase().includes('package') ? 'Package Activation' :
-                 tx.activityType.toLowerCase().includes('claim') ? 'MBTTC Claim' :
-                 tx.activityType.toLowerCase().includes('salary') ? 'Weekly Salary' :
-                 tx.activityType.toLowerCase().includes('reward') ? 'Weekly Reward' :
-                 tx.activityType.toLowerCase().includes('registration') ? 'Registration' : 'Income') as any,
-          title: tx.activityType,
-          amount: tx.amount,
-          date: tx.timestamp || tx.date || 'Just now',
-          status: 'Confirmed',
-          txHash: tx.txHash || '',
-          details: tx.details || tx.packageName || 'Confirmed on protocol smart contract.',
-          walletAddress: tx.memberWallet || tx.userId || 'Team Member',
-          read: true,
-        }));
+        const mapped: ActivityItem[] = res.transactions.map((tx) => {
+          const actLower = (tx.activityType || '').toLowerCase();
+          const amtLower = (tx.amount || '').toLowerCase();
+
+          // Precise item typing based on transaction payload
+          let resolvedType: any = 'Income';
+          if (actLower.includes('registration') || actLower.includes('register')) {
+            resolvedType = 'Registration';
+          } else if (actLower.includes('package') || actLower.includes('node activation')) {
+            resolvedType = 'Package Activation';
+          } else if (actLower.includes('claim')) {
+            resolvedType = 'MBTTC Claim';
+          } else if (actLower.includes('mbttc') || amtLower.includes('mbttc') || actLower.includes('yield')) {
+            resolvedType = 'MBTTC Credit';
+          } else if (actLower.includes('salary')) {
+            resolvedType = 'Weekly Salary';
+          } else if (actLower.includes('reward')) {
+            resolvedType = 'Weekly Reward';
+          }
+
+          return {
+            id: tx.id,
+            type: resolvedType,
+            title: tx.activityType,
+            amount: tx.amount,
+            date: tx.timestamp || tx.date || 'Just now',
+            status: 'Confirmed',
+            txHash: tx.txHash || '',
+            details: tx.details || tx.packageName || 'Confirmed on protocol smart contract.',
+            walletAddress: tx.memberWallet || tx.userId || 'Team Member',
+            read: true,
+          };
+        });
         setOnChainTeamItems(mapped);
       }
     }).catch((err) => {
@@ -669,7 +669,6 @@ const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
                 const visual = resolveActivityVisual(act.type, act.title, act.amount);
                 const IconComponent = visual.iconComponent;
                 const isCopied = copiedId === act.id;
-                const hasTxHash = act.txHash && act.txHash !== '0x0';
                 const shortAddress = formatShortAddressWithDots(act.walletAddress || act.txHash);
 
                 return (
