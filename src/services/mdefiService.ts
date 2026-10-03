@@ -1,6 +1,6 @@
 /**
  * MDeFi Hub Guaranteed On-Chain Direct State & Event Mirror
- * 100% Real Blockchain Data | Auto-Refresh Heartbeat | Sub-Second Execution | Bulletproof
+ * 100% Real Blockchain Data | Individual Claim Cards | Sub-Second Execution | Bulletproof
  */
 
 import { 
@@ -75,9 +75,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
+      // 15 सेकंड का शांत बैकग्राउंड टाइमर
       this.autoRefreshTimer = setInterval(() => {
         this.notifyFeedSubscribers();
-      }, 6000);
+      }, 15000);
     }
   }
 
@@ -214,12 +215,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         return `${date} · ${time}`;
       };
 
-      // 1. प्राथमिक नोड, डैशबोर्ड, वेस्टिंग और फेज़ रिवॉर्ड्स लोड करें
-      const [selfDash, selfNode, selfRefVesting, selfPkgVesting, phaseRewards] = await Promise.all([
+      // 1. प्राथमिक स्टेट और कॉन्ट्रैक्ट फेज़ रिवॉर्ड्स लोड करें
+      const [selfDash, selfNode, phaseRewards] = await Promise.all([
         hubContract.getUserDashboard(targetWallet).catch(() => null),
         hubContract.getUserNode(targetWallet).catch(() => null),
-        hubContract.referralVesting(targetWallet).catch(() => null),
-        hubContract.packageVesting(targetWallet).catch(() => null),
         hubContract.getPhaseRewards().catch(() => null),
       ]);
 
@@ -276,65 +275,6 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      // वास्तविक क्लेम डेटा
-      const selfRefClaimed = selfDash?.referralTotalClaimed ? Number(ethers.formatUnits(selfDash.referralTotalClaimed.toString(), 18)) : 0;
-      const selfPkgClaimed = selfDash?.packageTotalClaimed ? Number(ethers.formatUnits(selfDash.packageTotalClaimed.toString(), 18)) : 0;
-      const selfRefLastClaim = selfRefVesting?.lastClaimTimestamp ? Number(selfRefVesting.lastClaimTimestamp.toString()) : 0;
-      const selfPkgLastClaim = selfPkgVesting?.lastClaimTimestamp ? Number(selfPkgVesting.lastClaimTimestamp.toString()) : 0;
-
-      // अगर मेमोरी में रसीदें नहीं हैं, तो स्टोरेज से पुनः लोड करें
-      if (typeof window !== 'undefined' && this.liveClaimReceipts.length === 0) {
-        try {
-          const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
-          if (Array.isArray(cached) && cached.length > 0) {
-            this.liveClaimReceipts = cached;
-          }
-        } catch {}
-      }
-
-      // केवल तभी टोटल कार्ड दिखाएँ जब कोई वास्तविक लाइव रसीद न हो
-      const hasRealReferralClaim = this.liveClaimReceipts.some(
-        (r) => r.activityType === 'MBTTC Referral Pool Claim' && r.memberWallet.toLowerCase() === targetWallet.toLowerCase()
-      );
-
-      if (!hasRealReferralClaim && selfRefClaimed > 0 && selfRefLastClaim > 0) {
-        const claimDateStr = formatPremiumDate(selfRefLastClaim);
-        realTransactions.push({
-          id: `self-claim-ref-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${selfRefClaimed.toFixed(2)} MBTTC`,
-          amount: `+${selfRefClaimed.toFixed(2)} MBTTC`,
-          status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'CLAIM_REF', selfRefLastClaim),
-          date: claimDateStr,
-          activityType: 'MBTTC Referral Pool Claim',
-          details: `Referral yield claimed to wallet by ${selfId}`,
-          timestamp: claimDateStr,
-          isRealData: true,
-          rawTime: selfRefLastClaim,
-        });
-      }
-
-      if (selfPkgClaimed > 0 && selfPkgLastClaim > 0) {
-        const pkgClaimDateStr = formatPremiumDate(selfPkgLastClaim);
-        realTransactions.push({
-          id: `self-claim-pkg-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${selfPkgClaimed.toFixed(2)} MBTTC`,
-          amount: `+${selfPkgClaimed.toFixed(2)} MBTTC`,
-          status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'CLAIM_PKG', selfPkgLastClaim),
-          date: pkgClaimDateStr,
-          activityType: 'MBTTC Package Pool Claim',
-          details: `Package yield claimed to wallet by ${selfId}`,
-          timestamp: pkgClaimDateStr,
-          isRealData: true,
-          rawTime: selfPkgLastClaim,
-        });
-      }
-
       // 2. टीम मेंबर्स की डिस्कवरी (डाउनलाइन स्ट्रक्चर)
       const directWallets: string[] = selfNode?.directTeam ? Array.from(selfNode.directTeam) : [];
       const teamMap = new Map<string, { sponsorId: string; isDirect: boolean; level: number }>();
@@ -350,6 +290,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       });
 
+      // Level 2 Sub-nodes (Parallel Fetch)
       const subNodesData = await Promise.all(
         Array.from(teamMap.keys()).map(async (dirAddr) => {
           try {
@@ -384,6 +325,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       });
 
+      // Level 3 Downline (Parallel Fetch)
       if (level2List.length > 0) {
         const level3Data = await Promise.all(
           level2List.map(async (item) => {
@@ -422,12 +364,8 @@ export class MDefiHubMockService implements IMDefiHubService {
       const membersData = await Promise.all(
         teamEntries.map(async ([memberAddr, meta]) => {
           try {
-            const [mDash, mRefVesting, mPkgVesting] = await Promise.all([
-              hubContract.getUserDashboard(memberAddr).catch(() => null),
-              hubContract.referralVesting(memberAddr).catch(() => null),
-              hubContract.packageVesting(memberAddr).catch(() => null),
-            ]);
-            return { memberAddr, meta, mDash, mRefVesting, mPkgVesting };
+            const mDash = await hubContract.getUserDashboard(memberAddr).catch(() => null);
+            return { memberAddr, meta, mDash };
           } catch {
             return null;
           }
@@ -436,17 +374,12 @@ export class MDefiHubMockService implements IMDefiHubService {
 
       for (const item of membersData) {
         if (!item || !item.mDash) continue;
-        const { memberAddr, meta, mDash, mRefVesting, mPkgVesting } = item;
+        const { memberAddr, meta, mDash } = item;
 
         const regSec = mDash.registrationTime ? Number(mDash.registrationTime.toString()) : 0;
         const mNumericId = mDash.userId ? Number(mDash.userId.toString()) : 0;
         const mId = mNumericId > 0 ? toHumanFacingId(mNumericId) : `Member ••••${memberAddr.slice(-4)}`;
         const activePkgs = mDash.activePackageCount ? Number(mDash.activePackageCount.toString()) : 0;
-
-        const refClaimed = mDash.referralTotalClaimed ? Number(ethers.formatUnits(mDash.referralTotalClaimed.toString(), 18)) : 0;
-        const pkgClaimed = mDash.packageTotalClaimed ? Number(ethers.formatUnits(mDash.packageTotalClaimed.toString(), 18)) : 0;
-        const mRefLastClaim = mRefVesting?.lastClaimTimestamp ? Number(mRefVesting.lastClaimTimestamp.toString()) : 0;
-        const mPkgLastClaim = mPkgVesting?.lastClaimTimestamp ? Number(mPkgVesting.lastClaimTimestamp.toString()) : 0;
 
         const timeStr = formatPremiumDate(regSec);
         const teamLabel = meta.isDirect ? 'Direct partner' : `Level ${meta.level} partner`;
@@ -485,7 +418,7 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        if (meta.isDirect && Number(dynamicRegReward) > 0 && regSec > 0) {
+        if (meta.isDirect && Number(dynamicRefReward) > 0 && regSec > 0) {
           realTransactions.push({
             id: `team-sponsor-ref-${memberAddr}`,
             memberWallet: targetWallet,
@@ -496,7 +429,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             txHash: buildTxHash(memberAddr, 'SPONSOR_BONUS', regSec),
             date: timeStr,
             activityType: 'MBTTC Referral Pool Addition',
-            details: `Direct invite reward +${dynamicRegReward} MBTTC added to referral pool (${mId})`,
+            details: `Direct invite reward +${dynamicRefReward} MBTTC added to referral pool (${mId})`,
             timestamp: timeStr,
             isRealData: true,
             rawTime: regSec,
@@ -520,47 +453,19 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawTime: regSec,
           });
         }
-
-        if (refClaimed > 0 && mRefLastClaim > 0) {
-          const mClaimDateStr = formatPremiumDate(mRefLastClaim);
-          realTransactions.push({
-            id: `team-claim-ref-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: `+${refClaimed.toFixed(2)} MBTTC`,
-            amount: `+${refClaimed.toFixed(2)} MBTTC`,
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'CLAIM_REF', mRefLastClaim),
-            date: mClaimDateStr,
-            activityType: 'MBTTC Referral Pool Claim',
-            details: `Referral yield claimed to wallet by partner ${mId}`,
-            timestamp: mClaimDateStr,
-            isRealData: true,
-            rawTime: mRefLastClaim,
-          });
-        }
-
-        if (pkgClaimed > 0 && mPkgLastClaim > 0) {
-          const mPkgClaimDateStr = formatPremiumDate(mPkgLastClaim);
-          realTransactions.push({
-            id: `team-claim-pkg-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: `+${pkgClaimed.toFixed(2)} MBTTC`,
-            amount: `+${pkgClaimed.toFixed(2)} MBTTC`,
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'CLAIM_PKG', mPkgLastClaim),
-            date: mPkgClaimDateStr,
-            activityType: 'MBTTC Package Pool Claim',
-            details: `Package yield claimed to wallet by partner ${mId}`,
-            timestamp: mPkgClaimDateStr,
-            isRealData: true,
-            rawTime: mPkgLastClaim,
-          });
-        }
       }
 
-      // 4. वास्तविक लाइव रसीदों को सबसे ऊपर जोड़ें
+      // 4. वास्तविक अलग-अलग क्लेम रसीदें लोड करें (कोई लाइफटाइम टोटल सम नहीं)
+      if (typeof window !== 'undefined' && this.liveClaimReceipts.length === 0) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
+          if (Array.isArray(cached) && cached.length > 0) {
+            this.liveClaimReceipts = cached;
+          }
+        } catch {}
+      }
+
+      // प्रत्येक क्लेम रसीद अलग-अलग कार्ड के रूप में सबसे ऊपर जुड़ेगी
       this.liveClaimReceipts.forEach((receipt) => {
         const receiptHash = (receipt.txHash || '').toLowerCase();
         if (receiptHash && !realTransactions.some((tx) => (tx.txHash || '').toLowerCase() === receiptHash)) {
@@ -602,6 +507,7 @@ export class MDefiHubMockService implements IMDefiHubService {
     };
   }
 
+  // वास्तविक अलग-अलग क्लेम रसीदों को स्टोर करना
   async claimReward(
     type: 'Registration' | 'Referral' | 'Package',
     walletAddress?: string
@@ -627,6 +533,7 @@ export class MDefiHubMockService implements IMDefiHubService {
     const d = new Date(nowSec * 1000);
     const timeStr = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
+    // हर क्लेम का अपना व्यक्तिगत कार्ड बनेगा
     const realReceiptRecord: LedgerItem = {
       id: `live-claim-${result.txHash}`,
       memberWallet: targetWallet,
