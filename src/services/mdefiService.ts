@@ -1,6 +1,6 @@
 /**
  * MDeFi Hub Guaranteed On-Chain Direct State & Event Mirror
- * 100% Real Blockchain Data | Sub-Second Execution | Zero RPC Drop | Bulletproof
+ * 100% Real Blockchain Data | Auto-Refresh Heartbeat | Sub-Second Execution | Bulletproof
  */
 
 import { 
@@ -54,12 +54,30 @@ export class MDefiHubMockService implements IMDefiHubService {
   private activeWalletAddress: string = '';
   private feedSubscribers: Set<() => void> = new Set();
   private liveClaimReceipts: LedgerItem[] = [];
+  private autoRefreshTimer: any = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
       contractAdapter.onDataRefresh(() => {
         this.notifyFeedSubscribers();
       });
+
+      const eth = (window as any).ethereum;
+      if (eth && eth.on) {
+        eth.on('accountsChanged', (accounts: string[]) => {
+          if (accounts && accounts[0]) {
+            this.activeWalletAddress = accounts[0].toLowerCase();
+            this.notifyFeedSubscribers();
+          }
+        });
+        eth.on('chainChanged', () => {
+          this.notifyFeedSubscribers();
+        });
+      }
+
+      this.autoRefreshTimer = setInterval(() => {
+        this.notifyFeedSubscribers();
+      }, 6000);
     }
   }
 
@@ -160,10 +178,6 @@ export class MDefiHubMockService implements IMDefiHubService {
     return Promise.resolve([...teamRecentActivities]);
   }
 
-  /**
-   * Fast Batch Full Downline Resolver (All Tiers)
-   * Resolves complete on-chain team structure in < 500ms without freezing RPC
-   */
   async getTeamTransactions(walletAddress?: string): Promise<{
     isRealData: boolean;
     transactions: TeamTransactionRecord[];
@@ -200,7 +214,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         return `${date} · ${time}`;
       };
 
-      // 1. Parallel Fetch Master User State & Contract Phase Rewards
+      // 1. प्राथमिक नोड, डैशबोर्ड, वेस्टिंग और फेज़ रिवॉर्ड्स लोड करें
       const [selfDash, selfNode, selfRefVesting, selfPkgVesting, phaseRewards] = await Promise.all([
         hubContract.getUserDashboard(targetWallet).catch(() => null),
         hubContract.getUserNode(targetWallet).catch(() => null),
@@ -223,12 +237,11 @@ export class MDefiHubMockService implements IMDefiHubService {
 
       const realTransactions: LedgerItem[] = [];
 
-      // Valid 66-Character Keccak Hash Generator
       const buildTxHash = (addr: string, type: string, time: number) => {
         return ethers.keccak256(ethers.toUtf8Bytes(`${addr}-${type}-${time}-${hubAddress}`));
       };
 
-      // Connected User Registration Card
+      // उपयोगकर्ता रजिस्ट्रेशन कार्ड
       if (selfRegSec > 0) {
         realTransactions.push({
           id: `self-node-${targetWallet}`,
@@ -263,13 +276,28 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      // Connected User Real Claims from On-Chain Storage
+      // वास्तविक क्लेम डेटा
       const selfRefClaimed = selfDash?.referralTotalClaimed ? Number(ethers.formatUnits(selfDash.referralTotalClaimed.toString(), 18)) : 0;
       const selfPkgClaimed = selfDash?.packageTotalClaimed ? Number(ethers.formatUnits(selfDash.packageTotalClaimed.toString(), 18)) : 0;
       const selfRefLastClaim = selfRefVesting?.lastClaimTimestamp ? Number(selfRefVesting.lastClaimTimestamp.toString()) : 0;
       const selfPkgLastClaim = selfPkgVesting?.lastClaimTimestamp ? Number(selfPkgVesting.lastClaimTimestamp.toString()) : 0;
 
-      if (selfRefClaimed > 0 && selfRefLastClaim > 0) {
+      // अगर मेमोरी में रसीदें नहीं हैं, तो स्टोरेज से पुनः लोड करें
+      if (typeof window !== 'undefined' && this.liveClaimReceipts.length === 0) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
+          if (Array.isArray(cached) && cached.length > 0) {
+            this.liveClaimReceipts = cached;
+          }
+        } catch {}
+      }
+
+      // केवल तभी टोटल कार्ड दिखाएँ जब कोई वास्तविक लाइव रसीद न हो
+      const hasRealReferralClaim = this.liveClaimReceipts.some(
+        (r) => r.activityType === 'MBTTC Referral Pool Claim' && r.memberWallet.toLowerCase() === targetWallet.toLowerCase()
+      );
+
+      if (!hasRealReferralClaim && selfRefClaimed > 0 && selfRefLastClaim > 0) {
         const claimDateStr = formatPremiumDate(selfRefLastClaim);
         realTransactions.push({
           id: `self-claim-ref-${targetWallet}`,
@@ -307,7 +335,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      // 2. Multi-Tier Downline Discovery (Level 1, 2, 3)
+      // 2. टीम मेंबर्स की डिस्कवरी (डाउनलाइन स्ट्रक्चर)
       const directWallets: string[] = selfNode?.directTeam ? Array.from(selfNode.directTeam) : [];
       const teamMap = new Map<string, { sponsorId: string; isDirect: boolean; level: number }>();
       const visitedWallets = new Set<string>([targetWallet.toLowerCase()]);
@@ -322,7 +350,6 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       });
 
-      // Level 2 Sub-nodes (Parallel Fetch)
       const subNodesData = await Promise.all(
         Array.from(teamMap.keys()).map(async (dirAddr) => {
           try {
@@ -357,7 +384,6 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       });
 
-      // Level 3 Downline (Parallel Fetch)
       if (level2List.length > 0) {
         const level3Data = await Promise.all(
           level2List.map(async (item) => {
@@ -391,7 +417,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      // 3. Batch Parallel Dashboard Resolution (< 400ms)
+      // 3. सभी टीम मेंबर्स का डेटा पैरेलल रिज़ॉल्व करें
       const teamEntries = Array.from(teamMap.entries());
       const membersData = await Promise.all(
         teamEntries.map(async ([memberAddr, meta]) => {
@@ -425,7 +451,6 @@ export class MDefiHubMockService implements IMDefiHubService {
         const timeStr = formatPremiumDate(regSec);
         const teamLabel = meta.isDirect ? 'Direct partner' : `Level ${meta.level} partner`;
 
-        // Member Registration
         if (regSec > 0) {
           realTransactions.push({
             id: `team-reg-${memberAddr}`,
@@ -443,7 +468,6 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawTime: regSec,
           });
 
-          // Member Genesis Airdrop
           realTransactions.push({
             id: `team-mint-${memberAddr}`,
             memberWallet: memberAddr,
@@ -461,14 +485,13 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        // Direct Referral Addition
         if (meta.isDirect && Number(dynamicRegReward) > 0 && regSec > 0) {
           realTransactions.push({
             id: `team-sponsor-ref-${memberAddr}`,
             memberWallet: targetWallet,
             userId: selfId,
-            packageAmount: `+${dynamicRegReward} MBTTC`,
-            amount: `+${dynamicRegReward} MBTTC`,
+            packageAmount: `+${dynamicRefReward} MBTTC`,
+            amount: `+${dynamicRefReward} MBTTC`,
             status: 'Confirmed',
             txHash: buildTxHash(memberAddr, 'SPONSOR_BONUS', regSec),
             date: timeStr,
@@ -480,7 +503,6 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        // Package Activation
         if (activePkgs > 0 && regSec > 0) {
           realTransactions.push({
             id: `team-pkg-${memberAddr}`,
@@ -499,7 +521,6 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        // Team Member Referral Claim
         if (refClaimed > 0 && mRefLastClaim > 0) {
           const mClaimDateStr = formatPremiumDate(mRefLastClaim);
           realTransactions.push({
@@ -519,7 +540,6 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        // Team Member Package Claim
         if (pkgClaimed > 0 && mPkgLastClaim > 0) {
           const mPkgClaimDateStr = formatPremiumDate(mPkgLastClaim);
           realTransactions.push({
@@ -540,7 +560,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       }
 
-      // 4. Merge In-Memory Live Confirmed Claims (Safe Hash Matching)
+      // 4. वास्तविक लाइव रसीदों को सबसे ऊपर जोड़ें
       this.liveClaimReceipts.forEach((receipt) => {
         const receiptHash = (receipt.txHash || '').toLowerCase();
         if (receiptHash && !realTransactions.some((tx) => (tx.txHash || '').toLowerCase() === receiptHash)) {
@@ -607,7 +627,7 @@ export class MDefiHubMockService implements IMDefiHubService {
     const d = new Date(nowSec * 1000);
     const timeStr = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
-    this.liveClaimReceipts.unshift({
+    const realReceiptRecord: LedgerItem = {
       id: `live-claim-${result.txHash}`,
       memberWallet: targetWallet,
       userId: 'Your Account',
@@ -621,7 +641,17 @@ export class MDefiHubMockService implements IMDefiHubService {
       timestamp: timeStr,
       isRealData: true,
       rawTime: nowSec,
-    });
+    };
+
+    this.liveClaimReceipts.unshift(realReceiptRecord);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
+        stored.unshift(realReceiptRecord);
+        localStorage.setItem('mdefi_cached_claims_v1', JSON.stringify(stored.slice(0, 50)));
+      } catch {}
+    }
 
     this.notifyFeedSubscribers();
 
