@@ -1,41 +1,25 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   UserPlus,
-  Users,
   Coins,
-  Sparkles,
   Package,
-  Layers,
   TrendingUp,
-  ArrowUpRight,
   Crown,
-  Award,
   Gift,
-  Trophy,
   CheckCircle2,
-  ArrowDownLeft,
   RefreshCw,
-  ShieldCheck,
   ArrowRight,
-  ChevronRight,
   Copy,
   Check,
   Activity,
   Radio,
   Clock,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
-  Flame,
-  Zap,
   GitFork
 } from 'lucide-react';
 import { ActivityItem, NavPage } from '../types';
-import { communityRecentActivities } from '../data/mockData';
 import { mdefiService } from '../services/mdefiService';
-import { mbttcMarketService } from '../services/mbttcMarketService';
-import { centralEventSyncService } from '../services/centralEventSyncService';
-import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
+import { contractAdapter } from '../services/contractAdapter';
+import { copyFullAddress } from '../utils/formatAddress';
 import { getNotificationDeduplicationKey } from '../utils/notificationDeduplication';
 import { ResponsivePagination } from './common/ResponsivePagination';
 import { groupActivitiesInPairs } from './activity/CompactActivityRow';
@@ -71,12 +55,6 @@ export interface ResolvedActivityVisual {
   animationType: 'pulse' | 'glow' | 'float' | 'crown' | 'sparkle' | 'static';
 }
 
-/**
- * Strict category resolution engine:
- * 1. REGISTRATION events belong strictly to REGISTRATIONS.
- * 2. Real USDT commissions belong strictly to INCOME.
- * 3. Token yields & claims belong strictly to MBTTC.
- */
 function resolveActivityVisual(
   type: string = '', 
   title: string = '', 
@@ -85,7 +63,7 @@ function resolveActivityVisual(
   const t = (type + ' ' + title).toLowerCase();
   const a = amount.toLowerCase();
 
-  // 1. REGISTRATION (Checked FIRST so registration cards always populate REGISTRATIONS tab)
+  // 1. REGISTRATION
   if (t.includes('registration') || t.includes('register') || a.includes('node active') || a.includes('node registered')) {
     return {
       category: 'REGISTRATION',
@@ -104,7 +82,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 2. DIRECT INCOME (Real USDT Commission only)
+  // 2. DIRECT INCOME
   if (t.includes('direct referral income') || t.includes('direct income') || t.includes('commission') || (t.includes('income') && a.includes('usdt'))) {
     return {
       category: 'INCOME',
@@ -123,7 +101,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 3. MBTTC TOKENS (Airdrop welcome tokens, yield pool credits, token claims)
+  // 3. MBTTC TOKENS
   if (t.includes('mbttc') || a.includes('mbttc') || t.includes('yield') || t.includes('airdrop') || t.includes('mint')) {
     const isClaim = t.includes('claim');
     return {
@@ -143,7 +121,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 4. MATRIX INCOME (S4, Quantum, Nexus radial matrix)
+  // 4. MATRIX INCOME
   if (t.includes('matrix') || t.includes('s4') || t.includes('quantum') || t.includes('radial') || t.includes('slot') || t.includes('spillover')) {
     return {
       category: 'MATRIX',
@@ -162,7 +140,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 5. PACKAGES (Node purchase & activation events)
+  // 5. PACKAGES
   if (t.includes('package') || t.includes('node activation') || t.includes('activated') || t.includes('upgrade') || t.includes('prime')) {
     return {
       category: 'PACKAGE',
@@ -200,7 +178,7 @@ function resolveActivityVisual(
     };
   }
 
-  // 7. WEEKLY REWARDS (Pool distributions)
+  // 7. WEEKLY REWARDS
   if (t.includes('weekly reward') || t.includes('starter pool') || t.includes('premium pool') || t.includes('pool distribution')) {
     return {
       category: 'REWARD',
@@ -216,25 +194,6 @@ function resolveActivityVisual(
       isProfit: true,
       iconComponent: Gift,
       animationType: 'sparkle',
-    };
-  }
-
-  // 8. OTHER (Token Swap, Approvals, Generic)
-  if (t.includes('swap')) {
-    return {
-      category: 'MBTTC',
-      categoryLabel: 'DEX SWAP',
-      badgeBg: 'bg-zinc-900',
-      badgeText: 'text-zinc-300 font-bold',
-      badgeBorder: 'border-zinc-800',
-      iconBg: 'bg-zinc-900',
-      iconBorder: 'border-zinc-700',
-      iconColor: 'text-emerald-400',
-      glowColor: 'shadow-sm',
-      ringColor: 'border-zinc-600',
-      isProfit: false,
-      iconComponent: RefreshCw,
-      animationType: 'static',
     };
   }
 
@@ -256,9 +215,6 @@ function resolveActivityVisual(
   };
 }
 
-/**
- * Format address into compact Web3 display: 0x71C8••B389
- */
 function formatShortAddressWithDots(address?: string): string {
   if (!address) return '';
   const clean = address.trim();
@@ -269,21 +225,6 @@ function formatShortAddressWithDots(address?: string): string {
   return `${clean.slice(0, 4)}••${clean.slice(-4)}`;
 }
 
-export const DEMO_COMMUNITY_ACTIVITIES: ActivityItem[] = [
-  {
-    id: 'demo-team-1',
-    type: 'Registration',
-    title: 'Your Account Registration',
-    amount: 'Node Active',
-    date: 'Just now',
-    status: 'Confirmed',
-    txHash: '',
-    details: 'Protocol account established',
-    walletAddress: 'Your Account',
-    read: true,
-  }
-];
-
 export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   onNavigate,
   userActivities = [],
@@ -292,15 +233,13 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   const [activeCategory, setActiveCategory] = useState<ActivityCategory>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(false);
-  const pageSize = 8; // 8 records per page = 4 compact paired containers
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
+  const pageSize = 8;
 
   useEffect(() => {
     setCurrentPage(1);
   }, [activeCategory]);
-
-  const [isLive, setIsLive] = useState<boolean>(() => {
-    return mbttcMarketService.getMode() === 'live';
-  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -311,18 +250,21 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return () => mediaQuery.removeEventListener('change', listener);
   }, []);
 
-  const [syncedPublicItems, setSyncedPublicItems] = useState<ActivityItem[]>([]);
-  const [onChainTeamItems, setOnChainTeamItems] = useState<ActivityItem[]>([]);
+  const loadOnChainFeed = useCallback(async () => {
+    setIsLoading(true);
+    let activeWallet = '';
+    if (typeof window !== 'undefined') {
+      const eth = (window as any).ethereum;
+      if (eth?.selectedAddress) activeWallet = eth.selectedAddress;
+      else if (eth?.accounts && eth.accounts[0]) activeWallet = eth.accounts[0];
+      else {
+        activeWallet = localStorage.getItem('mdefi_user_wallet') || localStorage.getItem('walletAddress') || '';
+      }
+    }
 
-  // Real On-Chain Direct Team & Self Activities Fetcher
-  useEffect(() => {
-    let isMounted = true;
-    const activeWallet = (typeof window !== 'undefined' && (window as any).ethereum?.selectedAddress) || '';
-
-    mdefiService.getTeamTransactions(activeWallet).then((res) => {
-      if (!isMounted) return;
-      if (res.isRealData && res.transactions.length > 0) {
-        setIsLive(true);
+    try {
+      const res = await mdefiService.getTeamTransactions(activeWallet);
+      if (res && res.transactions) {
         const mapped: ActivityItem[] = res.transactions.map((tx) => {
           const actLower = (tx.activityType || '').toLowerCase();
           const amtLower = (tx.amount || '').toLowerCase();
@@ -357,52 +299,34 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         });
         setOnChainTeamItems(mapped);
       }
-    }).catch((err) => {
-      console.warn('[CommunityActivityFeed] Live on-chain sync notice:', err);
+    } catch (err) {
+      console.warn('[CommunityActivityFeed] Live fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOnChainFeed();
+  }, [loadOnChainFeed]);
+
+  // Real-time link: contractAdapter refresh triggers feed reload
+  useEffect(() => {
+    const unsubscribeAdapter = contractAdapter.onDataRefresh(() => {
+      loadOnChainFeed();
     });
+    const unsubscribeService = (mdefiService as any).onFeedRefresh 
+      ? (mdefiService as any).onFeedRefresh(() => loadOnChainFeed())
+      : () => {};
 
     return () => {
-      isMounted = false;
+      unsubscribeAdapter();
+      unsubscribeService();
     };
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = mbttcMarketService.subscribe((stats) => {
-      setIsLive(stats.isLive);
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = centralEventSyncService.subscribe((syncState) => {
-      if (syncState.publicEcosystemActivities.length > 0) {
-        const mapped: ActivityItem[] = syncState.publicEcosystemActivities.map((act) => ({
-          id: act.id,
-          type: (act.type === 'REGISTRATION' ? 'Registration' :
-                act.type === 'PACKAGE' ? 'Package Activation' :
-                act.type === 'MBTTC_CLAIM' ? 'MBTTC Claim' :
-                act.type === 'MBTTC_CREDIT' ? 'MBTTC Distribution' :
-                act.type === 'WEEKLY_REWARD' ? 'Weekly Reward' :
-                act.type === 'WEEKLY_SALARY' ? 'Weekly Salary' :
-                act.type === 'CLAIM' ? 'Claim' : 'Income') as any,
-          title: act.title,
-          amount: act.amount,
-          date: act.timestamp || 'Just now',
-          status: 'Confirmed',
-          txHash: '',
-          details: act.description,
-          walletAddress: act.member,
-          read: true,
-        }));
-        setSyncedPublicItems(mapped);
-      }
-    });
-    return unsubscribe;
-  }, []);
+  }, [loadOnChainFeed]);
 
   const allFeedItems = useMemo(() => {
-    const combined = [...onChainTeamItems, ...syncedPublicItems, ...(userActivities || [])];
-    
+    const combined = [...onChainTeamItems, ...(userActivities || [])];
     if (combined.length > 0) {
       const seen = new Set<string>();
       return combined.filter((item) => {
@@ -412,9 +336,8 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         return true;
       });
     }
-
     return [];
-  }, [onChainTeamItems, syncedPublicItems, userActivities]);
+  }, [onChainTeamItems, userActivities]);
 
   const filteredItems = useMemo(() => {
     if (activeCategory === 'ALL') return allFeedItems;
@@ -457,7 +380,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       id="community-activity-feed"
       className="relative mt-8 rounded-3xl bg-gradient-to-b from-[#0a140e] via-[#07100b] to-[#050b07] border border-emerald-500/25 p-4 sm:p-7 shadow-[0_0_50px_rgba(0,0,0,0.55)] overflow-hidden"
     >
-      {/* Background corner glows */}
       <div className="absolute -top-24 -right-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-950/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -480,27 +402,15 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
 
         {/* Status Indicator Badge */}
         <div className="flex items-center gap-2 shrink-0">
-          {isLive ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-xs font-mono font-bold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
-              <span className="relative flex h-2 w-2">
-                {!prefersReducedMotion && (
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                )}
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span>● LIVE TEAM ACTIVITY</span>
-            </div>
-          ) : (
-            <div className="inline-flex flex-col items-end">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/70 border border-amber-500/40 text-xs font-mono font-bold text-amber-300">
-                <span className={`w-2 h-2 rounded-full bg-amber-400 ${prefersReducedMotion ? '' : 'animate-pulse'}`} />
-                <span>● DEMO TEAM ACTIVITY</span>
-              </div>
-              <span className="text-[9px] font-mono text-zinc-500 mt-0.5">
-                SIMULATED PREVIEW DATA
-              </span>
-            </div>
-          )}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-xs font-mono font-bold text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+            <span className="relative flex h-2 w-2">
+              {!prefersReducedMotion && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span>● LIVE TEAM ACTIVITY</span>
+          </div>
         </div>
       </div>
 
@@ -509,9 +419,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         <div className="flex items-center gap-2 text-zinc-300">
           <Activity className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            {isLive 
-              ? 'Streaming verified events for your account and direct team network.'
-              : 'Streaming simulated preview for your account and team. Real events will stream when on-chain activity occurs.'}
+            Streaming verified on-chain events for your account and direct team network.
           </span>
         </div>
         <div className="text-[11px] font-mono text-zinc-400 shrink-0">
@@ -540,15 +448,19 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         })}
       </div>
 
-      {/* 4. ACTIVITY LIST CONTAINER: Clean Responsive Card Layout */}
+      {/* 4. ACTIVITY LIST CONTAINER */}
       <div className="relative z-10 mt-4 space-y-2.5 sm:space-y-3">
-        {currentRecords.length === 0 ? (
-          /* EMPTY STATE */
+        {isLoading ? (
+          <div className="py-12 px-4 text-center rounded-2xl bg-zinc-950/40 border border-zinc-800/60 space-y-2">
+            <RefreshCw className="w-6 h-6 text-emerald-400 mx-auto animate-spin" />
+            <p className="text-xs text-zinc-400 font-mono">Syncing verified blockchain events...</p>
+          </div>
+        ) : currentRecords.length === 0 ? (
           <div className="py-12 px-4 text-center rounded-2xl bg-zinc-950/40 border border-zinc-800/60 space-y-2">
             <Activity className="w-8 h-8 text-zinc-600 mx-auto" />
             <h3 className="text-sm font-bold text-zinc-300 font-mono">TEAM ACTIVITY</h3>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              No verified team activity recorded in this category yet.
+              No verified on-chain team activity recorded in this category yet.
             </p>
           </div>
         ) : (
@@ -570,20 +482,15 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                     key={act.id || `feed-item-${index}`}
                     className="relative z-10 p-3 sm:p-3.5 hover:bg-zinc-900/40 transition-colors"
                   >
-                    {/* TOP ROW: Icon + Badges + Title on Left, Amount on Right */}
+                    {/* TOP ROW: Icon + Category Badge + Title on Left, Amount on Right */}
                     <div className="flex items-start sm:items-center justify-between gap-2.5">
                       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                        {/* Animated Icon */}
                         <div className="relative shrink-0 mt-0.5 sm:mt-0">
-                          {!prefersReducedMotion && (visual.animationType === 'pulse' || visual.animationType === 'float') && (
-                            <div className={`absolute -inset-0.5 rounded-xl border border-dashed ${visual.ringColor} opacity-40 animate-[spin_16s_linear_infinite]`} />
-                          )}
                           <div className={`relative p-2 sm:p-2.5 rounded-xl border ${visual.iconBg} ${visual.iconBorder} ${visual.iconColor} ${visual.glowColor} transition-transform duration-200 group-hover:scale-105`}>
                             <IconComponent className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                           </div>
                         </div>
 
-                        {/* Title and Category Badge */}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider border shrink-0 ${visual.badgeBg} ${visual.badgeText} ${visual.badgeBorder}`}>
@@ -596,7 +503,6 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                         </div>
                       </div>
 
-                      {/* Right: Amount Badge (Never collapses or wraps awkwardly) */}
                       <div className="shrink-0 text-right">
                         <div className={`text-xs sm:text-sm font-extrabold font-mono tracking-tight px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-zinc-800/90 whitespace-nowrap shadow-sm ${
                           visual.isProfit ? 'text-emerald-400' : 'text-zinc-200'
@@ -606,7 +512,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                       </div>
                     </div>
 
-                    {/* MIDDLE ROW: Activity Details with Bold Highlighted MDF IDs */}
+                    {/* MIDDLE ROW: Details with bold highlighted MDF IDs */}
                     <div className="mt-1.5 sm:mt-1 pl-9 sm:pl-11">
                       <p className="text-[11px] sm:text-xs text-zinc-300 leading-normal line-clamp-2">
                         {act.details ? (
@@ -640,8 +546,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                         </span>
                       </div>
 
-                      {/* Copy Address Button */}
-                      {isLive && act.walletAddress?.startsWith('0x') && (
+                      {act.walletAddress?.startsWith('0x') && (
                         <button
                           type="button"
                           onClick={() => handleCopy(act.id, act.walletAddress || act.txHash || '')}
@@ -665,7 +570,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         )}
       </div>
 
-      {/* 5. DYNAMIC & UNLIMITED PAGINATION */}
+      {/* 5. DYNAMIC PAGINATION */}
       {filteredItems.length > pageSize && (
         <div className="relative z-10 mt-5 pt-4 border-t border-zinc-850">
           <ResponsivePagination
@@ -681,7 +586,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       {/* 6. ACTION FOOTER */}
       <div className="relative z-10 mt-5 pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="text-[11px] font-mono text-zinc-500">
-          Showing <span className="text-zinc-300 font-semibold">{filteredItems.length}</span> total team records
+          Showing <span className="text-zinc-300 font-semibold">{filteredItems.length}</span> total verified records
         </div>
 
         <button

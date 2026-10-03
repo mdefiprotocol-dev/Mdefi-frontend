@@ -1,6 +1,7 @@
 /**
- * MDeFi Hub Real On-Chain Blockchain Event & State Service
- * 100% Real Blockchain Data | Zero Mock | Instant Load (Sub-Second)
+ * MDeFi Hub Real On-Chain Blockchain Event Reader
+ * 100% Pure Event Mirror Architecture (Ethers v6)
+ * Zero Fake Data | Zero Generated Timestamps | Zero Synthetic Math
  */
 
 import { 
@@ -31,7 +32,7 @@ import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
 const PRIMARY_FAST_RPC = 'https://bsc-testnet-dataseed.bnbchain.org';
 
-type LedgerItem = TeamTransactionRecord & { rawTime: number; blockNumber: number };
+type LedgerItem = TeamTransactionRecord & { rawTime: number; blockNumber: number; logIndex: number };
 
 export interface IMDefiHubService {
   getUserProfile(walletAddress?: string): Promise<UserProfile>;
@@ -119,8 +120,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         this.blockTimeCache.set(blockNumber, block.timestamp);
         return block.timestamp;
       }
-    } catch {}
-    return Math.floor(Date.now() / 1000);
+    } catch (e) {
+      console.warn(`[MDefiHub] Timestamp fetch failed for block ${blockNumber}:`, e);
+    }
+    return 0;
   }
 
   async getUserProfile(walletAddress?: string): Promise<UserProfile> {
@@ -175,8 +178,8 @@ export class MDefiHubMockService implements IMDefiHubService {
   }
 
   /**
-   * High-Performance Instant Real On-Chain Activity Reader
-   * Loads in 500ms without freezing or falling into Demo fallback.
+   * 100% REAL BLOCKCHAIN EVENT MIRROR
+   * Reads raw event logs from MDEFIEnterpriseHubUnified contract without fake data or timeouts
    */
   async getTeamTransactions(walletAddress?: string): Promise<{
     isRealData: boolean;
@@ -214,360 +217,265 @@ export class MDefiHubMockService implements IMDefiHubService {
         return `${date} · ${time}`;
       };
 
-      // 1. Fetch user dashboard, node, and vesting state in parallel (under 500ms)
-      const [selfDash, selfNode, selfRefVesting, selfPkgVesting, phaseRewards] = await Promise.all([
-        hubContract.getUserDashboard(targetWallet).catch(() => null),
-        hubContract.getUserNode(targetWallet).catch(() => null),
-        hubContract.referralVesting(targetWallet).catch(() => null),
-        hubContract.packageVesting(targetWallet).catch(() => null),
-        hubContract.getPhaseRewards().catch(() => null),
-      ]);
+      // 1. Recursive Full-Team On-Chain Discovery (Direct descendants via getUserNode)
+      const trackedWallets = new Map<string, string>();
+      const userDash = await hubContract.getUserDashboard(targetWallet).catch(() => null);
+      const selfNumId = userDash?.userId ? Number(userDash.userId.toString()) : 0;
+      const selfIdStr = selfNumId > 0 ? toHumanFacingId(selfNumId) : `0x${targetWallet.slice(2, 6)}...${targetWallet.slice(-4)}`;
+      trackedWallets.set(targetWallet.toLowerCase(), selfIdStr);
 
-      const selfRegSec = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) : 0;
-      const selfNumId = selfDash?.userId ? Number(selfDash.userId.toString()) : 0;
-      const selfId = selfNumId > 0 ? toHumanFacingId(selfNumId) : `0x${targetWallet.slice(2, 6)}...${targetWallet.slice(-4)}`;
-      const formattedSelfTime = formatPremiumDate(selfRegSec);
+      const queue: string[] = [targetWallet.toLowerCase()];
+      const visited = new Set<string>([targetWallet.toLowerCase()]);
 
-      const dynamicRegReward = phaseRewards?.regReward 
-        ? Number(ethers.formatUnits(phaseRewards.regReward, 18)).toFixed(2) 
-        : '30.00';
-      const dynamicRefReward = phaseRewards?.refReward 
-        ? Number(ethers.formatUnits(phaseRewards.refReward, 18)).toFixed(2) 
-        : '20.00';
+      while (queue.length > 0) {
+        const batch = queue.splice(0, 10);
+        await Promise.all(
+          batch.map(async (parentAddr) => {
+            try {
+              const node = await hubContract.getUserNode(parentAddr);
+              const directTeam: string[] = node?.directTeam ? Array.from(node.directTeam) : [];
+              for (const member of directTeam) {
+                if (ethers.isAddress(member)) {
+                  const mLower = member.toLowerCase();
+                  if (!visited.has(mLower)) {
+                    visited.add(mLower);
+                    queue.push(mLower);
+                    const mId = Number(node.id ? node.id.toString() : 0);
+                    trackedWallets.set(mLower, mId > 0 ? toHumanFacingId(mId) : `0x${mLower.slice(2, 6)}...${mLower.slice(-4)}`);
+                  }
+                }
+              }
+            } catch {}
+          })
+        );
+      }
+
+      // 2. Fetch Events from Safe Deployment Window in balanced chunks
+      const currentBlock = await provider.getBlockNumber();
+      const startBlock = Math.max(0, currentBlock - 60000); // 60,000 blocks window
+      const CHUNK_SIZE = 30000;
+
+      const regEvents: any[] = [];
+      const refClaimEvents: any[] = [];
+      const pkgClaimEvents: any[] = [];
+      const pkgActivatedEvents: any[] = [];
+
+      for (let from = startBlock; from <= currentBlock; from += CHUNK_SIZE) {
+        const to = Math.min(currentBlock, from + CHUNK_SIZE - 1);
+        const [rLogs, refLogs, pkgLogs, actLogs] = await Promise.all([
+          hubContract.queryFilter(hubContract.filters.Registered(), from, to).catch(() => []),
+          hubContract.queryFilter(hubContract.filters.ReferralClaimed(), from, to).catch(() => []),
+          hubContract.queryFilter(hubContract.filters.PackageClaimed(), from, to).catch(() => []),
+          hubContract.queryFilter(hubContract.filters.PackageActivatedDetailed(), from, to).catch(() => []),
+        ]);
+        regEvents.push(...rLogs);
+        refClaimEvents.push(...refLogs);
+        pkgClaimEvents.push(...pkgLogs);
+        pkgActivatedEvents.push(...actLogs);
+      }
+
+      // 3. Cache Block Timestamps
+      const blocksToFetch = new Set<number>();
+      [...regEvents, ...refClaimEvents, ...pkgClaimEvents, ...pkgActivatedEvents].forEach((evt: any) => {
+        if (evt.blockNumber) blocksToFetch.add(evt.blockNumber);
+      });
+
+      await Promise.all(
+        Array.from(blocksToFetch).map(async (bNum) => {
+          await this.getBlockTimestamp(provider, bNum);
+        })
+      );
 
       const realTransactions: LedgerItem[] = [];
+      const seenLogKeys = new Set<string>();
 
-      // Add Self Verified On-Chain Activities
-      if (selfRegSec > 0) {
+      // Parse Registered Events
+      for (const evt of regEvents) {
+        const parsed = evt as ethers.EventLog;
+        if (!parsed.args) continue;
+
+        const userAddr = String(parsed.args.user || '').toLowerCase();
+        if (!trackedWallets.has(userAddr)) continue;
+
+        const key = `${parsed.transactionHash}-${parsed.index}`;
+        if (seenLogKeys.has(key)) continue;
+        seenLogKeys.add(key);
+
+        const regIdNum = Number(parsed.args.id?.toString() || 0);
+        const displayUserId = regIdNum > 0 ? toHumanFacingId(regIdNum) : trackedWallets.get(userAddr)!;
+        const blockTimestamp = await this.getBlockTimestamp(provider, parsed.blockNumber);
+        const timeStr = formatPremiumDate(blockTimestamp);
+
         realTransactions.push({
-          id: `self-node-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
+          id: `onchain-reg-${key}`,
+          memberWallet: userAddr,
+          userId: displayUserId,
           packageAmount: 'Node Registered',
           amount: 'Node Registered',
           status: 'Confirmed',
-          txHash: `0xreg${targetWallet.slice(2, 10)}`,
-          blockNumber: 0,
-          date: formattedSelfTime,
-          activityType: 'Your Account Registration',
-          details: `Protocol node established (${selfId})`,
-          timestamp: formattedSelfTime,
+          txHash: parsed.transactionHash,
+          blockNumber: parsed.blockNumber,
+          logIndex: parsed.index,
+          date: timeStr,
+          activityType: userAddr === targetWallet ? 'Your Account Registration' : 'Team Member Registration',
+          details: `Protocol account verified on-chain (${displayUserId})`,
+          timestamp: timeStr,
           isRealData: true,
-          rawTime: selfRegSec,
+          rawTime: blockTimestamp,
         });
 
-        realTransactions.push({
-          id: `self-airdrop-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${dynamicRegReward} MBTTC`,
-          amount: `+${dynamicRegReward} MBTTC`,
-          status: 'Confirmed',
-          txHash: `0xmint${targetWallet.slice(2, 10)}`,
-          blockNumber: 0,
-          date: formattedSelfTime,
-          activityType: 'MBTTC Welcome Airdrop',
-          details: `Genesis welcome ${dynamicRegReward} MBTTC minted to wallet (${selfId})`,
-          timestamp: formattedSelfTime,
-          isRealData: true,
-          rawTime: selfRegSec + 1,
-        });
+        // Parse Genesis Airdrop Mint directly from event argument
+        const regMintedWei = BigInt(parsed.args.regMinted?.toString() || '0');
+        if (regMintedWei > 0n) {
+          const regMintedFormatted = Number(ethers.formatUnits(regMintedWei, 18)).toFixed(2);
+          realTransactions.push({
+            id: `onchain-mint-${key}`,
+            memberWallet: userAddr,
+            userId: displayUserId,
+            packageAmount: `+${regMintedFormatted} MBTTC`,
+            amount: `+${regMintedFormatted} MBTTC`,
+            status: 'Confirmed',
+            txHash: parsed.transactionHash,
+            blockNumber: parsed.blockNumber,
+            logIndex: parsed.index + 1,
+            date: timeStr,
+            activityType: userAddr === targetWallet ? 'MBTTC Welcome Airdrop' : 'MBTTC Genesis Mint',
+            details: `Airdrop reward +${regMintedFormatted} MBTTC minted to wallet`,
+            timestamp: timeStr,
+            isRealData: true,
+            rawTime: blockTimestamp,
+          });
+        }
       }
 
-      // Add Self Real Claims from Verified Contract State
-      const selfRefClaimed = selfDash?.referralTotalClaimed ? Number(ethers.formatUnits(selfDash.referralTotalClaimed.toString(), 18)) : 0;
-      const selfPkgClaimed = selfDash?.packageTotalClaimed ? Number(ethers.formatUnits(selfDash.packageTotalClaimed.toString(), 18)) : 0;
-      const selfRefLastClaim = selfRefVesting?.lastClaimTimestamp ? Number(selfRefVesting.lastClaimTimestamp.toString()) : 0;
-      const selfPkgLastClaim = selfPkgVesting?.lastClaimTimestamp ? Number(selfPkgVesting.lastClaimTimestamp.toString()) : 0;
+      // Parse ReferralClaimed Events
+      for (const evt of refClaimEvents) {
+        const parsed = evt as ethers.EventLog;
+        if (!parsed.args) continue;
 
-      if (selfRefClaimed > 0 && selfRefLastClaim > 0) {
-        const claimDateStr = formatPremiumDate(selfRefLastClaim);
+        const leaderAddr = String(parsed.args.leader || '').toLowerCase();
+        if (!trackedWallets.has(leaderAddr)) continue;
+
+        const key = `${parsed.transactionHash}-${parsed.index}`;
+        if (seenLogKeys.has(key)) continue;
+        seenLogKeys.add(key);
+
+        const claimedWei = BigInt(parsed.args.amount?.toString() || '0');
+        if (claimedWei === 0n) continue;
+
+        const claimedFormatted = Number(ethers.formatUnits(claimedWei, 18)).toFixed(2);
+        const blockTimestamp = await this.getBlockTimestamp(provider, parsed.blockNumber);
+        const timeStr = formatPremiumDate(blockTimestamp);
+        const displayUserId = trackedWallets.get(leaderAddr) || leaderAddr;
+
         realTransactions.push({
-          id: `self-claim-ref-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${selfRefClaimed.toFixed(2)} MBTTC`,
-          amount: `+${selfRefClaimed.toFixed(2)} MBTTC`,
+          id: `onchain-refclaim-${key}`,
+          memberWallet: leaderAddr,
+          userId: displayUserId,
+          packageAmount: `+${claimedFormatted} MBTTC`,
+          amount: `+${claimedFormatted} MBTTC`,
           status: 'Confirmed',
-          txHash: `0xclaimref${targetWallet.slice(2, 10)}`,
-          blockNumber: 0,
-          date: claimDateStr,
+          txHash: parsed.transactionHash,
+          blockNumber: parsed.blockNumber,
+          logIndex: parsed.index,
+          date: timeStr,
           activityType: 'MBTTC Referral Pool Claim',
-          details: `Referral yield claimed to wallet by ${selfId}`,
-          timestamp: claimDateStr,
+          details: `Referral pool yield claimed on smart contract by ${displayUserId}`,
+          timestamp: timeStr,
           isRealData: true,
-          rawTime: selfRefLastClaim,
+          rawTime: blockTimestamp,
         });
       }
 
-      if (selfPkgClaimed > 0 && selfPkgLastClaim > 0) {
-        const pkgClaimDateStr = formatPremiumDate(selfPkgLastClaim);
+      // Parse PackageClaimed Events
+      for (const evt of pkgClaimEvents) {
+        const parsed = evt as ethers.EventLog;
+        if (!parsed.args) continue;
+
+        const userAddr = String(parsed.args.user || '').toLowerCase();
+        if (!trackedWallets.has(userAddr)) continue;
+
+        const key = `${parsed.transactionHash}-${parsed.index}`;
+        if (seenLogKeys.has(key)) continue;
+        seenLogKeys.add(key);
+
+        const claimedWei = BigInt(parsed.args.amount?.toString() || '0');
+        if (claimedWei === 0n) continue;
+
+        const claimedFormatted = Number(ethers.formatUnits(claimedWei, 18)).toFixed(2);
+        const blockTimestamp = await this.getBlockTimestamp(provider, parsed.blockNumber);
+        const timeStr = formatPremiumDate(blockTimestamp);
+        const displayUserId = trackedWallets.get(userAddr) || userAddr;
+
         realTransactions.push({
-          id: `self-claim-pkg-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${selfPkgClaimed.toFixed(2)} MBTTC`,
-          amount: `+${selfPkgClaimed.toFixed(2)} MBTTC`,
+          id: `onchain-pkgclaim-${key}`,
+          memberWallet: userAddr,
+          userId: displayUserId,
+          packageAmount: `+${claimedFormatted} MBTTC`,
+          amount: `+${claimedFormatted} MBTTC`,
           status: 'Confirmed',
-          txHash: `0xclaimpkg${targetWallet.slice(2, 10)}`,
-          blockNumber: 0,
-          date: pkgClaimDateStr,
+          txHash: parsed.transactionHash,
+          blockNumber: parsed.blockNumber,
+          logIndex: parsed.index,
+          date: timeStr,
           activityType: 'MBTTC Package Pool Claim',
-          details: `Package yield claimed to wallet by ${selfId}`,
-          timestamp: pkgClaimDateStr,
-          isRealData: true,
-          rawTime: selfPkgLastClaim,
-        });
-      }
-
-      // 2. Discover Direct & Downline Members
-      const directWallets: string[] = selfNode?.directTeam ? Array.from(selfNode.directTeam) : [];
-      const teamMap = new Map<string, { sponsorId: string; isDirect: boolean }>();
-
-      directWallets.forEach((addr) => {
-        if (ethers.isAddress(addr)) {
-          teamMap.set(addr.toLowerCase(), { sponsorId: selfId, isDirect: true });
-        }
-      });
-
-      const subNodesData = await Promise.all(
-        directWallets.map(async (dirAddr) => {
-          if (!ethers.isAddress(dirAddr)) return null;
-          try {
-            const [sNode, sDash] = await Promise.all([
-              hubContract.getUserNode(dirAddr).catch(() => null),
-              hubContract.getUserDashboard(dirAddr).catch(() => null),
-            ]);
-            return { dirAddr, sNode, sDash };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      subNodesData.forEach((res) => {
-        if (!res || !res.sNode) return;
-        const subDirects: string[] = res.sNode.directTeam ? Array.from(res.sNode.directTeam) : [];
-        const sNumericId = res.sDash?.userId ? Number(res.sDash.userId.toString()) : 0;
-        const parentId = sNumericId > 0 ? toHumanFacingId(sNumericId) : selfId;
-
-        subDirects.forEach((subAddr) => {
-          if (ethers.isAddress(subAddr) && !teamMap.has(subAddr.toLowerCase()) && subAddr.toLowerCase() !== targetWallet.toLowerCase()) {
-            teamMap.set(subAddr.toLowerCase(), { sponsorId: parentId, isDirect: false });
-          }
-        });
-      });
-
-      // 3. Batch Resolution for all Team Members (Under 500ms)
-      const teamEntries = Array.from(teamMap.entries());
-      const membersData = await Promise.all(
-        teamEntries.map(async ([memberAddr, meta]) => {
-          try {
-            const [mDash, mRefVesting, mPkgVesting] = await Promise.all([
-              hubContract.getUserDashboard(memberAddr).catch(() => null),
-              hubContract.referralVesting(memberAddr).catch(() => null),
-              hubContract.packageVesting(memberAddr).catch(() => null),
-            ]);
-            return { memberAddr, meta, mDash, mRefVesting, mPkgVesting };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      for (const item of membersData) {
-        if (!item || !item.mDash) continue;
-        const { memberAddr, meta, mDash, mRefVesting, mPkgVesting } = item;
-
-        const regSec = mDash.registrationTime ? Number(mDash.registrationTime.toString()) : 0;
-        const mNumericId = mDash.userId ? Number(mDash.userId.toString()) : 0;
-        const mId = mNumericId > 0 ? toHumanFacingId(mNumericId) : `Member ••••${memberAddr.slice(-4)}`;
-        const activePkgs = mDash.activePackageCount ? Number(mDash.activePackageCount.toString()) : 0;
-
-        const refClaimed = mDash.referralTotalClaimed ? Number(ethers.formatUnits(mDash.referralTotalClaimed.toString(), 18)) : 0;
-        const pkgClaimed = mDash.packageTotalClaimed ? Number(ethers.formatUnits(mDash.packageTotalClaimed.toString(), 18)) : 0;
-        const mRefLastClaim = mRefVesting?.lastClaimTimestamp ? Number(mRefVesting.lastClaimTimestamp.toString()) : 0;
-        const mPkgLastClaim = mPkgVesting?.lastClaimTimestamp ? Number(mPkgVesting.lastClaimTimestamp.toString()) : 0;
-
-        const timeStr = formatPremiumDate(regSec);
-        const teamLabel = meta.isDirect ? 'Direct partner' : 'Team member';
-
-        // Member Registration
-        realTransactions.push({
-          id: `team-reg-${memberAddr}`,
-          memberWallet: memberAddr,
-          userId: mId,
-          packageAmount: 'Node Registered',
-          amount: 'Node Registered',
-          status: 'Confirmed',
-          txHash: `0xnode${memberAddr.slice(2, 10)}`,
-          blockNumber: 0,
-          date: timeStr,
-          activityType: 'Team Member Registration',
-          details: `${teamLabel} ${mId} registered under sponsor ${meta.sponsorId}`,
+          details: `Package staking yield claimed on smart contract by ${displayUserId}`,
           timestamp: timeStr,
           isRealData: true,
-          rawTime: regSec,
+          rawTime: blockTimestamp,
         });
+      }
 
-        // Member Genesis Mint
+      // Parse PackageActivatedDetailed Events
+      for (const evt of pkgActivatedEvents) {
+        const parsed = evt as ethers.EventLog;
+        if (!parsed.args) continue;
+
+        const userAddr = String(parsed.args.user || '').toLowerCase();
+        if (!trackedWallets.has(userAddr)) continue;
+
+        const key = `${parsed.transactionHash}-${parsed.index}`;
+        if (seenLogKeys.has(key)) continue;
+        seenLogKeys.add(key);
+
+        const rawPkgAmt = Number(parsed.args.packageAmount?.toString() || 0);
+        const blockTimestamp = await this.getBlockTimestamp(provider, parsed.blockNumber);
+        const timeStr = formatPremiumDate(blockTimestamp);
+        const displayUserId = trackedWallets.get(userAddr) || userAddr;
+
         realTransactions.push({
-          id: `team-mint-${memberAddr}`,
-          memberWallet: memberAddr,
-          userId: mId,
-          packageAmount: `+${dynamicRegReward} MBTTC`,
-          amount: `+${dynamicRegReward} MBTTC`,
+          id: `onchain-pkgact-${key}`,
+          memberWallet: userAddr,
+          userId: displayUserId,
+          packageAmount: `$${rawPkgAmt} USDT`,
+          amount: `$${rawPkgAmt} USDT`,
           status: 'Confirmed',
-          txHash: `0xmint${memberAddr.slice(2, 10)}`,
-          blockNumber: 0,
+          txHash: parsed.transactionHash,
+          blockNumber: parsed.blockNumber,
+          logIndex: parsed.index,
           date: timeStr,
-          activityType: 'MBTTC Genesis Mint',
-          details: `Genesis welcome ${dynamicRegReward} MBTTC minted to ${mId}`,
+          activityType: 'Team Package Activation',
+          details: `Partner ${displayUserId} activated node package ($${rawPkgAmt} USDT)`,
           timestamp: timeStr,
           isRealData: true,
-          rawTime: regSec + 1,
+          rawTime: blockTimestamp,
         });
-
-        // Sponsor Referral Addition (Direct Only)
-        if (meta.isDirect && Number(dynamicRefReward) > 0) {
-          realTransactions.push({
-            id: `team-sponsor-ref-${memberAddr}`,
-            memberWallet: targetWallet,
-            userId: selfId,
-            packageAmount: `+${dynamicRefReward} MBTTC`,
-            amount: `+${dynamicRefReward} MBTTC`,
-            status: 'Confirmed',
-            txHash: `0xrefbonus${memberAddr.slice(2, 10)}`,
-            blockNumber: 0,
-            date: timeStr,
-            activityType: 'MBTTC Referral Pool Addition',
-            details: `Direct invite reward +${dynamicRefReward} MBTTC added to referral pool (${mId})`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec + 2,
-          });
-        }
-
-        // Package Activation Event
-        if (activePkgs > 0) {
-          realTransactions.push({
-            id: `team-pkg-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: 'Node Active',
-            amount: 'Node Active',
-            status: 'Confirmed',
-            txHash: `0xpkg${memberAddr.slice(2, 10)}`,
-            blockNumber: 0,
-            date: timeStr,
-            activityType: 'Team Package Activation',
-            details: `Partner ${mId} activated node package on smart contract`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec + 10,
-          });
-        }
-
-        // Team Member Referral Claim
-        if (refClaimed > 0 && mRefLastClaim > 0) {
-          const mClaimDateStr = formatPremiumDate(mRefLastClaim);
-          realTransactions.push({
-            id: `team-claim-ref-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: `+${refClaimed.toFixed(2)} MBTTC`,
-            amount: `+${refClaimed.toFixed(2)} MBTTC`,
-            status: 'Confirmed',
-            txHash: `0xclaimref${memberAddr.slice(2, 10)}`,
-            blockNumber: 0,
-            date: mClaimDateStr,
-            activityType: 'MBTTC Referral Pool Claim',
-            details: `Referral yield claimed to wallet by partner ${mId}`,
-            timestamp: mClaimDateStr,
-            isRealData: true,
-            rawTime: mRefLastClaim,
-          });
-        }
-
-        // Team Member Package Claim
-        if (pkgClaimed > 0 && mPkgLastClaim > 0) {
-          const mPkgClaimDateStr = formatPremiumDate(mPkgLastClaim);
-          realTransactions.push({
-            id: `team-claim-pkg-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: `+${pkgClaimed.toFixed(2)} MBTTC`,
-            amount: `+${pkgClaimed.toFixed(2)} MBTTC`,
-            status: 'Confirmed',
-            txHash: `0xclaimpkg${memberAddr.slice(2, 10)}`,
-            blockNumber: 0,
-            date: mPkgClaimDateStr,
-            activityType: 'MBTTC Package Pool Claim',
-            details: `Package yield claimed to wallet by partner ${mId}`,
-            timestamp: mPkgClaimDateStr,
-            isRealData: true,
-            rawTime: mPkgLastClaim,
-          });
-        }
       }
 
-      // Fast Light Query for latest Claim Logs (500 blocks only to avoid any RPC timeout)
-      try {
-        const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 500);
-
-        const refClaimLogs = await hubContract.queryFilter(hubContract.filters.ReferralClaimed(), fromBlock, 'latest').catch(() => []);
-        for (const log of refClaimLogs) {
-          const parsed = log as any;
-          const leaderAddr = String(parsed.args?.leader || '').toLowerCase();
-          if (teamMap.has(leaderAddr) || leaderAddr === targetWallet.toLowerCase()) {
-            const claimedWei = BigInt(parsed.args?.amount?.toString() || '0');
-            if (claimedWei > 0n) {
-              const claimedFormatted = Number(ethers.formatUnits(claimedWei, 18)).toFixed(2);
-              const bTime = await this.getBlockTimestamp(provider, parsed.blockNumber);
-              const dStr = formatPremiumDate(bTime);
-              const userLabel = leaderAddr === targetWallet.toLowerCase() ? selfId : (teamMap.get(leaderAddr)?.sponsorId || leaderAddr);
-
-              // Remove existing summary card if exact event is present
-              const existingIdx = realTransactions.findIndex(t => t.id === `self-claim-ref-${leaderAddr}` || t.id === `team-claim-ref-${leaderAddr}`);
-              if (existingIdx !== -1) realTransactions.splice(existingIdx, 1);
-
-              realTransactions.push({
-                id: `claim-event-${parsed.transactionHash}-${parsed.index}`,
-                memberWallet: leaderAddr,
-                userId: userLabel,
-                packageAmount: `+${claimedFormatted} MBTTC`,
-                amount: `+${claimedFormatted} MBTTC`,
-                status: 'Confirmed',
-                txHash: parsed.transactionHash,
-                blockNumber: parsed.blockNumber,
-                date: dStr,
-                activityType: 'MBTTC Referral Pool Claim',
-                details: `Referral yield claimed to wallet by ${userLabel}`,
-                timestamp: dStr,
-                isRealData: true,
-                rawTime: bTime,
-              });
-            }
-          }
+      // Sort Newest First (blockNumber DESC, logIndex DESC)
+      realTransactions.sort((a, b) => {
+        if (b.blockNumber !== a.blockNumber) {
+          return b.blockNumber - a.blockNumber;
         }
-      } catch {}
-
-      if (realTransactions.length > 0) {
-        // Sort Newest First
-        realTransactions.sort((a, b) => b.rawTime - a.rawTime);
-        return {
-          isRealData: true,
-          transactions: realTransactions.map(({ rawTime, blockNumber, ...record }) => record),
-        };
-      }
+        return b.logIndex - a.logIndex;
+      });
 
       return {
         isRealData: true,
-        transactions: [],
+        transactions: realTransactions.map(({ rawTime, blockNumber, logIndex, ...record }) => record),
       };
     } catch (err) {
-      console.error('[MDefiHub] Activity resolution error:', err);
+      console.error('[MDefiHub] Event log processing failed:', err);
       return {
         isRealData: false,
         transactions: [],
