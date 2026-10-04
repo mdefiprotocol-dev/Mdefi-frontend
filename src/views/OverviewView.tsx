@@ -888,7 +888,7 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
       </div>
 
       {/* 9. COMMUNITY FEEDS & REPUTATION */}
-      <CommunityActivityFeed onNavigate={onNavigate} userActivities={activities} />
+      <CommunityActivityFeed onNavigate={onNavigate} userActivities={activities} walletAddress={user.walletAddress} />
       <CommunityRatingSection userWallet={user.walletAddress} />
     </div>
   );

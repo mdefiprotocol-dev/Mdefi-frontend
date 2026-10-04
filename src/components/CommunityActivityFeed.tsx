@@ -37,6 +37,7 @@ export type ActivityCategory =
 interface CommunityActivityFeedProps {
   onNavigate: (page: NavPage) => void;
   userActivities?: ActivityItem[];
+  walletAddress?: string;
 }
 
 export interface ResolvedActivityVisual {
@@ -228,6 +229,7 @@ function formatShortAddressWithDots(address?: string): string {
 export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
   onNavigate,
   userActivities = [],
+  walletAddress = '',
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<ActivityCategory>('ALL');
@@ -254,18 +256,20 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     if (isInitial) {
       setIsLoading(true);
     }
-    let activeWallet: string = '';
+    
+    // Priority 1: Direct Prop Pass
+    let activeWallet: string = (walletAddress && walletAddress.startsWith('0x')) ? walletAddress.toLowerCase() : '';
 
-    if (typeof window !== 'undefined') {
-      // 1. Direct ContractAdapter Check (Phone / Tablet / Chrome)
+    if (!activeWallet && typeof window !== 'undefined') {
+      // Priority 2: ContractAdapter Global Memory
       try {
-        const adw = (contractAdapter as any)?.getActiveWallet?.();
+        const adw = (contractAdapter as any)?.getActiveWallet?.() || (contractAdapter as any)?.currentWallet;
         if (typeof adw === 'string' && adw.startsWith('0x')) {
           activeWallet = adw.toLowerCase();
         }
       } catch {}
 
-      // 2. Injected Web3 Provider Check (Trust Wallet, MetaMask DApp)
+      // Priority 3: Injected Provider
       if (!activeWallet) {
         const eth = (window as any).ethereum;
         if (typeof eth?.selectedAddress === 'string') {
@@ -275,50 +279,26 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         }
       }
 
-      // 3. Multi-Store Sweep (Chrome, Telegram, WalletConnect, Wagmi)
+      // Priority 4: All localStorage Stores (Wagmi, Web3Modal, AppKit)
       if (!activeWallet) {
-        const keysToTry: string[] = [
-          'mdefi_user_wallet',
-          'walletAddress',
-          'wagmi.store',
-          'wagmi.connected',
-          'walletconnect',
-          'wc@2:client:0.3//session'
-        ];
-        for (let i = 0; i < keysToTry.length; i++) {
+        for (let i = 0; i < localStorage.length; i++) {
           try {
-            const raw = localStorage.getItem(keysToTry[i]);
-            if (!raw) continue;
-            const clean = raw.trim();
-            if (clean.startsWith('0x') && clean.length === 42) {
-              activeWallet = clean.toLowerCase();
-              break;
-            }
-            const matched = clean.match(/0x[a-fA-F0-9]{40}/);
-            if (matched && matched[0]) {
-              activeWallet = matched[0].toLowerCase();
+            const key = localStorage.key(i) || '';
+            const val = localStorage.getItem(key) || '';
+            if (val.length < 42) continue;
+            const match = val.match(/0x[a-fA-F0-9]{40}/);
+            if (match && match[0]) {
+              activeWallet = match[0].toLowerCase();
               break;
             }
           } catch {}
         }
       }
-
-      // 4. Header UI Fallback (Screen par connected wallet button se direct sync)
-      if (!activeWallet && typeof document !== 'undefined') {
-        try {
-          const headerBtn = document.querySelector('button[class*="font-mono"], [data-testid="connect-button"]');
-          const txt = headerBtn?.textContent || '';
-          const matched = txt.match(/0x[a-fA-F0-9]{40}/);
-          if (matched && matched[0]) {
-            activeWallet = matched[0].toLowerCase();
-          }
-        } catch {}
-      }
     }
 
     try {
       const res = await mdefiService.getTeamTransactions(activeWallet);
-      if (res && Array.isArray(res.transactions)) {
+      if (res && Array.isArray(res.transactions) && res.transactions.length > 0) {
         const mapped: ActivityItem[] = res.transactions.map((tx) => {
           const actLower = (tx.activityType || '').toLowerCase();
           const amtLower = (tx.amount || '').toLowerCase();
@@ -360,14 +340,12 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [walletAddress]);
 
-  // Initial load
   useEffect(() => {
     loadOnChainFeed(true);
   }, [loadOnChainFeed]);
 
-  // Silent sync with fast delay catchers for Chrome/Telegram
   useEffect(() => {
     const unsubscribeAdapter = contractAdapter.onDataRefresh(() => {
       loadOnChainFeed(false);
@@ -379,10 +357,10 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
 
     const timer1 = setTimeout(() => {
       loadOnChainFeed(false);
-    }, 700);
+    }, 800);
     const timer2 = setTimeout(() => {
       loadOnChainFeed(false);
-    }, 2000);
+    }, 2200);
 
     return () => {
       clearTimeout(timer1);
