@@ -100,7 +100,7 @@ export class MDefiHubMockService implements IMDefiHubService {
   }
 
   private getEffectiveWallet(override?: string): string {
-    if (override && ethers.isAddress(override)) {
+    if (override && typeof override === 'string' && ethers.isAddress(override)) {
       return override.toLowerCase();
     }
     if (this.activeWalletAddress && ethers.isAddress(this.activeWalletAddress)) {
@@ -108,18 +108,34 @@ export class MDefiHubMockService implements IMDefiHubService {
     }
     if (typeof window !== 'undefined') {
       const eth = (window as any).ethereum;
-      if (eth?.accounts && Array.isArray(eth.accounts) && eth.accounts[0] && ethers.isAddress(eth.accounts[0])) {
-        return eth.accounts[0].toLowerCase();
-      }
-      if (eth?.selectedAddress && ethers.isAddress(eth.selectedAddress)) {
+      if (eth?.selectedAddress && typeof eth.selectedAddress === 'string' && ethers.isAddress(eth.selectedAddress)) {
         return eth.selectedAddress.toLowerCase();
       }
-      try {
-        const cached = localStorage.getItem('mdefi_user_wallet') || localStorage.getItem('walletAddress') || '';
-        if (cached && ethers.isAddress(cached)) {
-          return cached.toLowerCase();
-        }
-      } catch {}
+      if (eth?.accounts && Array.isArray(eth.accounts) && eth.accounts[0] && typeof eth.accounts[0] === 'string' && ethers.isAddress(eth.accounts[0])) {
+        return eth.accounts[0].toLowerCase();
+      }
+
+      // Multi-wallet resolution (Chrome, Telegram, WalletConnect)
+      const keys = ['mdefi_user_wallet', 'walletAddress', 'wagmi.store', 'walletconnect', 'mdefi_active_account'];
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          const rawItem: any = localStorage.getItem(keys[i]);
+          if (!rawItem || typeof rawItem !== 'string') continue;
+
+          const trimmed: any = rawItem.trim();
+          if (typeof trimmed === 'string' && ethers.isAddress(trimmed)) {
+            return (trimmed as string).toLowerCase();
+          }
+
+          if (typeof trimmed === 'string' && trimmed[0] === '{') {
+            const parsed: any = JSON.parse(trimmed);
+            const rawAddr: any = parsed?.state?.data?.account || parsed?.accounts?.[0] || parsed?.activeWallet;
+            if (rawAddr && typeof rawAddr === 'string' && ethers.isAddress(rawAddr)) {
+              return rawAddr.toLowerCase();
+            }
+          }
+        } catch {}
+      }
     }
     return '';
   }
@@ -184,6 +200,17 @@ export class MDefiHubMockService implements IMDefiHubService {
     transactions: TeamTransactionRecord[];
   }> {
     let targetWallet = this.getEffectiveWallet(walletAddress);
+
+    // Chrome WalletConnect Fallback (DOM Header Match)
+    if ((!targetWallet || !ethers.isAddress(targetWallet)) && typeof window !== 'undefined') {
+      try {
+        const rawWagmi = localStorage.getItem('wagmi.store') || '';
+        const matched = rawWagmi.match(/0x[a-fA-F0-9]{40}/);
+        if (matched && ethers.isAddress(matched[0])) {
+          targetWallet = matched[0].toLowerCase();
+        }
+      } catch {}
+    }
 
     if (!targetWallet && typeof window !== 'undefined' && (window as any).ethereum?.request) {
       try {
@@ -453,9 +480,30 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawTime: regSec,
           });
         }
+
+        // On-chain Direct Partner Referral Claim Card
+        const mRefClaimedWei = mDash.referralTotalClaimed ? BigInt(mDash.referralTotalClaimed.toString()) : 0n;
+        if (mRefClaimedWei > 0n) {
+          const mClaimFormatted = Number(ethers.formatUnits(mRefClaimedWei, 18)).toFixed(2);
+          realTransactions.push({
+            id: `team-claim-${memberAddr}`,
+            memberWallet: memberAddr,
+            userId: mId,
+            packageAmount: `+${mClaimFormatted} MBTTC`,
+            amount: `+${mClaimFormatted} MBTTC`,
+            status: 'Confirmed',
+            txHash: buildTxHash(memberAddr, 'CLAIM_REF_PARTNER', regSec),
+            date: timeStr,
+            activityType: 'MBTTC Referral Pool Claim',
+            details: `Partner ${mId} claimed ${mClaimFormatted} MBTTC referral yield on-chain`,
+            timestamp: timeStr,
+            isRealData: true,
+            rawTime: regSec + 5,
+          });
+        }
       }
 
-      // 4. Har individual claim ka alag card (LocalStorage + Memory Sync)
+      // 4. Har individual claim ka alag card (LocalStorage + Memory Sync + Fallback)
       if (typeof window !== 'undefined') {
         try {
           const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
@@ -470,13 +518,37 @@ export class MDefiHubMockService implements IMDefiHubService {
         } catch {}
       }
 
-      // Har claim ka exact receipt card attach karein
+      // Live claim receipts attach karein
       this.liveClaimReceipts.forEach((receipt) => {
         const receiptHash = (receipt.txHash || '').toLowerCase();
         if (receiptHash && !realTransactions.some((tx) => (tx.txHash || '').toLowerCase() === receiptHash)) {
           realTransactions.unshift(receipt);
         }
       });
+
+      // Self on-chain claim verified presence fallback (Agar local cache clear ho jaye)
+      const selfTotalClaimedWei = selfDash?.referralTotalClaimed ? BigInt(selfDash.referralTotalClaimed.toString()) : 0n;
+      const hasSelfReceipt = realTransactions.some((tx) => 
+        (tx.activityType || '').includes('Claim') && (tx.memberWallet || '').toLowerCase() === targetWallet.toLowerCase()
+      );
+      if (selfTotalClaimedWei > 0n && !hasSelfReceipt) {
+        const fallbackFormatted = Number(ethers.formatUnits(selfTotalClaimedWei, 18)).toFixed(2);
+        realTransactions.push({
+          id: `self-claim-onchain-${targetWallet}`,
+          memberWallet: targetWallet,
+          userId: selfId,
+          packageAmount: `+${fallbackFormatted} MBTTC`,
+          amount: `+${fallbackFormatted} MBTTC`,
+          status: 'Confirmed',
+          txHash: buildTxHash(targetWallet, 'SELF_CLAIM_VERIFIED', selfRegSec),
+          date: formattedSelfTime,
+          activityType: 'MBTTC Referral Pool Claim',
+          details: `Referral yield claimed to wallet by ${selfId}`,
+          timestamp: formattedSelfTime,
+          isRealData: true,
+          rawTime: selfRegSec + 5,
+        });
+      }
 
       if (realTransactions.length > 0) {
         realTransactions.sort((a, b) => b.rawTime - a.rawTime);

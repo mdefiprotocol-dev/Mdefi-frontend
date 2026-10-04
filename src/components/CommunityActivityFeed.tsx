@@ -257,10 +257,39 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     let activeWallet = '';
     if (typeof window !== 'undefined') {
       const eth = (window as any).ethereum;
-      if (eth?.selectedAddress) activeWallet = eth.selectedAddress;
-      else if (eth?.accounts && eth.accounts[0]) activeWallet = eth.accounts[0];
-      else {
-        activeWallet = localStorage.getItem('mdefi_user_wallet') || localStorage.getItem('walletAddress') || '';
+      if (eth?.selectedAddress && typeof eth.selectedAddress === 'string') {
+        activeWallet = eth.selectedAddress;
+      } else if (eth?.accounts && eth.accounts[0]) {
+        activeWallet = eth.accounts[0];
+      }
+
+      // 2. Chrome / WalletConnect Multi-Store Sweep
+      if (!activeWallet || !activeWallet.startsWith('0x')) {
+        const keysToTry = [
+          'mdefi_user_wallet',
+          'walletAddress',
+          'wagmi.store',
+          'wagmi.connected',
+          'walletconnect',
+          'wc@2:client:0.3//session'
+        ];
+        for (const k of keysToTry) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (!raw) continue;
+            if (raw.startsWith('0x') && raw.length === 42) {
+              activeWallet = raw;
+              break;
+            }
+            if (raw.includes('0x')) {
+              const matched = raw.match(/0x[a-fA-F0-9]{40}/);
+              if (matched && matched[0]) {
+                activeWallet = matched[0];
+                break;
+              }
+            }
+          } catch {}
+        }
       }
     }
 
@@ -310,12 +339,12 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     }
   }, []);
 
-  // पहली बार लोड होने पर ही लोडिंग दिखेगी
+  // First mount load
   useEffect(() => {
     loadOnChainFeed(true);
   }, [loadOnChainFeed]);
 
-  // रियल-टाइम ऑटो रिफ्रेश: साइलेंट रहेगा, चकरी नहीं घूमेगी
+  // Background Live Sync (Silent, no spinner flicker)
   useEffect(() => {
     const unsubscribeAdapter = contractAdapter.onDataRefresh(() => {
       loadOnChainFeed(false);
@@ -324,7 +353,13 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       ? (mdefiService as any).onFeedRefresh(() => loadOnChainFeed(false))
       : () => {};
 
+    // Auto wallet re-check for Telegram / Chrome delay injection
+    const timer = setTimeout(() => {
+      loadOnChainFeed(false);
+    }, 1200);
+
     return () => {
+      clearTimeout(timer);
       unsubscribeAdapter();
       unsubscribeService();
     };
