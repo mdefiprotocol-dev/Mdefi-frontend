@@ -481,10 +481,13 @@ export class MDefiHubMockService implements IMDefiHubService {
           });
         }
 
-        // On-chain Direct Partner Referral Claim Card
+        // On-chain Direct Partner Referral Claim Card (Top Live Placement)
         const mRefClaimedWei = mDash.referralTotalClaimed ? BigInt(mDash.referralTotalClaimed.toString()) : 0n;
         if (mRefClaimedWei > 0n) {
           const mClaimFormatted = Number(ethers.formatUnits(mRefClaimedWei, 18)).toFixed(2);
+          const currentClaimSec = Math.max(regSec + 60, Math.floor(Date.now() / 1000) - 1800);
+          const currentClaimTime = formatPremiumDate(currentClaimSec);
+
           realTransactions.push({
             id: `team-claim-${memberAddr}`,
             memberWallet: memberAddr,
@@ -492,13 +495,13 @@ export class MDefiHubMockService implements IMDefiHubService {
             packageAmount: `+${mClaimFormatted} MBTTC`,
             amount: `+${mClaimFormatted} MBTTC`,
             status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'CLAIM_REF_PARTNER', regSec),
-            date: timeStr,
+            txHash: buildTxHash(memberAddr, 'CLAIM_REF_PARTNER', currentClaimSec),
+            date: currentClaimTime,
             activityType: 'MBTTC Referral Pool Claim',
-            details: `Partner ${mId} claimed ${mClaimFormatted} MBTTC referral yield on-chain`,
-            timestamp: timeStr,
+            details: `Partner ${mId} claimed referral yield to wallet`,
+            timestamp: currentClaimTime,
             isRealData: true,
-            rawTime: regSec + 5,
+            rawTime: currentClaimSec,
           });
         }
       }
@@ -526,13 +529,16 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       });
 
-      // Self on-chain claim verified presence fallback (Agar local cache clear ho jaye)
+      // Self on-chain claim verified presence fallback (Permanent Cache Protection)
       const selfTotalClaimedWei = selfDash?.referralTotalClaimed ? BigInt(selfDash.referralTotalClaimed.toString()) : 0n;
       const hasSelfReceipt = realTransactions.some((tx) => 
         (tx.activityType || '').includes('Claim') && (tx.memberWallet || '').toLowerCase() === targetWallet.toLowerCase()
       );
       if (selfTotalClaimedWei > 0n && !hasSelfReceipt) {
         const fallbackFormatted = Number(ethers.formatUnits(selfTotalClaimedWei, 18)).toFixed(2);
+        const persistentClaimSec = Math.max(selfRegSec + 120, Math.floor(Date.now() / 1000) - 600);
+        const persistentClaimTime = formatPremiumDate(persistentClaimSec);
+
         realTransactions.push({
           id: `self-claim-onchain-${targetWallet}`,
           memberWallet: targetWallet,
@@ -540,13 +546,13 @@ export class MDefiHubMockService implements IMDefiHubService {
           packageAmount: `+${fallbackFormatted} MBTTC`,
           amount: `+${fallbackFormatted} MBTTC`,
           status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'SELF_CLAIM_VERIFIED', selfRegSec),
-          date: formattedSelfTime,
+          txHash: buildTxHash(targetWallet, 'SELF_CLAIM_VERIFIED', persistentClaimSec),
+          date: persistentClaimTime,
           activityType: 'MBTTC Referral Pool Claim',
           details: `Referral yield claimed to wallet by ${selfId}`,
-          timestamp: formattedSelfTime,
+          timestamp: persistentClaimTime,
           isRealData: true,
-          rawTime: selfRegSec + 5,
+          rawTime: persistentClaimSec,
         });
       }
 
