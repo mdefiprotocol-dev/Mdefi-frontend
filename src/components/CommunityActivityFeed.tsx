@@ -250,8 +250,10 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     return () => mediaQuery.removeEventListener('change', listener);
   }, []);
 
-  const loadOnChainFeed = useCallback(async () => {
-    setIsLoading(true);
+  const loadOnChainFeed = useCallback(async (isInitial: boolean = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+    }
     let activeWallet = '';
     if (typeof window !== 'undefined') {
       const eth = (window as any).ethereum;
@@ -302,21 +304,24 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     } catch (err) {
       console.warn('[CommunityActivityFeed] Live fetch error:', err);
     } finally {
-      setIsLoading(false);
+      if (isInitial) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
+  // पहली बार लोड होने पर ही लोडिंग दिखेगी
   useEffect(() => {
-    loadOnChainFeed();
+    loadOnChainFeed(true);
   }, [loadOnChainFeed]);
 
-  // Real-time link: contractAdapter refresh triggers feed reload
+  // रियल-टाइम ऑटो रिफ्रेश: साइलेंट रहेगा, चकरी नहीं घूमेगी
   useEffect(() => {
     const unsubscribeAdapter = contractAdapter.onDataRefresh(() => {
-      loadOnChainFeed();
+      loadOnChainFeed(false);
     });
     const unsubscribeService = (mdefiService as any).onFeedRefresh 
-      ? (mdefiService as any).onFeedRefresh(() => loadOnChainFeed())
+      ? (mdefiService as any).onFeedRefresh(() => loadOnChainFeed(false))
       : () => {};
 
     return () => {

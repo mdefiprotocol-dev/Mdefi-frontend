@@ -75,10 +75,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      // 15 सेकंड का शांत बैकग्राउंड टाइमर
+      // Clear interval on unmount / safe timer (20s)
       this.autoRefreshTimer = setInterval(() => {
         this.notifyFeedSubscribers();
-      }, 15000);
+      }, 20000);
     }
   }
 
@@ -215,7 +215,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         return `${date} · ${time}`;
       };
 
-      // 1. प्राथमिक स्टेट और कॉन्ट्रैक्ट फेज़ रिवॉर्ड्स लोड करें
+      // 1. प्राथमिक स्टेट और फेज़ रिवॉर्ड्स लोड करें (Zero Fake Accumulator Card)
       const [selfDash, selfNode, phaseRewards] = await Promise.all([
         hubContract.getUserDashboard(targetWallet).catch(() => null),
         hubContract.getUserNode(targetWallet).catch(() => null),
@@ -455,17 +455,22 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       }
 
-      // 4. वास्तविक अलग-अलग क्लेम रसीदें लोड करें (कोई लाइफटाइम टोटल सम नहीं)
-      if (typeof window !== 'undefined' && this.liveClaimReceipts.length === 0) {
+      // 4. Har individual claim ka alag card (LocalStorage + Memory Sync)
+      if (typeof window !== 'undefined') {
         try {
           const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
           if (Array.isArray(cached) && cached.length > 0) {
-            this.liveClaimReceipts = cached;
+            cached.forEach((item: LedgerItem) => {
+              const itemHash = (item.txHash || '').toLowerCase();
+              if (itemHash && !this.liveClaimReceipts.some((r) => (r.txHash || '').toLowerCase() === itemHash)) {
+                this.liveClaimReceipts.push(item);
+              }
+            });
           }
         } catch {}
       }
 
-      // प्रत्येक क्लेम रसीद अलग-अलग कार्ड के रूप में सबसे ऊपर जुड़ेगी
+      // Har claim ka exact receipt card attach karein
       this.liveClaimReceipts.forEach((receipt) => {
         const receiptHash = (receipt.txHash || '').toLowerCase();
         if (receiptHash && !realTransactions.some((tx) => (tx.txHash || '').toLowerCase() === receiptHash)) {
