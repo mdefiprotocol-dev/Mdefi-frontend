@@ -490,7 +490,8 @@ export class MDefiHubMockService implements IMDefiHubService {
             (r) => (r.memberWallet || '').toLowerCase() === memberAddr.toLowerCase() && (r.activityType || '').includes('Claim')
           );
           
-          let displayAmt = cachedMatch ? cachedMatch.amount : `+${totalClaimNum.toFixed(2)} MBTTC`;
+          // Contract claim amount: agar individual cached receipt hai to exact amount, warna live confirmed claim amount
+          let displayAmt = cachedMatch?.amount || (mDash.lastClaimedAmount ? `+${Number(ethers.formatUnits(mDash.lastClaimedAmount, 18)).toFixed(2)} MBTTC` : `+${totalClaimNum.toFixed(2)} MBTTC`);
           const currentClaimSec = cachedMatch?.rawTime || Math.max(regSec + 60, Math.floor(Date.now() / 1000) - 1800);
           const currentClaimTime = formatPremiumDate(currentClaimSec);
 
@@ -550,7 +551,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       } else if (selfTotalClaimedWei > 0n) {
         // Sirf tab fallback banega jab local storage bilkul empty ho chuki ho
-        const fallbackFormatted = Number(ethers.formatUnits(selfTotalClaimedWei, 18)).toFixed(2);
+        // Authentic On-chain Contract Claim Value (Lifetime cumulative sum na dikhe)
+        const fallbackFormatted = selfDash?.lastClaimedAmount 
+          ? Number(ethers.formatUnits(selfDash.lastClaimedAmount, 18)).toFixed(2) 
+          : (selfTotalClaimedWei > 0n ? Number(ethers.formatUnits(selfTotalClaimedWei, 18)).toFixed(2) : '0.00');
         const persistentClaimSec = Math.max(selfRegSec + 120, Math.floor(Date.now() / 1000) - 600);
         const persistentClaimTime = formatPremiumDate(persistentClaimSec);
 
