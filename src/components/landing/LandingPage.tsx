@@ -189,20 +189,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     setIsWalletConnected(true);
     setShowWalletModal(false);
 
-    // Tablet Device Detection (Screen Width 768px-1024px ya Tablet UserAgent)
-    const isTabletDevice = (typeof window !== 'undefined') && (
-      (window.innerWidth >= 768 && window.innerWidth <= 1024) ||
-      /iPad|tablet|(android(?!.*mobile))/i.test(navigator.userAgent)
-    );
-
-    // Agar Tablet hai aur user ne Login dabaya hai: 
-    // Direct Login Modal khulega ("ENTER WITH CONNECTED WALLET" button ke sath) bina blocking call ke
-    if (isTabletDevice && walletModalAction === 'login') {
-      setShowRegisterModal(false);
-      setShowLoginModal(true);
-      return;
-    }
-
     // Phone aur Laptop ke liye wahi purana verified flow (100% UNTOUCHED):
     const isReg = await checkRegistrationStatus(cleanAddr);
 
