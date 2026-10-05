@@ -44,7 +44,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     return formatCompactAddress(addr);
   };
 
-// 1. Web3 Wallet Login Guard (On-chain check - Universal Multi-Device Guard)
+// 1. Web3 Wallet Login Guard (On-chain check with Smooth Loading Buffer)
   const handleWalletLogin = async () => {
     setErrorMsg('');
     setIsNotRegistered(false);
@@ -56,10 +56,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       return;
     }
 
+    // Step 1: Pehle spinner loader show karein
     setIsVerifying(true);
 
     try {
-      // Triple on-chain verification fallback (Tablet & DApp Browser safe)
+      // Step 2: DApp Browser aur Tablet RPC ke liye thoda loading buffer (800ms) taaki call smoothly resolve ho
+      await new Promise((res) => setTimeout(res, 800));
+
+      // Step 3: On-chain parallel verify call
       const [node, userDash, resolverCheck] = await Promise.all([
         contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
         contractAdapter.getHubUserData(cleanWallet).catch(() => null),
@@ -71,13 +75,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       const nodeNumericId = Number(rawNode.id ?? rawNode[0] ?? 0);
       const resolverNumericId = Number(resolverCheck?.numericId || 0);
 
-      // Kisi bhi source se valid on-chain numeric ID ya registration flag milne par accept karein
+      // Kisi bhi source se ID mili ya registered flag mila
       const resolvedId = nodeNumericId > 0 
         ? nodeNumericId 
         : (dashNumericId > 0 ? dashNumericId : resolverNumericId);
 
       const isReg = Boolean(rawNode.isRegistered || resolvedId > 0 || (resolverCheck?.isValid && resolverNumericId > 0));
 
+      // Root Admin (ID 1) ya registered user check
       if (resolvedId === 0 && !isReg) {
         setIsNotRegistered(true);
         setErrorMsg('Account not registered on-chain. Please complete registration first.');
@@ -92,6 +97,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         return;
       }
 
+      // Step 4: Success - seedha dashboard me login handover
       setIsVerifying(false);
       onLoginSuccess(cleanWallet);
     } catch (err: any) {
