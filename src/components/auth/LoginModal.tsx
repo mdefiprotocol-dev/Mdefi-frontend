@@ -49,7 +49,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorMsg('');
     setIsNotRegistered(false);
 
-    // एड्रेस की क्लीनिंग (DApp Browser / WalletConnect / Tablet सपोर्ट)
     const cleanWallet = (connectedWalletAddress || '').trim().toLowerCase();
 
     if (!cleanWallet || cleanWallet.length < 42) {
@@ -60,21 +59,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsVerifying(true);
 
     try {
-      // डुअल ऑन-चेन पैरेलल चेक (टैबलेट या स्लो नेटवर्क में कॉल ड्रॉप न हो)
-      const [node, userDash] = await Promise.all([
+      // Triple on-chain verification fallback (Tablet & DApp Browser safe)
+      const [node, userDash, resolverCheck] = await Promise.all([
         contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
         contractAdapter.getHubUserData(cleanWallet).catch(() => null),
+        sponsorIdResolver.resolveSponsorNumericId(cleanWallet).catch(() => null),
       ]);
 
       const rawNode = (node || {}) as any;
       const dashNumericId = Number((userDash as any)?.numericId || 0);
       const nodeNumericId = Number(rawNode.id ?? rawNode[0] ?? 0);
-      
-      // किसी भी ऑन-चेन सोर्स से ID मिली तो यूजर रजिस्टर्ड है
-      const resolvedId = nodeNumericId > 0 ? nodeNumericId : dashNumericId;
-      const isReg = Boolean(rawNode.isRegistered || resolvedId > 0);
+      const resolverNumericId = Number(resolverCheck?.numericId || 0);
 
-      // अगर कॉन्ट्रैक्ट में बिल्कुल नया एड्रेस है (ID = 0 और Unregistered)
+      // Kisi bhi source se valid on-chain numeric ID ya registration flag milne par accept karein
+      const resolvedId = nodeNumericId > 0 
+        ? nodeNumericId 
+        : (dashNumericId > 0 ? dashNumericId : resolverNumericId);
+
+      const isReg = Boolean(rawNode.isRegistered || resolvedId > 0 || (resolverCheck?.isValid && resolverNumericId > 0));
+
       if (resolvedId === 0 && !isReg) {
         setIsNotRegistered(true);
         setErrorMsg('Account not registered on-chain. Please complete registration first.');
@@ -82,7 +85,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         return;
       }
 
-      // ब्लॉकचेन एडमिन ब्लॉक चेक
       const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5] ?? (userDash as any)?.isBlocked ?? false);
       if (isBlocked) {
         setErrorMsg('This wallet node has been blocked by the protocol administration.');
@@ -90,7 +92,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         return;
       }
 
-      // 100% सक्सेस - तुरंत ऑथेंटिकेटेड डैशबोर्ड पर भेजें
       setIsVerifying(false);
       onLoginSuccess(cleanWallet);
     } catch (err: any) {
