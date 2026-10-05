@@ -70,24 +70,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         sponsorIdResolver.resolveSponsorNumericId(cleanWallet).catch(() => null),
       ]);
 
-      const rawDash = (userDash || {}) as any;
       const rawNode = (node || {}) as any;
+      const dashNumericId = Number((userDash as any)?.numericId || 0);
+      const nodeNumericId = Number(rawNode.id ?? rawNode[0] ?? 0);
+      const resolverNumericId = Number(resolverCheck?.numericId || 0);
 
-      // Pure Smart Contract Wallet Verification:
-      // BscScan dashboard ke mutabiq registrationTime ya on-chain wallet match check
-      const onChainWallet = (rawDash.wallet || rawNode.wallet || '').toLowerCase();
-      const registrationTime = Number(rawDash.registrationTime || rawNode.registrationTime || 0);
-      const onChainUserId = Number(rawDash.userId ?? rawDash[0] ?? rawNode.id ?? 0);
+      // Kisi bhi source se ID mili ya registered flag mila
+      const resolvedId = nodeNumericId > 0 
+        ? nodeNumericId 
+        : (dashNumericId > 0 ? dashNumericId : resolverNumericId);
 
-      const isWalletRegistered = Boolean(
-        registrationTime > 0 || 
-        onChainUserId > 0 ||
-        (onChainWallet && onChainWallet === cleanWallet) ||
-        rawNode.isRegistered
-      );
+      const isReg = Boolean(rawNode.isRegistered || resolvedId > 0 || (resolverCheck?.isValid && resolverNumericId > 0));
 
-      // Agar smart contract par wallet ka koi on-chain record nahi mila:
-      if (!isWalletRegistered) {
+      // Root Admin (ID 1) ya registered user check
+      if (resolvedId === 0 && !isReg) {
         setIsNotRegistered(true);
         setErrorMsg('Account not registered on-chain. Please complete registration first.');
         setIsVerifying(false);
