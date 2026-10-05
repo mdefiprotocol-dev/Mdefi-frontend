@@ -86,15 +86,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     walletAddress: '',
   });
 
-  // Check on-chain registration helper
-  const checkRegistrationStatus = async (address: string): Promise<boolean> => {
+  // Check on-chain registration helper (Dual check for Tablet/Mobile)
+  const checkRegistrationStatus = async (address: string): Promise<{ isReg: boolean; userId: string; sponsorId: string }> => {
+    if (!address) return { isReg: false, userId: '', sponsorId: '' };
+    const cleanAddr = address.toLowerCase();
     try {
-      const node = await contractAdapter.getHubUserNode(address);
-      if (!node) return false;
-      const numId = Number(node.id || 0);
-      return Boolean(node.isRegistered || numId > 0);
+      const [node, dash] = await Promise.all([
+        contractAdapter.getHubUserNode(cleanAddr).catch(() => null),
+        contractAdapter.getHubUserData(cleanAddr).catch(() => null),
+      ]);
+      const rawNode = (node || {}) as any;
+      const dashId = Number((dash as any)?.numericId || 0);
+      const nodeNumId = Number(rawNode.id ?? rawNode[0] ?? dashId ?? 0);
+      const isReg = Boolean(rawNode.isRegistered || nodeNumId > 0 || dashId > 0);
+      const userId = nodeNumId > 0 ? String(nodeNumId) : (dashId > 0 ? String(dashId) : '');
+      const sponsorId = String(rawNode.upline || (dash as any)?.sponsor || '');
+      return { isReg, userId, sponsorId };
     } catch {
-      return false;
+      return { isReg: false, userId: '', sponsorId: '' };
     }
   };
 
@@ -175,34 +184,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     }
   };
 
-  // 3. WALLET CONNECTED CALLBACK: Transition with instant On-Chain Verification
+  // 3. WALLET CONNECTED CALLBACK: Instant On-Chain Verification & Direct Login
   const handleWalletConnected = async (address: string, _walletName: string) => {
-    setConnectedWallet(address);
+    const cleanAddr = address.toLowerCase();
+    setConnectedWallet(cleanAddr);
     setIsWalletConnected(true);
     setShowWalletModal(false);
 
-    const isReg = await checkRegistrationStatus(address);
+    const { isReg, userId, sponsorId } = await checkRegistrationStatus(cleanAddr);
 
-    if (walletModalAction === 'register') {
-      if (isReg) {
-        setStatusNotice({ message: 'You are already registered! Please login to your dashboard.', type: 'info' });
-        setShowLoginModal(true);
-      } else {
-        setShowRegisterModal(true);
-      }
-    } else if (walletModalAction === 'login') {
-      if (!isReg) {
-        setStatusNotice({ message: 'This wallet is not registered yet. Please register first then login.', type: 'warning' });
-        setShowRegisterModal(true);
-      } else {
-        setShowLoginModal(true);
-      }
+    if (isReg) {
+      // Agar wallet already registered hai toh chahe tablet ho ya mobile, seedha Dashboard enter hoga!
+      onEnterDashboard({
+        userId: userId || 'MDF-NODE',
+        sponsorId: sponsorId || '',
+        walletAddress: cleanAddr,
+      });
+      return;
+    }
+
+    // Sirf tab register khulega jab sach me on-chain unregistered ho
+    if (walletModalAction === 'login') {
+      setStatusNotice({ message: 'This wallet is not registered yet. Please register first then login.', type: 'warning' });
+      setShowRegisterModal(true);
     } else {
-      if (isReg) {
-        setShowLoginModal(true);
-      } else {
-        setShowRegisterModal(true);
-      }
+      setShowRegisterModal(true);
     }
   };
 
