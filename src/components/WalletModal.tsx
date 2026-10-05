@@ -16,6 +16,7 @@ import { playClaimSuccessSound } from '../utils/successSound';
 import { formatCompactAddress } from '../utils/formatAddress';
 import { connectWalletConnect } from '../services/walletConnectService';
 import { setExternalWalletProvider } from '../services/contractProvider';
+import { contractAdapter } from '../services/contractAdapter';
 
 interface EIP1193Provider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -353,8 +354,19 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           playClaimSuccessSound();
         } catch {}
 
-        successTimeoutRef.current = setTimeout(() => {
+        successTimeoutRef.current = setTimeout(async () => {
           if (activeSessionIdRef.current !== currentSessionId) return;
+          
+          // Smart Contract Multi-Device Auto-Router
+          try {
+            const clean = resolvedAddress.toLowerCase();
+            const node = await contractAdapter.getHubUserNode(clean);
+            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
+              localStorage.setItem('mdefi_user_wallet', clean);
+              localStorage.setItem('walletAddress', clean);
+            }
+          } catch {}
+
           if (onWalletConnected) {
             onWalletConnected(resolvedAddress, 'WalletConnect');
           }
@@ -362,7 +374,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             onSwitchAddress(resolvedAddress);
           }
           onClose();
-        }, 700);
+        }, 600);
         return;
       }
 
@@ -397,8 +409,19 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           playClaimSuccessSound();
         } catch {}
 
-        successTimeoutRef.current = setTimeout(() => {
+        successTimeoutRef.current = setTimeout(async () => {
           if (activeSessionIdRef.current !== currentSessionId) return;
+
+          // Smart Contract Multi-Device Auto-Router
+          try {
+            const clean = resolvedAddress.toLowerCase();
+            const node = await contractAdapter.getHubUserNode(clean);
+            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
+              localStorage.setItem('mdefi_user_wallet', clean);
+              localStorage.setItem('walletAddress', clean);
+            }
+          } catch {}
+
           if (onWalletConnected) {
             onWalletConnected(resolvedAddress, wallet.name);
           }
@@ -406,7 +429,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             onSwitchAddress(resolvedAddress);
           }
           onClose();
-        }, 700);
+        }, 600);
       } else {
         if (isMobileEnvironment()) {
           setStatusMessage(`Opening ${wallet.name} App...`);
