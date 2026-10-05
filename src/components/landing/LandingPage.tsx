@@ -259,19 +259,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
   // 8. DIRECT LOGIN COMPLETED: Enter Existing Main Dashboard (Tablet Direct Sync)
   const handleDirectLogin = async (userIdentifier: string) => {
     setShowLoginModal(false);
-    setShowRegisterModal(false);
+    const targetWallet = (connectedWallet || (userIdentifier.startsWith('0x') ? userIdentifier : '')).trim().toLowerCase();
+    
+    // Tablet/Mobile active on-chain metadata resolution
+    let resolvedUserFacingId = userIdentifier;
+    let resolvedSponsor = '';
+    try {
+      const node = await contractAdapter.getHubUserNode(targetWallet);
+      if (node && Number(node.id || 0) > 0) {
+        resolvedUserFacingId = `MDF-${node.id}`;
+        resolvedSponsor = node.upline || '';
+      }
+    } catch {}
 
-    // Wallet address resolve karein (userIdentifier 0x se shuru hota hai ya connectedWallet se)
-    const targetWallet = (
-      userIdentifier.startsWith('0x') 
-        ? userIdentifier 
-        : (connectedWallet || '')
-    ).trim().toLowerCase();
-
-    // Tablet par direct entry trigger karein
     onEnterDashboard({
-      userId: userIdentifier.startsWith('0x') ? '' : userIdentifier,
-      sponsorId: '',
+      userId: resolvedUserFacingId,
+      sponsorId: resolvedSponsor,
       walletAddress: targetWallet,
     });
   };
