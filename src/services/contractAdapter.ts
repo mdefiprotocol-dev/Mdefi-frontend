@@ -442,27 +442,31 @@ export class ContractAdapter {
     totalTeam: number;
   } | null> {
     if (!walletAddress || !ethers.isAddress(walletAddress)) return null;
+    const cleanWallet = walletAddress.toLowerCase();
 
     try {
       const provider = getContractProvider(true);
-      const node = await provider.read<any>('mdefiHub', 'getUserNode', [walletAddress]);
-      if (!node) return null;
+      const [node, dashboard] = await Promise.all([
+        provider.read<any>('mdefiHub', 'getUserNode', [cleanWallet]).catch(() => null),
+        provider.read<any>('mdefiHub', 'getUserDashboard', [cleanWallet]).catch(() => null),
+      ]);
 
-      const raw = node as any;
-      const parsedId = Number(raw.id ?? raw[0] ?? 0);
-      const parsedRegTime = Number(raw.registrationTime ?? raw[1] ?? 0);
-      const parsedIsBlocked = Boolean(raw.isBlocked ?? raw[2] ?? false);
-      const parsedIsRegistered = Boolean(raw.isRegistered ?? raw[3] ?? (parsedId > 0));
+      const raw = (node || {}) as any;
+      const dashId = dashboard?.userId ? Number(dashboard.userId.toString()) : 0;
+      const parsedId = Number(raw.id ?? raw[0] ?? dashId ?? 0);
+      const parsedRegTime = Number(raw.registrationTime ?? raw[1] ?? (dashboard?.registrationTime ? Number(dashboard.registrationTime.toString()) : 0));
+      const parsedIsBlocked = Boolean(raw.isBlocked ?? raw[2] ?? dashboard?.isBlocked ?? false);
+      const isRegisteredOnChain = parsedId > 0 || Boolean(raw.isRegistered ?? raw[3] ?? false);
 
       return {
         id: parsedId,
         registrationTime: parsedRegTime,
         isBlocked: parsedIsBlocked,
-        isRegistered: parsedIsRegistered || parsedId > 0,
-        wallet: String(raw.wallet ?? raw[4] ?? walletAddress),
-        upline: String(raw.upline ?? raw[5] ?? ''),
+        isRegistered: isRegisteredOnChain,
+        wallet: String(raw.wallet ?? raw[4] ?? cleanWallet),
+        upline: String(raw.upline ?? raw[5] ?? dashboard?.sponsor ?? ''),
         directTeam: Array.isArray(raw.directTeam ?? raw[6]) ? (raw.directTeam ?? raw[6]) : [],
-        totalTeam: Number(raw.totalTeam ?? raw[7] ?? 0),
+        totalTeam: Number(raw.totalTeam ?? raw[7] ?? (dashboard?.totalTeamCount ? Number(dashboard.totalTeamCount.toString()) : 0)),
       };
     } catch (err) {
       console.error('[ContractAdapter] getUserNode failed:', err);
@@ -501,12 +505,24 @@ export class ContractAdapter {
 
       const alphaThresholdWei = await this.getBridgeAlphaThresholdWei();
 
-      const txResult = await provider.write(
+      let txResult = await provider.write(
         'mdefiHub',
         functionName,
         [],
         alphaThresholdWei > 0n ? alphaThresholdWei.toString() : undefined
       );
+
+      // Agar mobile background sleep se session stale drop hua ho, refresh karke retry karein
+      if (!txResult.success && txResult.message?.includes('No active Web3 wallet session')) {
+        this.triggerDataRefresh();
+        const retryProvider = getContractProvider(true);
+        txResult = await retryProvider.write(
+          'mdefiHub',
+          functionName,
+          [],
+          alphaThresholdWei > 0n ? alphaThresholdWei.toString() : undefined
+        );
+      }
 
       if (!txResult.success) {
         this.setTxLifecycleState(txResult.status);

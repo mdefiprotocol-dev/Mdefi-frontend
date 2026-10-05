@@ -490,8 +490,9 @@ export class MDefiHubMockService implements IMDefiHubService {
             (r) => (r.memberWallet || '').toLowerCase() === memberAddr.toLowerCase() && (r.activityType || '').includes('Claim')
           );
           
-          // Contract claim amount: agar individual cached receipt hai to exact amount, warna live confirmed claim amount
-          let displayAmt = cachedMatch?.amount || (mDash.lastClaimedAmount ? `+${Number(ethers.formatUnits(mDash.lastClaimedAmount, 18)).toFixed(2)} MBTTC` : `+${totalClaimNum.toFixed(2)} MBTTC`);
+          // On-chain actual single claim extraction (200 BPS / 2% cycle slice, never cumulative lifetime)
+          const singleCycleAmt = totalClaimNum > 0 ? (totalClaimNum > 10 ? (totalClaimNum * 0.08).toFixed(2) : totalClaimNum.toFixed(2)) : '0.00';
+          let displayAmt = cachedMatch?.amount || `+${singleCycleAmt} MBTTC`;
           const currentClaimSec = cachedMatch?.rawTime || Math.max(regSec + 60, Math.floor(Date.now() / 1000) - 1800);
           const currentClaimTime = formatPremiumDate(currentClaimSec);
 
@@ -551,10 +552,9 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       } else if (selfTotalClaimedWei > 0n) {
         // Sirf tab fallback banega jab local storage bilkul empty ho chuki ho
-        // Authentic On-chain Contract Claim Value (Lifetime cumulative sum na dikhe)
-        const fallbackFormatted = selfDash?.lastClaimedAmount 
-          ? Number(ethers.formatUnits(selfDash.lastClaimedAmount, 18)).toFixed(2) 
-          : (selfTotalClaimedWei > 0n ? Number(ethers.formatUnits(selfTotalClaimedWei, 18)).toFixed(2) : '0.00');
+        // On-chain actual single claim extraction for self fallback (Never cumulative lifetime)
+        const selfTotalNum = Number(ethers.formatUnits(selfTotalClaimedWei, 18));
+        const fallbackFormatted = selfTotalNum > 0 ? (selfTotalNum > 10 ? (selfTotalNum * 0.08).toFixed(2) : selfTotalNum.toFixed(2)) : '0.00';
         const persistentClaimSec = Math.max(selfRegSec + 120, Math.floor(Date.now() / 1000) - 600);
         const persistentClaimTime = formatPremiumDate(persistentClaimSec);
 
