@@ -86,20 +86,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     walletAddress: '',
   });
 
-  // Check on-chain registration helper (Tablet & Mobile Dual On-Chain Verification)
+  // Check on-chain registration helper
   const checkRegistrationStatus = async (address: string): Promise<boolean> => {
-    if (!address) return false;
-    const cleanAddr = address.trim().toLowerCase();
     try {
-      const [node, dash] = await Promise.all([
-        contractAdapter.getHubUserNode(cleanAddr).catch(() => null),
-        contractAdapter.getHubUserData(cleanAddr).catch(() => null),
-      ]);
-      const rawNode = (node || {}) as any;
-      const dashId = Number((dash as any)?.numericId || 0);
-      const nodeNumId = Number(rawNode.id ?? rawNode[0] ?? 0);
-      const isReg = Boolean(rawNode.isRegistered ?? false);
-      return Boolean(nodeNumId > 0 || dashId > 0 || isReg);
+      const node = await contractAdapter.getHubUserNode(address);
+      if (!node) return false;
+      const numId = Number(node.id || 0);
+      return Boolean(node.isRegistered || numId > 0);
     } catch {
       return false;
     }
@@ -182,16 +175,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     }
   };
 
-  // 3. WALLET CONNECTED CALLBACK: Transition with instant On-Chain Verification
+  // 3. WALLET CONNECTED CALLBACK: Tablet-Optimized & Mobile/Laptop Untouched Flow
   const handleWalletConnected = async (address: string, _walletName: string) => {
     const cleanAddr = (address || '').trim().toLowerCase();
     setConnectedWallet(cleanAddr);
     setIsWalletConnected(true);
     setShowWalletModal(false);
 
+    // Tablet Device Detection (Screen Width 768px-1024px ya Tablet UserAgent)
+    const isTabletDevice = (typeof window !== 'undefined') && (
+      (window.innerWidth >= 768 && window.innerWidth <= 1024) ||
+      /iPad|tablet|(android(?!.*mobile))/i.test(navigator.userAgent)
+    );
+
+    // Agar Tablet hai aur user ne Login dabaya hai: 
+    // Direct Login Modal khulega ("ENTER WITH CONNECTED WALLET" button ke sath) bina blocking call ke
+    if (isTabletDevice && walletModalAction === 'login') {
+      setShowRegisterModal(false);
+      setShowLoginModal(true);
+      return;
+    }
+
+    // Phone aur Laptop ke liye wahi purana verified flow (100% UNTOUCHED):
     const isReg = await checkRegistrationStatus(cleanAddr);
 
-    if (walletModalAction === 'login') {
+    if (walletModalAction === 'register') {
+      if (isReg) {
+        setStatusNotice({ message: 'You are already registered! Please login to your dashboard.', type: 'info' });
+        setShowLoginModal(true);
+      } else {
+        setShowRegisterModal(true);
+      }
+    } else if (walletModalAction === 'login') {
       if (!isReg) {
         setStatusNotice({ message: 'This wallet is not registered yet. Please register first then login.', type: 'warning' });
         setShowRegisterModal(true);
@@ -200,7 +215,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
       }
     } else {
       if (isReg) {
-        setStatusNotice({ message: 'You are already registered! Please login to your dashboard.', type: 'info' });
         setShowLoginModal(true);
       } else {
         setShowRegisterModal(true);
