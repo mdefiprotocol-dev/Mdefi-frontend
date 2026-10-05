@@ -78,9 +78,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
       const isReg = Boolean(rawNode.isRegistered || resolvedId > 0 || (resolverCheck?.isValid && resolverNumericId > 0));
 
-      setIsVerifying(false);
-      onLoginSuccess(cleanWallet);
-      return;
+      if (resolvedId === 0 && !isReg) {
+        setIsNotRegistered(true);
+        setErrorMsg('Account not registered on-chain. Please complete registration first.');
+        setIsVerifying(false);
+        return;
+      }
 
       const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5] ?? (userDash as any)?.isBlocked ?? false);
       if (isBlocked) {
