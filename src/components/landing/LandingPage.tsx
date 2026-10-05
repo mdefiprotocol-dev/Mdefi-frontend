@@ -86,13 +86,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     walletAddress: '',
   });
 
-  // Check on-chain registration helper
+  // Check on-chain registration helper (Tablet & Mobile Dual On-Chain Check)
   const checkRegistrationStatus = async (address: string): Promise<boolean> => {
+    if (!address) return false;
+    const clean = address.trim().toLowerCase();
     try {
-      const node = await contractAdapter.getHubUserNode(address);
-      if (!node) return false;
-      const numId = Number(node.id || 0);
-      return Boolean(node.isRegistered || numId > 0);
+      const [node, dash] = await Promise.all([
+        contractAdapter.getHubUserNode(clean).catch(() => null),
+        contractAdapter.getHubUserData(clean).catch(() => null),
+      ]);
+      const rawNode = (node || {}) as any;
+      const dashId = Number((dash as any)?.numericId || 0);
+      const nodeNumId = Number(rawNode.id ?? rawNode[0] ?? 0);
+      const isReg = Boolean(rawNode.isRegistered || nodeNumId > 0 || dashId > 0);
+      return isReg;
     } catch {
       return false;
     }
@@ -249,13 +256,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterDashboard }) =>
     onEnterDashboard({ ...registeredUser, isNewRegistration: true });
   };
 
-  // 8. DIRECT LOGIN COMPLETED: Enter Existing Main Dashboard
-  const handleDirectLogin = (userIdentifier: string) => {
+  // 8. DIRECT LOGIN COMPLETED: Enter Existing Main Dashboard (Tablet Direct Sync)
+  const handleDirectLogin = async (userIdentifier: string) => {
     setShowLoginModal(false);
+    const targetWallet = (connectedWallet || (userIdentifier.startsWith('0x') ? userIdentifier : '')).trim().toLowerCase();
+    
+    // Tablet/Mobile active on-chain metadata resolution
+    let resolvedUserFacingId = userIdentifier;
+    let resolvedSponsor = '';
+    try {
+      const node = await contractAdapter.getHubUserNode(targetWallet);
+      if (node && Number(node.id || 0) > 0) {
+        resolvedUserFacingId = `MDF-${node.id}`;
+        resolvedSponsor = node.upline || '';
+      }
+    } catch {}
+
     onEnterDashboard({
-      userId: userIdentifier,
-      sponsorId: '',
-      walletAddress: connectedWallet || (userIdentifier.startsWith('0x') ? userIdentifier : ''),
+      userId: resolvedUserFacingId,
+      sponsorId: resolvedSponsor,
+      walletAddress: targetWallet,
     });
   };
 
