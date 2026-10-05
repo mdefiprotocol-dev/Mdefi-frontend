@@ -63,6 +63,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       // Step 2: DApp Browser aur Tablet RPC ke liye thoda loading buffer (800ms) taaki call smoothly resolve ho
       await new Promise((res) => setTimeout(res, 800));
 
+      // DEBUG ALERT: Exact check dekhne ke liye ki Tablet par kya response aa raha hai
+      const testNode = await contractAdapter.getHubUserNode(cleanWallet).catch(e => ({ err: e?.message || String(e) }));
+      alert("Tablet Node Result: " + JSON.stringify(testNode));
+
       // Step 3: On-chain parallel verify call
       const [node, userDash, resolverCheck] = await Promise.all([
         contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
