@@ -70,13 +70,24 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         setUplineId('');
       }
 
-      // Check on-chain if connected wallet is already registered
+      // Check on-chain if connected wallet is already registered (Auto-bypass for Login)
       if (connectedWalletAddress) {
         setIsCheckingRegistration(true);
         contractAdapter.getHubUserNode(connectedWalletAddress)
           .then((node) => {
-            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
+            const rawId = Number(node?.id || 0);
+            if (node && (node.isRegistered || rawId > 0)) {
               setIsAlreadyRegistered(true);
+              // Tablet & Mobile direct login auto-trigger (No registration screen)
+              if (typeof onSwitchToLogin === 'function') {
+                onSwitchToLogin();
+              } else if (typeof onSuccess === 'function') {
+                onSuccess({
+                  userId: String(rawId),
+                  sponsorId: String(node.upline || ''),
+                  walletAddress: connectedWalletAddress,
+                });
+              }
             }
           })
           .catch(() => {})
