@@ -44,12 +44,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     return formatCompactAddress(addr);
   };
 
-// 1. Web3 Wallet Login Guard (On-chain check)
+// 1. Web3 Wallet Login Guard (On-chain check - Universal Multi-Device Guard)
   const handleWalletLogin = async () => {
     setErrorMsg('');
     setIsNotRegistered(false);
 
-    if (!connectedWalletAddress) {
+    // एड्रेस की क्लीनिंग (DApp Browser / WalletConnect / Tablet सपोर्ट)
+    const cleanWallet = (connectedWalletAddress || '').trim().toLowerCase();
+
+    if (!cleanWallet || cleanWallet.length < 42) {
       setErrorMsg('No Web3 wallet connected. Please connect your wallet first.');
       return;
     }
@@ -57,37 +60,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsVerifying(true);
 
     try {
-      // Query Hub.getUserNode(walletAddress) directly on-chain
-      const node = await contractAdapter.getHubUserNode(connectedWalletAddress);
+      // डुअल ऑन-चेन पैरेलल चेक (टैबलेट या स्लो नेटवर्क में कॉल ड्रॉप न हो)
+      const [node, userDash] = await Promise.all([
+        contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
+        contractAdapter.getHubUserData(cleanWallet).catch(() => null),
+      ]);
 
-      if (!node) {
+      const rawNode = (node || {}) as any;
+      const dashNumericId = Number((userDash as any)?.numericId || 0);
+      const nodeNumericId = Number(rawNode.id ?? rawNode[0] ?? 0);
+      
+      // किसी भी ऑन-चेन सोर्स से ID मिली तो यूजर रजिस्टर्ड है
+      const resolvedId = nodeNumericId > 0 ? nodeNumericId : dashNumericId;
+      const isReg = Boolean(rawNode.isRegistered || resolvedId > 0);
+
+      // अगर कॉन्ट्रैक्ट में बिल्कुल नया एड्रेस है (ID = 0 और Unregistered)
+      if (resolvedId === 0 && !isReg) {
         setIsNotRegistered(true);
         setErrorMsg('Account not registered on-chain. Please complete registration first.');
         setIsVerifying(false);
         return;
       }
 
-      // Robust check: Chahe BigInt ho ya number, ya node.isRegistered flag ho
-      const rawNode = node as any;
-      const numericId = Number(rawNode.id ?? rawNode[0] ?? 0);
-      const isReg = Boolean(rawNode.isRegistered ?? rawNode[4]);
-      // Agar ID 1 (Root Admin) hai ya registered hai (numericId > 0)
-      if (numericId === 0 && !isReg) {
-        setIsNotRegistered(true);
-        setErrorMsg('Account not registered on-chain. Please complete registration first.');
-        setIsVerifying(false);
-        return;
-      }
-
-const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5]);
+      // ब्लॉकचेन एडमिन ब्लॉक चेक
+      const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5] ?? (userDash as any)?.isBlocked ?? false);
       if (isBlocked) {
         setErrorMsg('This wallet node has been blocked by the protocol administration.');
         setIsVerifying(false);
         return;
       }
 
+      // 100% सक्सेस - तुरंत ऑथेंटिकेटेड डैशबोर्ड पर भेजें
       setIsVerifying(false);
-      onLoginSuccess(connectedWalletAddress);
+      onLoginSuccess(cleanWallet);
     } catch (err: any) {
       console.error('[LoginModal] Wallet login verification failed:', err);
       setErrorMsg('Failed to verify on-chain registration. Check testnet connection.');
