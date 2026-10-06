@@ -202,24 +202,38 @@ function MainApp() {
       return { registered: false, node: null };
     }
 
+    const clean = walletAddress.trim().toLowerCase();
+
     try {
-      const node = await contractAdapter.getHubUserNode(walletAddress);
-      if (!node) {
-        return { registered: false, node: null };
+      // Primary Authoritative check: getUserDashboard
+      const dash: any = await contractAdapter.getHubUserData(clean).catch(() => null);
+      if (dash) {
+        const uId = Number(dash.userId?.toString?.() || dash.numericId || dash[0] || 0);
+        const rTime = Number(dash.registrationTimestamp || dash.registrationTime || 0);
+        if (uId > 0 || rTime > 0) {
+          return {
+            registered: true,
+            node: {
+              id: uId,
+              wallet: clean,
+              isRegistered: true,
+              isBlocked: Boolean(dash.isBlocked),
+              upline: dash.sponsor || dash.sponsorId || '',
+            },
+          };
+        }
       }
 
-      const numericId = Number(node.id || 0);
-
-      if (numericId === 1) {
-        return { registered: true, node };
+      // Secondary check: getHubUserNode
+      const node = await contractAdapter.getHubUserNode(clean).catch(() => null);
+      if (node) {
+        const numericId = Number(node.id || 0);
+        if (numericId > 0 || node.isRegistered) {
+          return { registered: true, node };
+        }
       }
 
-      const isRegistered = Boolean(node.isRegistered);
-      if (isRegistered || numericId > 0) {
-        return { registered: true, node };
-      }
-
-      return { registered: false, node };
+      return { registered: false, node: null };
     } catch (error) {
       console.error('[App] On-chain registration verification failed:', error);
       return { registered: false, node: null };

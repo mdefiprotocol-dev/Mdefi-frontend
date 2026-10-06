@@ -233,7 +233,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   // -------------------------------------------------------
-  // ON-CHAIN REGISTRATION CHECK
+  // ON-CHAIN REGISTRATION CHECK (Fast Single-Source Authoritative)
   // -------------------------------------------------------
 
   const checkRegistrationStatus = async (
@@ -248,35 +248,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
 
     try {
-      const [node, dash] = await Promise.all([
-        contractAdapter
-          .getHubUserNode(clean)
-          .catch(() => null),
+      // Primary authoritative read from getUserDashboard
+      const dash: any = await contractAdapter.getHubUserData(clean).catch(() => null);
 
-        contractAdapter
-          .getHubUserData(clean)
-          .catch(() => null),
-      ]);
+      if (dash) {
+        const uId = Number(dash.userId?.toString?.() || dash.numericId || dash[0] || 0);
+        const rTime = Number(dash.registrationTimestamp || dash.registrationTime || 0);
+        if (uId > 0 || rTime > 0) return true;
+      }
 
-      const rawNode = (node || {}) as any;
+      // Fast fallback to getHubUserNode
+      const node: any = await contractAdapter.getHubUserNode(clean).catch(() => null);
+      if (node) {
+        const nId = Number(node.id || node[0] || 0);
+        if (node.isRegistered || nId > 0) return true;
+      }
 
-      const dashId = Number(
-        (dash as any)?.numericId || 0
-      );
-
-      const nodeNumId = Number(
-        rawNode.id ??
-        rawNode[0] ??
-        0
-      );
-
-      const isReg = Boolean(
-        rawNode.isRegistered ||
-        nodeNumId > 0 ||
-        dashId > 0
-      );
-
-      return isReg;
+      return false;
     } catch {
       return false;
     }
@@ -808,21 +796,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   // -------------------------------------------------------
-  // 8. DIRECT LOGIN COMPLETED
+  // 8. DIRECT LOGIN COMPLETED (Pure Dynamic Handover, No Kickback)
   // -------------------------------------------------------
 
   const handleDirectLogin = async (
     userIdentifier: string
   ) => {
-    // -----------------------------------------------------
-    // Clear login flow BEFORE dashboard transition.
-    // This prevents the landing page from trying to recover
-    // the previous login again.
-    // -----------------------------------------------------
-
     clearLoginFlow();
-
     setShowLoginModal(false);
+    setShowRegisterModal(false);
 
     const targetWallet = (
       connectedWallet ||
@@ -837,19 +819,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     let resolvedSponsor = '';
 
     try {
-      const node =
-        await contractAdapter.getHubUserNode(targetWallet);
-
-      if (
-        node &&
-        Number(node.id || 0) > 0
-      ) {
-        resolvedUserFacingId = `MDF-${node.id}`;
-        resolvedSponsor = node.upline || '';
+      const dash: any = await contractAdapter.getHubUserData(targetWallet).catch(() => null);
+      const numId = Number(dash?.userId?.toString?.() || dash?.numericId || 0);
+      if (numId > 0) {
+        resolvedUserFacingId = `MDF-${numId}`;
+        resolvedSponsor = dash?.sponsor || dash?.sponsorId || '';
       }
-    } catch {
-      // Keep existing fallback values.
-    }
+    } catch {}
 
     stopAuthTransition();
 
@@ -857,6 +833,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       userId: resolvedUserFacingId,
       sponsorId: resolvedSponsor,
       walletAddress: targetWallet,
+      isNewRegistration: false,
     });
   };
 

@@ -233,7 +233,9 @@ export class RealContractProvider implements IContractProvider {
     }
 
     try {
-      const provider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC_URLS[0]);
+      // Fast static network caching + 4.5s strict timeout to eliminate 30-40s hung state
+      const rpcUrl = BSC_TESTNET_RPC_URLS[0];
+      const provider = new ethers.JsonRpcProvider(rpcUrl, { chainId: 97, name: 'bnbt' }, { staticNetwork: true });
       const contract = new ethers.Contract(
         contractAddress,
         abi,
@@ -246,7 +248,12 @@ export class RealContractProvider implements IContractProvider {
         );
       }
 
-      const result = await contract[methodName](...(args || []));
+      const callPromise = contract[methodName](...(args || []));
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('RPC request timed out')), 4500)
+      );
+
+      const result = await Promise.race([callPromise, timeoutPromise]);
       return result as T;
     } catch (err: any) {
       throw new Error(
