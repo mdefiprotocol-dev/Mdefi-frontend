@@ -328,6 +328,12 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   const currentSessionId = Date.now();
   activeSessionIdRef.current = currentSessionId;
 
+  // Cancel any previous completion timer
+  if (successTimeoutRef.current) {
+    clearTimeout(successTimeoutRef.current);
+    successTimeoutRef.current = null;
+  }
+
   setConnectingWalletId(wallet.id);
   setSelectedWalletName(wallet.name);
   setConnectionStatus('connecting');
@@ -336,9 +342,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   try {
     let resolvedAddress: string;
 
-    // ---------------------------------------------------------
+    // =========================================================
     // WALLETCONNECT
-    // ---------------------------------------------------------
+    // =========================================================
     if (wallet.id === 'walletconnect') {
       setStatusMessage('Connecting via WalletConnect...');
 
@@ -356,39 +362,39 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       setConnectionStatus('connected');
       setStatusMessage('Connected via WalletConnect (Verified)');
 
-      // KEEP EXISTING SUCCESS SOUND
+      // Preserve existing success sound
       try {
         playClaimSuccessSound();
       } catch {}
 
       // IMPORTANT:
-      // No extra smart-contract verification here.
-      // LandingPage handles registration verification.
-      if (onWalletConnected) {
-        onWalletConnected(resolvedAddress, 'WalletConnect');
-      }
+      // Do NOT perform blockchain registration lookup here.
+      // LandingPage already performs registration verification.
+      successTimeoutRef.current = setTimeout(() => {
+        if (activeSessionIdRef.current !== currentSessionId) return;
 
-      if (onSwitchAddress) {
-        onSwitchAddress(resolvedAddress);
-      }
+        if (onWalletConnected) {
+          onWalletConnected(resolvedAddress, 'WalletConnect');
+        }
 
-      onClose();
+        if (onSwitchAddress) {
+          onSwitchAddress(resolvedAddress);
+        }
+
+        onClose();
+      }, 100);
+
       return;
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // INJECTED WALLET
-    // MetaMask / Trust Wallet / TokenPocket / Bitget etc.
-    // ---------------------------------------------------------
+    // MetaMask / Trust Wallet / TokenPocket / Bitget
+    // =========================================================
     const injectedProvider = getSpecificProvider(wallet.id);
 
-    if (
-      injectedProvider &&
-      typeof injectedProvider.request === 'function'
-    ) {
-      setStatusMessage(
-        `Authorizing ${wallet.name} on BSC Testnet...`
-      );
+    if (injectedProvider && typeof injectedProvider.request === 'function') {
+      setStatusMessage(`Authorizing ${wallet.name} on BSC Testnet...`);
 
       const accounts = (await injectedProvider.request({
         method: 'eth_requestAccounts',
@@ -418,33 +424,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
       setConnectedAddress(resolvedAddress);
       setConnectionStatus('connected');
-      setStatusMessage(
-        `Connected via ${wallet.name} (Verified)`
-      );
+      setStatusMessage(`Connected via ${wallet.name} (Verified)`);
 
-      // KEEP EXISTING SUCCESS SOUND
+      // Preserve existing success sound
       try {
         playClaimSuccessSound();
       } catch {}
 
       // IMPORTANT:
-      // Do NOT call getHubUserNode() here.
-      // Registration check is handled by LandingPage.
-      if (onWalletConnected) {
-        onWalletConnected(resolvedAddress, wallet.name);
-      }
+      // Registration lookup removed from WalletModal.
+      // LandingPage handles registration status separately.
+      successTimeoutRef.current = setTimeout(() => {
+        if (activeSessionIdRef.current !== currentSessionId) return;
 
-      if (onSwitchAddress) {
-        onSwitchAddress(resolvedAddress);
-      }
+        if (onWalletConnected) {
+          onWalletConnected(resolvedAddress, wallet.name);
+        }
 
-      onClose();
+        if (onSwitchAddress) {
+          onSwitchAddress(resolvedAddress);
+        }
+
+        onClose();
+      }, 100);
+
       return;
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // MOBILE DEEP-LINK FALLBACK
-    // ---------------------------------------------------------
+    // =========================================================
     if (isMobileEnvironment()) {
       setStatusMessage(`Opening ${wallet.name} App...`);
 
@@ -462,9 +471,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // WALLET NOT DETECTED
-    // ---------------------------------------------------------
+    // =========================================================
     const walletErrors: Record<string, string> = {
       metamask:
         'MetaMask was not detected. Please open MDeFi in MetaMask or install MetaMask.',
@@ -497,8 +506,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       rawError?.code === 4001 ||
       rawError?.message?.includes('User rejected')
     ) {
-      errorText =
-        'Connection request was cancelled or rejected by user.';
+      errorText = 'Connection request was cancelled or rejected by user.';
     } else if (rawError?.message) {
       errorText = rawError.message;
     }
@@ -508,7 +516,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     setConnectingWalletId(null);
   }
 };
-
   const shorten = (addr: string) => {
     return formatCompactAddress(addr);
   };

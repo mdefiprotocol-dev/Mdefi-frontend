@@ -46,67 +46,75 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
 // 1. Web3 Wallet Login Guard (On-chain check with Smooth Loading Buffer)
   const handleWalletLogin = async () => {
-    setErrorMsg('');
-    setIsNotRegistered(false);
+  setErrorMsg('');
+  setIsNotRegistered(false);
 
-    const cleanWallet = (connectedWalletAddress || '').trim().toLowerCase();
+  const cleanWallet = (connectedWalletAddress || '').trim().toLowerCase();
 
-    if (!cleanWallet || cleanWallet.length < 42) {
-      setErrorMsg('No Web3 wallet connected. Please connect your wallet first.');
+  if (!/^0x[a-fA-F0-9]{40}$/.test(cleanWallet)) {
+    setErrorMsg('No valid Web3 wallet connected. Please connect your wallet first.');
+    return;
+  }
+
+  setIsVerifying(true);
+
+  try {
+    // Single-source on-chain verification.
+    // Do NOT run sponsor resolver or duplicate dashboard lookup here.
+    const node = await contractAdapter.getHubUserNode(cleanWallet);
+
+    const rawNode = (node || {}) as any;
+
+    const nodeNumericId = Number(
+      rawNode.id ??
+      rawNode[0] ??
+      0
+    );
+
+    const isRegistered = Boolean(
+      rawNode.isRegistered ||
+      nodeNumericId > 0
+    );
+
+    if (!isRegistered) {
+      setIsNotRegistered(true);
+      setErrorMsg(
+        'Account not registered on-chain. Please complete registration first.'
+      );
+      setIsVerifying(false);
       return;
     }
 
-    // Step 1: Pehle spinner loader show karein
-    setIsVerifying(true);
+    const isBlocked = Boolean(
+      rawNode.isBlocked ??
+      rawNode[5] ??
+      false
+    );
 
-    try {
-      // Step 2: DApp Browser aur Tablet RPC ke liye thoda loading buffer (800ms) taaki call smoothly resolve ho
-      await new Promise((res) => setTimeout(res, 800));
-
-      // Step 3: On-chain parallel verify call
-      const [node, userDash, resolverCheck] = await Promise.all([
-        contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
-        contractAdapter.getHubUserData(cleanWallet).catch(() => null),
-        sponsorIdResolver.resolveSponsorNumericId(cleanWallet).catch(() => null),
-      ]);
-
-      const rawNode = (node || {}) as any;
-      const dashNumericId = Number((userDash as any)?.numericId || 0);
-      const nodeNumericId = Number(rawNode.id ?? rawNode[0] ?? 0);
-      const resolverNumericId = Number(resolverCheck?.numericId || 0);
-
-      // Kisi bhi source se ID mili ya registered flag mila
-      const resolvedId = nodeNumericId > 0 
-        ? nodeNumericId 
-        : (dashNumericId > 0 ? dashNumericId : resolverNumericId);
-
-      const isReg = Boolean(rawNode.isRegistered || resolvedId > 0 || (resolverCheck?.isValid && resolverNumericId > 0));
-
-      // Root Admin (ID 1) ya registered user check
-      if (resolvedId === 0 && !isReg) {
-        setIsNotRegistered(true);
-        setErrorMsg('Account not registered on-chain. Please complete registration first.');
-        setIsVerifying(false);
-        return;
-      }
-
-      const isBlocked = Boolean(rawNode.isBlocked ?? rawNode[5] ?? (userDash as any)?.isBlocked ?? false);
-      if (isBlocked) {
-        setErrorMsg('This wallet node has been blocked by the protocol administration.');
-        setIsVerifying(false);
-        return;
-      }
-
-      // Step 4: Success - seedha dashboard me login handover
+    if (isBlocked) {
+      setErrorMsg(
+        'This wallet node has been blocked by the protocol administration.'
+      );
       setIsVerifying(false);
-      onLoginSuccess(cleanWallet);
-    } catch (err: any) {
-      console.error('[LoginModal] Wallet login verification failed:', err);
-      setErrorMsg('Failed to verify on-chain registration. Check testnet connection.');
-      setIsVerifying(false);
+      return;
     }
-  };
 
+    // Verified wallet -> hand over directly to dashboard/login flow.
+    setIsVerifying(false);
+    onLoginSuccess(cleanWallet);
+  } catch (err: any) {
+    console.error(
+      '[LoginModal] Wallet login verification failed:',
+      err
+    );
+
+    setErrorMsg(
+      'Failed to verify on-chain registration. Check testnet connection.'
+    );
+
+    setIsVerifying(false);
+  }
+};
   // 2. Manual User ID / Referral ID Lookup Guard
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
