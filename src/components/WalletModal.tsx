@@ -325,153 +325,189 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   const handleConnect = async (wallet: WalletOption) => {
-    const currentSessionId = Date.now();
-    activeSessionIdRef.current = currentSessionId;
+  const currentSessionId = Date.now();
+  activeSessionIdRef.current = currentSessionId;
 
-    setConnectingWalletId(wallet.id);
-    setSelectedWalletName(wallet.name);
-    setConnectionStatus('connecting');
-    setErrorMessage(null);
+  setConnectingWalletId(wallet.id);
+  setSelectedWalletName(wallet.name);
+  setConnectionStatus('connecting');
+  setErrorMessage(null);
 
-    try {
-      let resolvedAddress: string;
+  try {
+    let resolvedAddress: string;
 
-      if (wallet.id === 'walletconnect') {
-        setStatusMessage('Connecting via WalletConnect...');
-        resolvedAddress = await connectWalletConnect();
+    // ---------------------------------------------------------
+    // WALLETCONNECT
+    // ---------------------------------------------------------
+    if (wallet.id === 'walletconnect') {
+      setStatusMessage('Connecting via WalletConnect...');
 
-        if (activeSessionIdRef.current !== currentSessionId) return;
+      resolvedAddress = await connectWalletConnect();
 
-        if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {
-          throw new Error('Wallet connection timed out or did not return a valid address.');
-        }
-
-        setConnectedAddress(resolvedAddress);
-        setConnectionStatus('connected');
-        setStatusMessage('Connected via WalletConnect (Verified)');
-
-        try {
-          playClaimSuccessSound();
-        } catch {}
-
-        successTimeoutRef.current = setTimeout(async () => {
-          if (activeSessionIdRef.current !== currentSessionId) return;
-          
-          // Smart Contract Multi-Device Auto-Router
-          try {
-            const clean = resolvedAddress.toLowerCase();
-            const node = await contractAdapter.getHubUserNode(clean);
-            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
-              localStorage.setItem('mdefi_user_wallet', clean);
-              localStorage.setItem('walletAddress', clean);
-            }
-          } catch {}
-
-          if (onWalletConnected) {
-            onWalletConnected(resolvedAddress, 'WalletConnect');
-          }
-          if (onSwitchAddress) {
-            onSwitchAddress(resolvedAddress);
-          }
-          onClose();
-        }, 600);
-        return;
-      }
-
-      const injectedProvider = getSpecificProvider(wallet.id);
-
-      if (injectedProvider && typeof injectedProvider.request === 'function') {
-        setStatusMessage(`Authorizing ${wallet.name} on BSC Testnet...`);
-
-        const accounts = (await injectedProvider.request({
-          method: 'eth_requestAccounts',
-        })) as string[];
-
-        if (activeSessionIdRef.current !== currentSessionId) return;
-
-        if (!Array.isArray(accounts) || !accounts[0] || !isValidEthereumAddress(accounts[0])) {
-          throw new Error(`No valid BSC account unlocked in ${wallet.name}.`);
-        }
-
-        setStatusMessage('Verifying BNB Smart Chain Testnet...');
-        await ensureBscTestnetChain(injectedProvider);
-
-        if (activeSessionIdRef.current !== currentSessionId) return;
-
-        setExternalWalletProvider(injectedProvider);
-        resolvedAddress = accounts[0];
-
-        setConnectedAddress(resolvedAddress);
-        setConnectionStatus('connected');
-        setStatusMessage(`Connected via ${wallet.name} (Verified)`);
-
-        try {
-          playClaimSuccessSound();
-        } catch {}
-
-        successTimeoutRef.current = setTimeout(async () => {
-          if (activeSessionIdRef.current !== currentSessionId) return;
-
-          // Smart Contract Multi-Device Auto-Router
-          try {
-            const clean = resolvedAddress.toLowerCase();
-            const node = await contractAdapter.getHubUserNode(clean);
-            if (node && (node.isRegistered || Number(node.id || 0) > 0)) {
-              localStorage.setItem('mdefi_user_wallet', clean);
-              localStorage.setItem('walletAddress', clean);
-            }
-          } catch {}
-
-          if (onWalletConnected) {
-            onWalletConnected(resolvedAddress, wallet.name);
-          }
-          if (onSwitchAddress) {
-            onSwitchAddress(resolvedAddress);
-          }
-          onClose();
-        }, 600);
-      } else {
-        if (isMobileEnvironment()) {
-          setStatusMessage(`Opening ${wallet.name} App...`);
-          const opened = triggerWalletDeepLink(wallet.id);
-          if (opened) {
-            successTimeoutRef.current = setTimeout(() => {
-              if (activeSessionIdRef.current !== currentSessionId) return;
-              setConnectionStatus('idle');
-              setConnectingWalletId(null);
-            }, 3000);
-            return;
-          }
-        }
-
-        const walletErrors: Record<string, string> = {
-          metamask: 'MetaMask was not detected. Please open MDeFi in MetaMask or install MetaMask.',
-          trustwallet: "Trust Wallet was not detected. Please open MDeFi inside Trust Wallet's DApp browser.",
-          tokenpocket: "TokenPocket was not detected. Please open MDeFi inside TokenPocket's DApp browser.",
-          bitget: "Bitget Wallet was not detected. Please open MDeFi inside Bitget Wallet's DApp browser.",
-        };
-
-        throw new Error(
-          walletErrors[wallet.id] || `${wallet.name} was not detected. Please open MDeFi inside ${wallet.name}'s DApp browser or select WalletConnect.`
-        );
-      }
-    } catch (err: unknown) {
       if (activeSessionIdRef.current !== currentSessionId) return;
 
-      const rawError = err as { code?: number; message?: string };
-      let errorText = 'Connection request failed.';
-
-      if (rawError?.code === 4001 || rawError?.message?.includes('User rejected')) {
-        errorText = 'Connection request was cancelled or rejected by user.';
-      } else if (rawError?.message) {
-        errorText = rawError.message;
+      if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {
+        throw new Error(
+          'Wallet connection timed out or did not return a valid address.'
+        );
       }
 
-      setConnectionStatus('error');
-      setErrorMessage(errorText);
-      setConnectingWalletId(null);
+      setConnectedAddress(resolvedAddress);
+      setConnectionStatus('connected');
+      setStatusMessage('Connected via WalletConnect (Verified)');
+
+      // KEEP EXISTING SUCCESS SOUND
+      try {
+        playClaimSuccessSound();
+      } catch {}
+
+      // IMPORTANT:
+      // No extra smart-contract verification here.
+      // LandingPage handles registration verification.
+      if (onWalletConnected) {
+        onWalletConnected(resolvedAddress, 'WalletConnect');
+      }
+
+      if (onSwitchAddress) {
+        onSwitchAddress(resolvedAddress);
+      }
+
+      onClose();
+      return;
     }
-  };
+
+    // ---------------------------------------------------------
+    // INJECTED WALLET
+    // MetaMask / Trust Wallet / TokenPocket / Bitget etc.
+    // ---------------------------------------------------------
+    const injectedProvider = getSpecificProvider(wallet.id);
+
+    if (
+      injectedProvider &&
+      typeof injectedProvider.request === 'function'
+    ) {
+      setStatusMessage(
+        `Authorizing ${wallet.name} on BSC Testnet...`
+      );
+
+      const accounts = (await injectedProvider.request({
+        method: 'eth_requestAccounts',
+      })) as string[];
+
+      if (activeSessionIdRef.current !== currentSessionId) return;
+
+      if (
+        !Array.isArray(accounts) ||
+        !accounts[0] ||
+        !isValidEthereumAddress(accounts[0])
+      ) {
+        throw new Error(
+          `No valid BSC account unlocked in ${wallet.name}.`
+        );
+      }
+
+      setStatusMessage('Verifying BNB Smart Chain Testnet...');
+
+      await ensureBscTestnetChain(injectedProvider);
+
+      if (activeSessionIdRef.current !== currentSessionId) return;
+
+      setExternalWalletProvider(injectedProvider);
+
+      resolvedAddress = accounts[0];
+
+      setConnectedAddress(resolvedAddress);
+      setConnectionStatus('connected');
+      setStatusMessage(
+        `Connected via ${wallet.name} (Verified)`
+      );
+
+      // KEEP EXISTING SUCCESS SOUND
+      try {
+        playClaimSuccessSound();
+      } catch {}
+
+      // IMPORTANT:
+      // Do NOT call getHubUserNode() here.
+      // Registration check is handled by LandingPage.
+      if (onWalletConnected) {
+        onWalletConnected(resolvedAddress, wallet.name);
+      }
+
+      if (onSwitchAddress) {
+        onSwitchAddress(resolvedAddress);
+      }
+
+      onClose();
+      return;
+    }
+
+    // ---------------------------------------------------------
+    // MOBILE DEEP-LINK FALLBACK
+    // ---------------------------------------------------------
+    if (isMobileEnvironment()) {
+      setStatusMessage(`Opening ${wallet.name} App...`);
+
+      const opened = triggerWalletDeepLink(wallet.id);
+
+      if (opened) {
+        successTimeoutRef.current = setTimeout(() => {
+          if (activeSessionIdRef.current !== currentSessionId) return;
+
+          setConnectionStatus('idle');
+          setConnectingWalletId(null);
+        }, 3000);
+
+        return;
+      }
+    }
+
+    // ---------------------------------------------------------
+    // WALLET NOT DETECTED
+    // ---------------------------------------------------------
+    const walletErrors: Record<string, string> = {
+      metamask:
+        'MetaMask was not detected. Please open MDeFi in MetaMask or install MetaMask.',
+
+      trustwallet:
+        "Trust Wallet was not detected. Please open MDeFi inside Trust Wallet's DApp browser.",
+
+      tokenpocket:
+        "TokenPocket was not detected. Please open MDeFi inside TokenPocket's DApp browser.",
+
+      bitget:
+        "Bitget Wallet was not detected. Please open MDeFi inside Bitget Wallet's DApp browser.",
+    };
+
+    throw new Error(
+      walletErrors[wallet.id] ||
+        `${wallet.name} was not detected. Please open MDeFi inside ${wallet.name}'s DApp browser or select WalletConnect.`
+    );
+  } catch (err: unknown) {
+    if (activeSessionIdRef.current !== currentSessionId) return;
+
+    const rawError = err as {
+      code?: number;
+      message?: string;
+    };
+
+    let errorText = 'Connection request failed.';
+
+    if (
+      rawError?.code === 4001 ||
+      rawError?.message?.includes('User rejected')
+    ) {
+      errorText =
+        'Connection request was cancelled or rejected by user.';
+    } else if (rawError?.message) {
+      errorText = rawError.message;
+    }
+
+    setConnectionStatus('error');
+    setErrorMessage(errorText);
+    setConnectingWalletId(null);
+  }
+};
 
   const shorten = (addr: string) => {
     return formatCompactAddress(addr);
