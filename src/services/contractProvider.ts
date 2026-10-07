@@ -55,41 +55,7 @@ const BSC_TESTNET_RPC_URLS = [
   'https://bsc-testnet.public.blastapi.io',
 ];
 
-/**
- * Demo Provider: Implements benchmark simulated responses for developer & preview testing
- */
-export class DemoContractProvider implements IContractProvider {
-  public isLive(): boolean {
-    return false;
-  }
-
-  public async read<T = any>(_contractKey: keyof typeof CONTRACT_ADDRESSES, _methodName: string, _args?: any[]): Promise<T> {
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    return null as unknown as T;
-  }
-
-  public async write(
-    _contractKey: keyof typeof CONTRACT_ADDRESSES,
-    _methodName: string,
-    _args?: any[],
-    _valueWei?: string
-  ): Promise<IProviderTxResult> {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    return {
-      success: true,
-      txHash: `0x${randomHex}`,
-      status: 'CONFIRMED',
-      isRealBlockchainData: false,
-      message: 'Simulated demo transaction executed successfully.',
-    };
-  }
-
-  public async waitForConfirmation(_txHash: string): Promise<boolean> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    return true;
-  }
-}
+// no demo provider
 
 /**
  * Real Contract Provider: Complete Mobile & WalletConnect Compatible EIP-1193 Engine
@@ -395,10 +361,10 @@ export class RealContractProvider implements IContractProvider {
   }
 }
 
-// Singletons
-export const demoContractProvider = new DemoContractProvider();
+// 100% Real Blockchain Pure Engine (Zero Demo / Zero Fallback)
 export const realContractProvider = new RealContractProvider();
 
-export function getContractProvider(isLive: boolean): IContractProvider {
-  return isLive ? realContractProvider : demoContractProvider;
+export function getContractProvider(_isLive?: boolean): IContractProvider {
+  // Always return Real On-Chain Provider regardless of any flag
+  return realContractProvider;
 }
