@@ -303,11 +303,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     setAuthTransitioning(true);
 
-    // Safety release only.
-    // Normal flow finishes much earlier.
+    // Safety release: max 5 seconds only
     authTransitionTimerRef.current = setTimeout(() => {
       setAuthTransitioning(false);
-    }, 15000);
+    }, 5000);
   };
 
   // -------------------------------------------------------
