@@ -51,8 +51,10 @@ export interface IContractProvider {
 }
 
 const BSC_TESTNET_RPC_URLS = [
-  'https://bsc-testnet-rpc.publicnode.com',
+  'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+  'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
   'https://bsc-testnet.public.blastapi.io',
+  'https://bsc-testnet-rpc.publicnode.com',
 ];
 
 // Single shared provider instance - browser connection pool choke nahi hoga
