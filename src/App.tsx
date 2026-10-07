@@ -205,32 +205,35 @@ function MainApp() {
     const clean = walletAddress.trim().toLowerCase();
 
     try {
-      // Primary Authoritative check: getUserDashboard
-      const dash: any = await contractAdapter.getHubUserData(clean).catch(() => null);
-      if (dash) {
-        const uId = Number(dash.userId?.toString?.() || dash.numericId || dash[0] || 0);
-        const rTime = Number(dash.registrationTimestamp || dash.registrationTime || 0);
-        if (uId > 0 || rTime > 0) {
-          return {
-            registered: true,
-            node: {
-              id: uId,
-              wallet: clean,
-              isRegistered: true,
-              isBlocked: Boolean(dash.isBlocked),
-              upline: dash.sponsor || dash.sponsorId || '',
-            },
-          };
-        }
-      }
+      const [dash, node]: [any, any] = await Promise.all([
+        contractAdapter.getHubUserData(clean).catch(() => null),
+        contractAdapter.getHubUserNode(clean).catch(() => null),
+      ]);
 
-      // Secondary check: getHubUserNode
-      const node = await contractAdapter.getHubUserNode(clean).catch(() => null);
-      if (node) {
-        const numericId = Number(node.id || 0);
-        if (numericId > 0 || node.isRegistered) {
-          return { registered: true, node };
-        }
+      const dashNumericId = Number(dash?.numericId || 0);
+      const dashRegTime = Number(dash?.registrationTimestamp || 0);
+      const dashWalletMatch = Boolean(dash?.walletAddress && dash.walletAddress.toLowerCase() === clean);
+
+      const nodeNumericId = Number(node?.id || 0);
+      const nodeIsReg = Boolean(node?.isRegistered);
+      const nodeWalletMatch = Boolean(node?.wallet && node.wallet.toLowerCase() === clean);
+
+      const isReg = dashNumericId > 0 || dashRegTime > 0 || dashWalletMatch || nodeNumericId > 0 || nodeIsReg || nodeWalletMatch;
+
+      if (isReg) {
+        const resolvedId = dashNumericId > 0 ? dashNumericId : nodeNumericId;
+        return {
+          registered: true,
+          node: {
+            id: resolvedId,
+            wallet: clean,
+            isRegistered: true,
+            isBlocked: Boolean(dash?.isBlocked ?? node?.isBlocked ?? false),
+            upline: dash?.sponsor || dash?.sponsorId || node?.upline || '',
+            directTeam: node?.directTeam || [],
+            totalTeam: node?.totalTeam || dash?.totalTeamCount || 0,
+          },
+        };
       }
 
       return { registered: false, node: null };
@@ -731,7 +734,7 @@ function MainApp() {
     try {
       let verification = await verifyWalletRegistration(targetAddress);
       if (!verification.registered && registeredUser?.isNewRegistration) {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 1500));
         verification = await verifyWalletRegistration(targetAddress);
       }
 
@@ -748,7 +751,14 @@ function MainApp() {
         return;
       }
 
-      await syncLiveOnChainUser(targetAddress, verification.node);
+      // First unlock the dashboard view immediately
+      persistAppMode('dashboard');
+      setIsVerifyingOnChain(false);
+
+      // Complete profile synchronization in background
+      syncLiveOnChainUser(targetAddress, verification.node).catch((e) =>
+        console.warn('[App] Background profile sync warning:', e)
+      );
 
       if (registeredUser?.isNewRegistration) {
         centralEventSyncService.dispatchAction({
@@ -769,12 +779,10 @@ function MainApp() {
         } catch {}
       }
 
-      persistAppMode('dashboard');
-      showToast('Registration verified! Welcome to MDeFi Dashboard.', 'success');
+      showToast('Connected! Welcome to MDeFi Dashboard.', 'success');
     } catch (err) {
       console.error('[App] Verification error:', err);
       showToast('Blockchain verification timeout. Please try again.', 'warning');
-    } finally {
       setIsVerifyingOnChain(false);
     }
   };
