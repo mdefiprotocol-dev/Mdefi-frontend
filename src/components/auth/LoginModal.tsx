@@ -59,14 +59,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   setIsVerifying(true);
 
   try {
-    // Single-source on-chain verification via getUserDashboard (Fast & Authoritative)
-    const dashboard: any = await contractAdapter.getHubUserData(cleanWallet);
+    // Authoritative on-chain verification with fallback
+    const [dashboard, node] = await Promise.all([
+      contractAdapter.getHubUserData(cleanWallet).catch(() => null),
+      contractAdapter.getHubUserNode(cleanWallet).catch(() => null),
+    ]);
 
-    const hasValidWallet = Boolean(dashboard?.walletAddress && dashboard.walletAddress.toLowerCase() === cleanWallet);
-    const numericId = Number(dashboard?.numericId ?? 0);
-    const regTimestamp = Number(dashboard?.registrationTimestamp ?? 0);
+    const dashWallet = String((dashboard as any)?.walletAddress || '').toLowerCase();
+    const dashId = Number((dashboard as any)?.numericId || 0);
+    const dashRegTime = Number((dashboard as any)?.registrationTimestamp || 0);
 
-    const isRegistered = hasValidWallet || numericId > 0 || regTimestamp > 0;
+    const nodeWallet = String((node as any)?.wallet || '').toLowerCase();
+    const nodeId = Number((node as any)?.id || 0);
+    const nodeIsReg = Boolean((node as any)?.isRegistered);
+
+    const isRegistered = 
+      dashWallet === cleanWallet ||
+      dashId > 0 ||
+      dashRegTime > 0 ||
+      nodeWallet === cleanWallet ||
+      nodeId > 0 ||
+      nodeIsReg;
 
     if (!isRegistered) {
       setIsNotRegistered(true);
