@@ -55,6 +55,19 @@ const BSC_TESTNET_RPC_URLS = [
   'https://bsc-testnet.public.blastapi.io',
 ];
 
+// Single shared provider instance - browser connection pool choke nahi hoga
+let sharedRpcProvider: ethers.JsonRpcProvider | null = null;
+function getSharedRpcProvider(): ethers.JsonRpcProvider {
+  if (!sharedRpcProvider) {
+    sharedRpcProvider = new ethers.JsonRpcProvider(
+      BSC_TESTNET_RPC_URLS[0],
+      { chainId: 97, name: 'bnbt' },
+      { staticNetwork: true }
+    );
+  }
+  return sharedRpcProvider;
+}
+
 // no demo provider
 
 /**
@@ -199,9 +212,7 @@ export class RealContractProvider implements IContractProvider {
     }
 
     try {
-      // Fast static network caching + 4.5s strict timeout to eliminate 30-40s hung state
-      const rpcUrl = BSC_TESTNET_RPC_URLS[0];
-      const provider = new ethers.JsonRpcProvider(rpcUrl, { chainId: 97, name: 'bnbt' }, { staticNetwork: true });
+      const provider = getSharedRpcProvider();
       const contract = new ethers.Contract(
         contractAddress,
         abi,
@@ -214,18 +225,30 @@ export class RealContractProvider implements IContractProvider {
         );
       }
 
-      const callPromise = contract[methodName](...(args || []));
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('RPC request timed out')), 4500)
-      );
-
-      const result = await Promise.race([callPromise, timeoutPromise]);
+      // Direct on-chain pipeline - koi artificial timeout ya premature reject nahi
+      const result = await contract[methodName](...(args || []));
       return result as T;
     } catch (err: any) {
-      throw new Error(
-        err?.message ||
-          `[RealContractProvider] READ call failed for "${methodName}" on "${contractKey}".`
-      );
+      // Fallback to secondary public node if primary dropped
+      try {
+        const backupProvider = new ethers.JsonRpcProvider(
+          BSC_TESTNET_RPC_URLS[1],
+          { chainId: 97, name: 'bnbt' },
+          { staticNetwork: true }
+        );
+        const backupContract = new ethers.Contract(
+          contractAddress,
+          abi,
+          backupProvider
+        );
+        return (await backupContract[methodName](...(args || []))) as T;
+      } catch (backupErr: any) {
+        throw new Error(
+          backupErr?.message ||
+            err?.message ||
+            `[RealContractProvider] READ call failed for "${methodName}" on "${contractKey}".`
+        );
+      }
     }
   }
 

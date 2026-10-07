@@ -243,77 +243,71 @@ function MainApp() {
     }
   }, []);
 
-  // SINGLE UNIFIED INJECTED WALLET AND DAPP AUTO-SYNC
+  // SINGLE UNIFIED INJECTED WALLET AND DAPP AUTO-SYNC (Guarded Single-Trigger)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const w = window as any;
     const activeProvider = w.ethereum || w.trustwallet?.ethereum || w.tokenpocket?.ethereum || w.bitkeep?.ethereum || w.bitget?.ethereum;
 
     if (!activeProvider || typeof activeProvider.request !== 'function') {
-      // If not in injected DApp browser, verify cached user if in dashboard
-      if (appMode === 'dashboard' && userRef.current.walletAddress) {
-        verifyWalletRegistration(userRef.current.walletAddress).then(({ registered, node }) => {
-          if (registered && node) {
-            syncLiveOnChainUser(userRef.current.walletAddress, node);
-          } else {
-            persistAppMode('landing');
-          }
-        });
-      }
       return;
     }
 
-    // Set provider globally immediately
     setExternalWalletProvider(activeProvider);
 
+    let isSyncing = false;
+
     const checkAndSyncAccount = async () => {
+      if (isSyncing) return;
       try {
+        isSyncing = true;
         const accounts = (await activeProvider.request({ method: 'eth_accounts' })) as string[];
         if (Array.isArray(accounts) && accounts[0] && ethers.isAddress(accounts[0])) {
-          const liveAddr = accounts[0];
-          const currentStored = userRef.current.walletAddress;
+          const liveAddr = accounts[0].trim().toLowerCase();
+          const currentStored = (userRef.current.walletAddress || '').trim().toLowerCase();
 
-          // If address changed or not set, force refresh state
-          if (!currentStored || currentStored.toLowerCase() !== liveAddr.toLowerCase()) {
+          // Sirf tabhi verify & sync karein jab wallet naya ho ya stored na ho
+          if (!currentStored || currentStored !== liveAddr) {
             const { registered, node } = await verifyWalletRegistration(liveAddr);
             if (registered && node) {
               await syncLiveOnChainUser(liveAddr, node);
               persistAppMode('dashboard');
-            } else {
-              persistUserProfile({ ...emptyUserProfile, walletAddress: liveAddr });
-              persistAppMode('landing');
-            }
-          } else if (appMode === 'dashboard') {
-            // Address matches, verify node status
-            const { registered, node } = await verifyWalletRegistration(liveAddr);
-            if (registered && node) {
-              await syncLiveOnChainUser(liveAddr, node);
-            } else {
-              persistAppMode('landing');
             }
           }
-        } else if (appMode === 'dashboard' && userRef.current.walletAddress) {
-          // Injected wallet locked
-          persistAppMode('landing');
         }
       } catch (err) {
         console.warn('[App] Injected wallet auto-sync error:', err);
+      } finally {
+        isSyncing = false;
       }
     };
 
     checkAndSyncAccount();
 
     const handleAccountsChanged = async (accounts: unknown) => {
+      if (isSyncing) return;
       const accs = accounts as string[];
       if (Array.isArray(accs) && accs.length > 0 && ethers.isAddress(accs[0])) {
-        const newAddr = accs[0];
-        const { registered, node } = await verifyWalletRegistration(newAddr);
-        if (registered && node) {
-          await syncLiveOnChainUser(newAddr, node);
-          persistAppMode('dashboard');
-        } else {
-          persistUserProfile({ ...emptyUserProfile, walletAddress: newAddr });
-          persistAppMode('landing');
+        const newAddr = accs[0].trim().toLowerCase();
+        const currentStored = (userRef.current.walletAddress || '').trim().toLowerCase();
+
+        // Guard: Agar wahi same account dobara event throw kar raha hai, toh loop mat chalao
+        if (newAddr === currentStored && appMode === 'dashboard') {
+          return;
+        }
+
+        isSyncing = true;
+        try {
+          const { registered, node } = await verifyWalletRegistration(newAddr);
+          if (registered && node) {
+            await syncLiveOnChainUser(newAddr, node);
+            persistAppMode('dashboard');
+          } else {
+            persistUserProfile({ ...emptyUserProfile, walletAddress: newAddr });
+            persistAppMode('landing');
+          }
+        } finally {
+          isSyncing = false;
         }
       } else {
         persistUserProfile(emptyUserProfile);
@@ -336,7 +330,7 @@ function MainApp() {
         activeProvider.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, []); // Run once on mount safely, handles live events internally
+  }, [appMode, verifyWalletRegistration, syncLiveOnChainUser]);
 
   useEffect(() => {
     if (!user.walletAddress) return;
