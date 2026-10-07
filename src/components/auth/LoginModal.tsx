@@ -59,22 +59,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   setIsVerifying(true);
 
   try {
-    // Single-source on-chain verification.
-    // Do NOT run sponsor resolver or duplicate dashboard lookup here.
-    const node = await contractAdapter.getHubUserNode(cleanWallet);
+    // Single-source on-chain verification via getUserDashboard (Fast & Authoritative)
+    const dashboard: any = await contractAdapter.getHubUserData(cleanWallet);
 
-    const rawNode = (node || {}) as any;
+    const hasValidWallet = Boolean(dashboard?.walletAddress && dashboard.walletAddress.toLowerCase() === cleanWallet);
+    const numericId = Number(dashboard?.numericId ?? 0);
+    const regTimestamp = Number(dashboard?.registrationTimestamp ?? 0);
 
-    const nodeNumericId = Number(
-      rawNode.id ??
-      rawNode[0] ??
-      0
-    );
-
-    const isRegistered = Boolean(
-      rawNode.isRegistered ||
-      nodeNumericId > 0
-    );
+    const isRegistered = hasValidWallet || numericId > 0 || regTimestamp > 0;
 
     if (!isRegistered) {
       setIsNotRegistered(true);
@@ -85,11 +77,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       return;
     }
 
-    const isBlocked = Boolean(
-      rawNode.isBlocked ??
-      rawNode[5] ??
-      false
-    );
+    const isBlocked = Boolean(dashboard?.isBlocked ?? false);
 
     if (isBlocked) {
       setErrorMsg(
