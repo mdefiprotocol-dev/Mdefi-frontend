@@ -51,8 +51,8 @@ export interface IContractProvider {
 }
 
 const BSC_TESTNET_RPC_URLS = [
-  'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
-  'https://bsc-testnet.bnbchain.org',
+  'https://bsc-testnet-rpc.publicnode.com',
+  'https://bsc-testnet.public.blastapi.io',
 ];
 
 /**

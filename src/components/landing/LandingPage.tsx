@@ -236,6 +236,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // ON-CHAIN REGISTRATION CHECK (Fast Single-Source Authoritative)
   // -------------------------------------------------------
 
+  // -------------------------------------------------------
+  // ON-CHAIN REGISTRATION CHECK (Fast Single-Source Authoritative)
+  // -------------------------------------------------------
+
   const checkRegistrationStatus = async (
     address: string
   ): Promise<boolean> => {
@@ -248,20 +252,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
 
     try {
-      // Primary authoritative read from getUserDashboard
+      // 1. Primary check: getHubUserData (getUserDashboard tuple)
       const dash: any = await contractAdapter.getHubUserData(clean).catch(() => null);
 
       if (dash) {
-        const uId = Number(dash.userId?.toString?.() || dash.numericId || dash[0] || 0);
-        const rTime = Number(dash.registrationTimestamp || dash.registrationTime || 0);
-        if (uId > 0 || rTime > 0) return true;
+        const hasValidAddress = Boolean(dash.walletAddress && dash.walletAddress.toLowerCase() === clean);
+        const numericId = Number(dash.numericId ?? 0);
+        const regTime = Number(dash.registrationTimestamp ?? 0);
+
+        if (hasValidAddress || numericId > 0 || regTime > 0) {
+          return true;
+        }
       }
 
-      // Fast fallback to getHubUserNode
+      // 2. Safe fallback: getHubUserNode
       const node: any = await contractAdapter.getHubUserNode(clean).catch(() => null);
       if (node) {
-        const nId = Number(node.id || node[0] || 0);
-        if (node.isRegistered || nId > 0) return true;
+        const nodeNumId = Number(node.id || 0);
+        const isRegistered = Boolean(node.isRegistered);
+        const nodeWalletMatch = Boolean(node.wallet && node.wallet.toLowerCase() === clean);
+
+        if (isRegistered || nodeNumId > 0 || nodeWalletMatch) {
+          return true;
+        }
       }
 
       return false;

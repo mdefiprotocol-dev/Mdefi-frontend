@@ -394,16 +394,32 @@ export class ContractAdapter {
 
       if (!dashboard) return null;
 
-      const rawNumericId = dashboard.userId ? Number(dashboard.userId.toString()) : 0;
-      if (rawNumericId === 0) return null;
+      // Smart Contract Tuple Mapping (Supports named keys, array indices, and BigInt):
+      // index 0: userId (uint256) | index 1: wallet (address) | index 2: sponsor (address) | index 3: registrationTime (uint256)
+      const onChainWallet = String(dashboard.wallet ?? dashboard[1] ?? '').toLowerCase();
+      const rawRegTime = Number(dashboard.registrationTime ?? dashboard[3] ?? 0);
+      const rawNumericId = Number(dashboard.userId ?? dashboard[0] ?? 0);
+
+      // Web3 Principle: Wallet tabhi registered hoga jab contract par registrationTime > 0 ho
+      // ya on-chain wallet actual connected wallet address se match kare
+      const isRegisteredOnChain = rawRegTime > 0 || (onChainWallet.length === 42 && onChainWallet === walletAddress.toLowerCase()) || rawNumericId > 0;
+
+      if (!isRegisteredOnChain) {
+        return null;
+      }
 
       const formatUSDT = (val: any) => {
         if (!val) return '0.00';
-        return ethers.formatUnits(val.toString(), 18);
+        try {
+          return ethers.formatUnits(val.toString(), 18);
+        } catch {
+          return '0.00';
+        }
       };
 
-      const userFacingId = toHumanFacingId(rawNumericId);
-      const sponsorAddress = dashboard.sponsor || '';
+      // Real On-Chain ID: idConverter dynamic mapping se UI format generate karega
+      const userFacingId = rawNumericId > 0 ? toHumanFacingId(rawNumericId) : '';
+      const sponsorAddress = String(dashboard.sponsor ?? dashboard[2] ?? '');
 
       return {
         walletAddress,

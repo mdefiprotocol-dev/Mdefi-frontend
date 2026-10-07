@@ -26,7 +26,7 @@ export const NETWORK_CONFIG: ContractDeploymentConfig = {
   isDeployed: true,
   networkName: 'BNB Smart Chain Testnet (BEP-20)',
   chainId: 97,
-  rpcUrl: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
+  rpcUrl: 'https://bsc-testnet-rpc.publicnode.com',
   explorerUrl: 'https://testnet.bscscan.com',
 };
 
