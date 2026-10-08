@@ -383,7 +383,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         // Team activity record
@@ -409,7 +409,7 @@ class CentralEventSyncService {
           package: 'Tier 1 Node',
           status: 'Active',
           joinedDate: new Date().toISOString().split('T')[0],
-          volumeUSD: 10,
+          volumeUSDT: 10,
           isDirect: true,
           directPartners: 0,
           sponsor: sId,
@@ -425,102 +425,114 @@ class CentralEventSyncService {
       }
 
       case 'REFERRAL_REWARD': {
-        const bonus = payload.amountMbttc || 50;
+        const claimedTokens = Number(payload.amountMbttc ?? 0);
+        const amountDisplay = `+${claimedTokens.toFixed(2)} MBTTC`;
+        const uniqueHistoryKey = `ref-claim-${tx !== '0x0' ? tx : wallet}-${timestamp}`;
+
         userActivityItem = {
-          id: `ref-reward-${tx}`,
-          type: 'Team Income',
-          title: 'Referral Reward',
-          amount: `+${bonus.toFixed(2)} MBTTC`,
+          id: uniqueHistoryKey,
+          type: 'Claim',
+          title: 'Referral Reward Claimed',
+          amount: amountDisplay,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
-          details: payload.details || `Direct sponsor referral reward of ${bonus.toFixed(2)} MBTTC credited on BSC`,
+          details: payload.details || `On-chain referral reward distribution of ${amountDisplay} claimed to wallet.`,
           walletAddress: wallet,
           read: false,
+          timestamp: timestamp,
+          createdAt: timestamp,
         };
 
         publicActivityItem = {
-          id: `eco-ref-${tx}`,
-          type: 'DIRECT_INCOME',
-          title: 'Direct Referral Commission',
-          description: 'Referral bonus distributed on-chain',
-          amount: `+${bonus.toFixed(2)} MBTTC`,
+          id: `eco-${uniqueHistoryKey}`,
+          type: 'MBTTC_CLAIM',
+          title: 'Referral Reward Claim',
+          description: payload.details || 'Referral yield reward claimed on-chain',
+          amount: amountDisplay,
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
         };
 
         teamTxRecord = {
-          id: `team-ref-${tx}`,
-          activityType: 'Direct Referral',
+          id: `team-${uniqueHistoryKey}`,
+          activityType: 'Referral Claim',
           memberWallet: wallet,
-          userId: payload.userId || 'MDF-User',
-          packageName: 'Referral Commission',
-          amount: `+${bonus.toFixed(2)} MBTTC`,
+          userId: payload.userId || '',
+          packageName: 'Referral Pool',
+          amount: amountDisplay,
           status: 'Confirmed',
           date: 'Just now',
           timestamp: 'Just now',
-          details: 'Direct partner referral bonus confirmed on-chain',
+          details: payload.details || `Referral reward claimed: ${amountDisplay}`,
           txHash: tx,
         };
         break;
       }
 
       case 'REGISTRATION_REWARD': {
-        const amount = payload.amountMbttc || 30;
+        const rawRegMbttc = Number(payload.amountMbttc ?? 0);
+        const amountDisplay = `+${rawRegMbttc.toFixed(2)} MBTTC`;
+        const uniqueRegKey = `reg-claim-${tx !== '0x0' ? tx : wallet}-${timestamp}`;
+
         userActivityItem = {
-          id: `reg-claim-${tx}`,
+          id: uniqueRegKey,
           type: 'Claim',
           title: 'Registration Reward Claimed',
-          amount: `+${amount.toFixed(2)} MBTTC`,
+          amount: amountDisplay,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
-          details: `Welcome registration reward of ${amount.toFixed(2)} MBTTC claimed to wallet on BSC`,
+          details: payload.details || `Welcome registration reward of ${amountDisplay} claimed to wallet.`,
           walletAddress: wallet,
           read: false,
+          timestamp: timestamp,
+          createdAt: timestamp,
         };
 
         publicActivityItem = {
-          id: `eco-reg-claim-${tx}`,
+          id: `eco-${uniqueRegKey}`,
           type: 'MBTTC_CLAIM',
           title: 'Registration Reward Claim',
-          description: 'Welcome bonus claimed to wallet',
-          amount: `+${amount.toFixed(2)} MBTTC`,
+          description: payload.details || 'Welcome registration reward claimed on-chain',
+          amount: amountDisplay,
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
         };
         break;
       }
 
       case 'PACKAGE_REWARD': {
-        const amount = payload.amountMbttc || 25;
+        const claimedPkgTokens = Number(payload.amountMbttc ?? 0);
+        const amountDisplay = `+${claimedPkgTokens.toFixed(2)} MBTTC`;
+        const uniqueHistoryKey = `pkg-claim-${tx !== '0x0' ? tx : wallet}-${timestamp}`;
+
         userActivityItem = {
-          id: `pkg-reward-${tx}`,
+          id: uniqueHistoryKey,
           type: 'Claim',
           title: 'Package Reward Claimed',
-          amount: `+${amount.toFixed(2)} MBTTC`,
+          amount: amountDisplay,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
-          details: `Package reward distribution of ${amount.toFixed(2)} MBTTC collected to wallet`,
+          details: payload.details || `On-chain package reward distribution of ${amountDisplay} collected to wallet.`,
           walletAddress: wallet,
           read: false,
+          timestamp: timestamp,
+          createdAt: timestamp,
         };
 
         publicActivityItem = {
-          id: `eco-pkg-reward-${tx}`,
+          id: `eco-${uniqueHistoryKey}`,
           type: 'MBTTC_CLAIM',
           title: 'Package Yield Claim',
-          description: 'Package reward credited on-chain',
-          amount: `+${amount.toFixed(2)} MBTTC`,
+          description: payload.details || 'Package yield reward claimed on-chain',
+          amount: amountDisplay,
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
         };
         break;
       }
@@ -532,8 +544,8 @@ class CentralEventSyncService {
         userActivityItem = {
           id: `s4-${tx}`,
           type: 'Package Activation',
-          title: `S4 Node Activated — ${pkgName} ($${price} USD)`,
-          amount: `-$${price} USD`,
+          title: `S4 Node Activated — ${pkgName} ($${price} USDT)`,
+          amount: `-$${price} USDT`,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
@@ -551,7 +563,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -576,7 +588,7 @@ class CentralEventSyncService {
           id: `quantum-${tx}`,
           type: 'Quantum Node',
           title: 'Quantum Node ($70) Activated',
-          amount: `-$${price} USD`,
+          amount: `-$${price} USDT`,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
@@ -594,7 +606,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -619,7 +631,7 @@ class CentralEventSyncService {
           id: `prime-${tx}`,
           type: 'Nexus Prime',
           title: 'Nexus Prime ($120) Activated',
-          amount: `-$${price} USD`,
+          amount: `-$${price} USDT`,
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
@@ -637,7 +649,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -690,7 +702,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -743,7 +755,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -796,7 +808,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -873,7 +885,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
 
         teamTxRecord = {
@@ -915,7 +927,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
         break;
       }
@@ -952,7 +964,7 @@ class CentralEventSyncService {
           member: this.formatMaskedMember(wallet),
           timestamp: 'Just now',
           status: 'Confirmed',
-          isDemo: false,
+          
         };
         break;
       }

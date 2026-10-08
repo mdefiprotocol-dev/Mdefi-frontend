@@ -15,7 +15,7 @@ export type NavPage =
   | 'profile';
 
 export interface UserProfile {
-  userId: string; // Dynamic user facing ID (jaise: MDF-00002)
+  userId: string; // Dynamic user facing ID (e.g. MDF-1)
   blockchainNumericId?: number; // On-chain uint64 numeric ID
   numericId?: number;
   walletAddress: string;
@@ -39,6 +39,7 @@ export interface UserProfile {
   totalEarnedMbttc?: number;
   isRealBlockchainData?: boolean;
 }
+
 export interface RewardBalances {
   // Referral rewards
   referralEarned: number;
@@ -64,7 +65,8 @@ export interface PackageItem {
   id: string;
   numericId?: number;
   name: string;
-  priceUSD: number;
+  priceUSDT: number; // Pure USDT Standard (No USD)
+  priceUSD?: number;  // Optional legacy fallback so other components don't crash
   status: 'Active' | 'Available' | 'Pending';
   activationDate?: string;
   version?: string;
@@ -82,7 +84,7 @@ export interface TeamMember {
   package: string;
   status: 'Active' | 'Inactive';
   joinedDate: string;
-  volumeUSD: number;
+  volumeUSDT: number; // Pure USDT Standard (No USD)
   isDirect: boolean;
   directPartners: number;
   name?: string;
@@ -140,12 +142,12 @@ export interface MbttcTokenStats {
 }
 
 export interface IncomeBreakdown {
-  totalIncomeUSD: number;
+  totalIncomeUSDT: number;
   totalMbttc: number;
-  referralIncomeUSD: number;
-  packageIncomeUSD: number;
-  matrixIncomeUSD: number;
-  otherIncomeUSD: number;
+  referralIncomeUSDT: number;
+  packageIncomeUSDT: number;
+  matrixIncomeUSDT: number;
+  otherIncomeUSDT: number;
 }
 
 export interface TransactionRecord {
