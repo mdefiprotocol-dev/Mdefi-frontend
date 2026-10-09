@@ -299,7 +299,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     try {
       const res = await mdefiService.getTeamTransactions(activeWallet);
       if (res && Array.isArray(res.transactions) && res.transactions.length > 0) {
-        const mapped: ActivityItem[] = res.transactions.map((tx) => {
+        const mapped: ActivityItem[] = res.transactions.map((tx:any) => {
           const actLower = (tx.activityType || '').toLowerCase();
           const amtLower = (tx.amount || '').toLowerCase();
 
