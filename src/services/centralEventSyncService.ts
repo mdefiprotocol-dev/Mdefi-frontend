@@ -186,7 +186,8 @@ class CentralEventSyncService {
   private state: SynchronizedEcosystemState;
 
   constructor() {
-    this.loadProcessedEvents();
+    // Event identities are deduplicated in memory. Persisting IDs without the corresponding
+    // event ledger would make a page reload suppress historical backfill records.
     this.state = this.loadInitialState();
   }
 
@@ -268,6 +269,11 @@ class CentralEventSyncService {
    */
   public handleRawContractEvent(rawEvent: RawBlockchainEvent): boolean {
     if (!rawEvent || !rawEvent.contractId) return false;
+    if (rawEvent.chainId !== 56 && rawEvent.chainId !== 97) return false;
+    if (!rawEvent.contractAddress || !/^0x[a-fA-F0-9]{40}$/.test(rawEvent.contractAddress)) return false;
+    if (!rawEvent.transactionHash || !/^0x[a-fA-F0-9]{64}$/.test(rawEvent.transactionHash)) return false;
+    if (!Number.isSafeInteger(rawEvent.blockNumber) || Number(rawEvent.blockNumber) < 0) return false;
+    if (!Number.isSafeInteger(rawEvent.logIndex) || Number(rawEvent.logIndex) < 0) return false;
     const adapter = this.adapters.get(rawEvent.contractId);
     if (!adapter) {
       console.warn(`[CentralEventSync] No adapter registered for contract: ${rawEvent.contractId}`);
@@ -288,17 +294,15 @@ class CentralEventSyncService {
     const chain = payload.chainId || 56;
     const contract = (payload.contractAddress || payload.contractId || 'hub').trim().toLowerCase();
     const tx = (payload.txHash || '').trim().toLowerCase();
-    const log = payload.logIndex !== undefined ? payload.logIndex : 0;
+    const log = payload.logIndex;
     const action = payload.actionType.toLowerCase();
 
-    if (tx && tx !== '0x0' && tx.length >= 10) {
+    if (tx && /^0x[a-f0-9]{64}$/.test(tx) && payload.logIndex !== undefined && payload.contractAddress) {
       return `chain:${chain}:contract:${contract}:tx:${tx}:log:${log}:${action}`;
     }
 
-    // Demo deterministic fallback
-    const wallet = (payload.walletAddress || 'demo').trim().toLowerCase();
-    const pkg = (payload.packageId || '').toLowerCase();
-    return `demo:${action}:${wallet}:${pkg}:${tx || 'tx0'}`;
+    // Invalid/incomplete event metadata must not collide with a real on-chain event.
+    return `invalid:${action}:${tx || 'missing-tx'}:${payload.walletAddress || 'missing-wallet'}`;
   }
 
   /**

@@ -199,400 +199,151 @@ export class MDefiHubMockService implements IMDefiHubService {
     isRealData: boolean;
     transactions: TeamTransactionRecord[];
   }> {
-    let targetWallet = this.getEffectiveWallet(walletAddress);
-
-    // Chrome WalletConnect Fallback (DOM Header Match)
-    if ((!targetWallet || !ethers.isAddress(targetWallet)) && typeof window !== 'undefined') {
-      try {
-        const rawWagmi = localStorage.getItem('wagmi.store') || '';
-        const matched = rawWagmi.match(/0x[a-fA-F0-9]{40}/);
-        if (matched && ethers.isAddress(matched[0])) {
-          targetWallet = matched[0].toLowerCase();
-        }
-      } catch {}
-    }
-
-    if (!targetWallet && typeof window !== 'undefined' && (window as any).ethereum?.request) {
-      try {
-        const accs = await (window as any).ethereum.request({ method: 'eth_accounts' });
-        if (accs && accs[0] && ethers.isAddress(accs[0])) {
-          targetWallet = accs[0].toLowerCase();
-        }
-      } catch {}
-    }
-
+    const targetWallet = this.getEffectiveWallet(walletAddress);
     if (!targetWallet || !ethers.isAddress(targetWallet)) {
       return { isRealData: false, transactions: [] };
     }
 
+    const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
+    if (!hubAddress || !ethers.isAddress(hubAddress)) {
+      console.warn('[MDefiHub] Historical feed disabled: valid mdefiHub address is not configured.');
+      return { isRealData: false, transactions: [] };
+    }
+
     try {
-      const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
-      if (!hubAddress || !ethers.isAddress(hubAddress)) {
-        return { isRealData: false, transactions: [] };
-      }
-
       const provider = this.getReliableProvider();
-      const hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
-
-      const formatPremiumDate = (sec: number) => {
-        if (!sec || sec <= 0) return 'Just now';
-        const d = new Date(sec * 1000);
-        const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-        return `${date} · ${time}`;
-      };
-
-      // 1. प्राथमिक स्टेट और फेज़ रिवॉर्ड्स लोड करें (Zero Fake Accumulator Card)
-      const [selfDash, selfNode, phaseRewards] = await Promise.all([
-        hubContract.getUserDashboard(targetWallet).catch(() => null),
-        hubContract.getUserNode(targetWallet).catch(() => null),
-        hubContract.getPhaseRewards().catch(() => null),
-      ]);
-
-      const selfRegSec = selfDash?.registrationTime ? Number(selfDash.registrationTime.toString()) : 0;
-      const selfNumId = selfDash?.userId ? Number(selfDash.userId.toString()) : 0;
-      const selfId = selfNumId > 0 ? toHumanFacingId(selfNumId) : `0x${targetWallet.slice(2, 6)}...${targetWallet.slice(-4)}`;
-      const formattedSelfTime = formatPremiumDate(selfRegSec);
-
-      const dynamicRegReward = phaseRewards?.regReward 
-        ? Number(ethers.formatUnits(phaseRewards.regReward, 18)).toFixed(2) 
-        : '30.00';
-      const dynamicRefReward = phaseRewards?.refReward 
-        ? Number(ethers.formatUnits(phaseRewards.refReward, 18)).toFixed(2) 
-        : '20.00';
-
-      const realTransactions: LedgerItem[] = [];
-
-      const buildTxHash = (addr: string, type: string, time: number) => {
-        return ethers.keccak256(ethers.toUtf8Bytes(`${addr}-${type}-${time}-${hubAddress}`));
-      };
-
-      // उपयोगकर्ता रजिस्ट्रेशन कार्ड
-      if (selfRegSec > 0) {
-        realTransactions.push({
-          id: `self-node-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: 'Node Registered',
-          amount: 'Node Registered',
-          status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'REGISTRATION', selfRegSec),
-          date: formattedSelfTime,
-          activityType: 'Your Account Registration',
-          details: `Protocol node established (${selfId})`,
-          timestamp: formattedSelfTime,
-          isRealData: true,
-          rawTime: selfRegSec,
-        });
-
-        realTransactions.push({
-          id: `self-airdrop-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${dynamicRegReward} MBTTC`,
-          amount: `+${dynamicRegReward} MBTTC`,
-          status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'AIRDROP', selfRegSec),
-          date: formattedSelfTime,
-          activityType: 'MBTTC Welcome Airdrop',
-          details: `Genesis welcome ${dynamicRegReward} MBTTC minted to wallet (${selfId})`,
-          timestamp: formattedSelfTime,
-          isRealData: true,
-          rawTime: selfRegSec,
-        });
+      const network = await provider.getNetwork();
+      if (Number(network.chainId) !== 97 && Number(network.chainId) !== 56) {
+        throw new Error(`Unexpected RPC chain ID: ${network.chainId}`);
       }
 
-      // 2. टीम मेंबर्स की डिस्कवरी (डाउनलाइन स्ट्रक्चर)
-      const directWallets: string[] = selfNode?.directTeam ? Array.from(selfNode.directTeam) : [];
-      const teamMap = new Map<string, { sponsorId: string; isDirect: boolean; level: number }>();
-      const visitedWallets = new Set<string>([targetWallet.toLowerCase()]);
-
-      directWallets.forEach((addr) => {
-        if (ethers.isAddress(addr)) {
-          const cAddr = addr.toLowerCase();
-          if (!visitedWallets.has(cAddr)) {
-            visitedWallets.add(cAddr);
-            teamMap.set(cAddr, { sponsorId: selfId, isDirect: true, level: 1 });
-          }
-        }
-      });
-
-      // Level 2 Sub-nodes (Parallel Fetch)
-      const subNodesData = await Promise.all(
-        Array.from(teamMap.keys()).map(async (dirAddr) => {
-          try {
-            const [sNode, sDash] = await Promise.all([
-              hubContract.getUserNode(dirAddr).catch(() => null),
-              hubContract.getUserDashboard(dirAddr).catch(() => null),
-            ]);
-            return { dirAddr, sNode, sDash };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      const level2List: { addr: string; sponsorId: string }[] = [];
-
-      subNodesData.forEach((res) => {
-        if (!res || !res.sNode) return;
-        const subDirects: string[] = res.sNode.directTeam ? Array.from(res.sNode.directTeam) : [];
-        const sNumericId = res.sDash?.userId ? Number(res.sDash.userId.toString()) : 0;
-        const parentId = sNumericId > 0 ? toHumanFacingId(sNumericId) : selfId;
-
-        subDirects.forEach((subAddr) => {
-          if (ethers.isAddress(subAddr)) {
-            const cSub = subAddr.toLowerCase();
-            if (!visitedWallets.has(cSub)) {
-              visitedWallets.add(cSub);
-              teamMap.set(cSub, { sponsorId: parentId, isDirect: false, level: 2 });
-              level2List.push({ addr: cSub, sponsorId: parentId });
-            }
-          }
-        });
-      });
-
-      // Level 3 Downline (Parallel Fetch)
-      if (level2List.length > 0) {
-        const level3Data = await Promise.all(
-          level2List.map(async (item) => {
-            try {
-              const [l3Node, l3Dash] = await Promise.all([
-                hubContract.getUserNode(item.addr).catch(() => null),
-                hubContract.getUserDashboard(item.addr).catch(() => null),
-              ]);
-              return { item, l3Node, l3Dash };
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        level3Data.forEach((res) => {
-          if (!res || !res.l3Node) return;
-          const l3Directs: string[] = res.l3Node.directTeam ? Array.from(res.l3Node.directTeam) : [];
-          const l3Num = res.l3Dash?.userId ? Number(res.l3Dash.userId.toString()) : 0;
-          const l3ParentId = l3Num > 0 ? toHumanFacingId(l3Num) : res.item.sponsorId;
-
-          l3Directs.forEach((l3Addr) => {
-            if (ethers.isAddress(l3Addr)) {
-              const cL3 = l3Addr.toLowerCase();
-              if (!visitedWallets.has(cL3)) {
-                visitedWallets.add(cL3);
-                teamMap.set(cL3, { sponsorId: l3ParentId, isDirect: false, level: 3 });
-              }
-            }
-          });
-        });
+      const iface = new ethers.Interface(HUB_ABI as any);
+      const latestBlock = await provider.getBlockNumber();
+      // Configure VITE_MDEFI_HUB_DEPLOYMENT_BLOCK to avoid scanning from genesis.
+      const envBlock = Number((import.meta as any)?.env?.VITE_MDEFI_HUB_DEPLOYMENT_BLOCK ?? 0);
+      const fromBlock = Number.isSafeInteger(envBlock) && envBlock >= 0 ? envBlock : 0;
+      if (fromBlock > latestBlock) {
+        throw new Error(`Configured deployment block ${fromBlock} is ahead of latest block ${latestBlock}`);
       }
 
-      // 3. सभी टीम मेंबर्स का डेटा पैरेलल रिज़ॉल्व करें
-      const teamEntries = Array.from(teamMap.entries());
-      const membersData = await Promise.all(
-        teamEntries.map(async ([memberAddr, meta]) => {
-          try {
-            const mDash = await hubContract.getUserDashboard(memberAddr).catch(() => null);
-            return { memberAddr, meta, mDash };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      for (const item of membersData) {
-        if (!item || !item.mDash) continue;
-        const { memberAddr, meta, mDash } = item;
-
-        const regSec = mDash.registrationTime ? Number(mDash.registrationTime.toString()) : 0;
-        const mNumericId = mDash.userId ? Number(mDash.userId.toString()) : 0;
-        const mId = mNumericId > 0 ? toHumanFacingId(mNumericId) : `Member ••••${memberAddr.slice(-4)}`;
-        const activePkgs = mDash.activePackageCount ? Number(mDash.activePackageCount.toString()) : 0;
-
-        const timeStr = formatPremiumDate(regSec);
-        const teamLabel = meta.isDirect ? 'Direct partner' : `Level ${meta.level} partner`;
-
-        if (regSec > 0) {
-          realTransactions.push({
-            id: `team-reg-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: 'Node Registered',
-            amount: 'Node Registered',
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'REGISTRATION', regSec),
-            date: timeStr,
-            activityType: 'Team Member Registration',
-            details: `${teamLabel} ${mId} registered under sponsor ${meta.sponsorId}`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec,
-          });
-
-          realTransactions.push({
-            id: `team-mint-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: `+${dynamicRegReward} MBTTC`,
-            amount: `+${dynamicRegReward} MBTTC`,
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'AIRDROP', regSec),
-            date: timeStr,
-            activityType: 'MBTTC Genesis Mint',
-            details: `Genesis welcome ${dynamicRegReward} MBTTC minted to ${mId}`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec,
-          });
-        }
-
-        if (meta.isDirect && Number(dynamicRefReward) > 0 && regSec > 0) {
-          realTransactions.push({
-            id: `team-sponsor-ref-${memberAddr}`,
-            memberWallet: targetWallet,
-            userId: selfId,
-            packageAmount: `+${dynamicRefReward} MBTTC`,
-            amount: `+${dynamicRefReward} MBTTC`,
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'SPONSOR_BONUS', regSec),
-            date: timeStr,
-            activityType: 'MBTTC Referral Pool Addition',
-            details: `Direct invite reward +${dynamicRefReward} MBTTC added to referral pool (${mId})`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec,
-          });
-        }
-
-        if (activePkgs > 0 && regSec > 0) {
-          realTransactions.push({
-            id: `team-pkg-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: 'Node Active',
-            amount: 'Node Active',
-            status: 'Confirmed',
-            txHash: buildTxHash(memberAddr, 'PACKAGE_ACTIVE', regSec),
-            date: timeStr,
-            activityType: 'Team Package Activation',
-            details: `Partner ${mId} activated node package on smart contract`,
-            timestamp: timeStr,
-            isRealData: true,
-            rawTime: regSec,
-          });
-        }
-
-        // On-chain Direct Partner Referral Claim Card (Exact Individual Claim Sync)
-        const mRefClaimedWei = mDash.referralTotalClaimed ? BigInt(mDash.referralTotalClaimed.toString()) : 0n;
-        if (mRefClaimedWei > 0n) {
-          const totalClaimNum = Number(ethers.formatUnits(mRefClaimedWei, 18));
-          // Pehle live receipt check karein agar exact amount saved hai
-          const cachedMatch = this.liveClaimReceipts.find(
-            (r) => (r.memberWallet || '').toLowerCase() === memberAddr.toLowerCase() && (r.activityType || '').includes('Claim')
-          );
-          
-          // On-chain actual single claim extraction (200 BPS / 2% cycle slice, never cumulative lifetime)
-          const singleCycleAmt = totalClaimNum > 0 ? (totalClaimNum > 10 ? (totalClaimNum * 0.08).toFixed(2) : totalClaimNum.toFixed(2)) : '0.00';
-          let displayAmt = cachedMatch?.amount || `+${singleCycleAmt} MBTTC`;
-          const currentClaimSec = cachedMatch?.rawTime || Math.max(regSec + 60, Math.floor(Date.now() / 1000) - 1800);
-          const currentClaimTime = formatPremiumDate(currentClaimSec);
-
-          realTransactions.push({
-            id: `team-claim-${memberAddr}`,
-            memberWallet: memberAddr,
-            userId: mId,
-            packageAmount: displayAmt,
-            amount: displayAmt,
-            status: 'Confirmed',
-            txHash: cachedMatch?.txHash || buildTxHash(memberAddr, 'CLAIM_REF_PARTNER', currentClaimSec),
-            date: currentClaimTime,
-            activityType: 'MBTTC Referral Pool Claim',
-            details: `Partner ${mId} claimed referral yield to wallet`,
-            timestamp: currentClaimTime,
-            isRealData: true,
-            rawTime: currentClaimSec,
-          });
-        }
+      // Discover the target's team exclusively from Registered logs (user, id, upline).
+      // Logs are paged to avoid RPC range limits; no dashboard totals are converted into fake history.
+      const registrationLogs: ethers.Log[] = [];
+      const rangeSize = 1500;
+      for (let from = fromBlock; from <= latestBlock; from += rangeSize) {
+        const to = Math.min(from + rangeSize - 1, latestBlock);
+        const logs = await provider.getLogs({ address: hubAddress, fromBlock: from, toBlock: to });
+        registrationLogs.push(...logs);
       }
 
-      // 4. Har individual claim ka alag card (LocalStorage + Memory Sync + Fallback)
-      if (typeof window !== 'undefined') {
+      type Registration = { user: string; upline: string; id: string; log: ethers.Log };
+      const registrations: Registration[] = [];
+      for (const log of registrationLogs) {
         try {
-          const cached = JSON.parse(localStorage.getItem('mdefi_cached_claims_v1') || '[]');
-          if (Array.isArray(cached) && cached.length > 0) {
-            cached.forEach((item: LedgerItem) => {
-              const itemHash = (item.txHash || '').toLowerCase();
-              if (itemHash && !this.liveClaimReceipts.some((r) => (r.txHash || '').toLowerCase() === itemHash)) {
-                this.liveClaimReceipts.push(item);
-              }
-            });
-          }
-        } catch {}
+          const parsed = iface.parseLog({ topics: [...log.topics], data: log.data });
+          if (!parsed || parsed.name !== 'Registered') continue;
+          const userArg = parsed.args.user ?? parsed.args[0];
+          const idArg = parsed.args.id ?? parsed.args[1];
+          const uplineArg = parsed.args.upline ?? parsed.args[2];
+          if (!ethers.isAddress(String(userArg)) || !ethers.isAddress(String(uplineArg))) continue;
+          registrations.push({ user: String(userArg).toLowerCase(), upline: String(uplineArg).toLowerCase(), id: String(idArg), log });
+        } catch { /* unrelated or unknown ABI event */ }
       }
 
-      // Live claim receipts attach karein
-      this.liveClaimReceipts.forEach((receipt) => {
-        const receiptHash = (receipt.txHash || '').toLowerCase();
-        if (receiptHash && !realTransactions.some((tx) => (tx.txHash || '').toLowerCase() === receiptHash)) {
-          realTransactions.unshift(receipt);
+      const teamDepth = new Map<string, number>();
+      const target = targetWallet.toLowerCase();
+      // Repeat until no new descendants are found, with a hard depth cap to prevent corrupt cycles.
+      teamDepth.set(target, 0);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const reg of registrations) {
+          const parentDepth = teamDepth.get(reg.upline);
+          if (parentDepth !== undefined && parentDepth < 20 && !teamDepth.has(reg.user)) {
+            teamDepth.set(reg.user, parentDepth + 1);
+            changed = true;
+          }
         }
-      });
+      }
 
-      // Self on-chain claim verified presence fallback (Exact Clean Card)
-      const selfTotalClaimedWei = selfDash?.referralTotalClaimed ? BigInt(selfDash.referralTotalClaimed.toString()) : 0n;
-      const selfCachedReceipts = this.liveClaimReceipts.filter(
-        (tx) => (tx.activityType || '').includes('Claim') && (tx.memberWallet || '').toLowerCase() === targetWallet.toLowerCase()
-      );
+      const relevantAddresses = new Set(teamDepth.keys());
+      const records: Array<TeamTransactionRecord & { __block: number; __log: number }> = [];
+      const blockTimes = new Map<number, number>();
+      const blockTimestamp = async (blockNumber: number) => {
+        if (!blockTimes.has(blockNumber)) {
+          const block = await provider.getBlock(blockNumber);
+          blockTimes.set(blockNumber, block?.timestamp ?? 0);
+        }
+        return blockTimes.get(blockNumber) || 0;
+      };
 
-      // Agar localStorage me already exact receipts hain, unko priority do
-      if (selfCachedReceipts.length > 0) {
-        selfCachedReceipts.forEach((r) => {
-          if (!realTransactions.some((tx) => tx.id === r.id || tx.txHash === r.txHash)) {
-            realTransactions.unshift(r);
+      for (const log of registrationLogs) {
+        let parsed: ethers.LogDescription | null = null;
+        try { parsed = iface.parseLog({ topics: [...log.topics], data: log.data }); } catch { continue; }
+        if (!parsed) continue;
+        const args: any = parsed.args;
+        const name = parsed.name;
+        const argValues = Object.values(args).filter((v: any) => typeof v === 'string');
+        const addresses = argValues.filter((v: any) => ethers.isAddress(v)).map((v: string) => v.toLowerCase());
+        const preferredAddress = args.user ?? args.leader ?? args.account ?? args.member;
+        const eventWallet = (preferredAddress && ethers.isAddress(String(preferredAddress)) && relevantAddresses.has(String(preferredAddress).toLowerCase()))
+          ? String(preferredAddress).toLowerCase()
+          : addresses.find((a) => relevantAddresses.has(a));
+        if (!eventWallet) continue;
+
+        const depth = teamDepth.get(eventWallet) ?? 0;
+        const ts = await blockTimestamp(log.blockNumber);
+        const date = ts > 0 ? new Date(ts * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Timestamp unavailable';
+        const hash = log.transactionHash;
+        if (!hash || !/^0x[0-9a-fA-F]{64}$/.test(hash)) continue;
+
+        // Display only events actually emitted by the configured hub contract.
+        // No inferred registration, mint, package, or claim cards are synthesized from dashboard totals.
+        let amount = '';
+        const amountKeys = ['amount', 'price', 'packageAmount', 'usdtCollected', 'matrixIncome', 'directIncome', 'weeklyReward', 'weeklySalary', 'daoRevenue', 'liquidityAmount', 'regMinted', 'refVestingAdded'];
+        for (const key of amountKeys) {
+          const value = args[key];
+          if (value !== undefined && value !== null) {
+            try { amount = ethers.formatUnits(value, 18); break; } catch { /* try next known amount */ }
           }
-        });
-      } else if (selfTotalClaimedWei > 0n) {
-        // Sirf tab fallback banega jab local storage bilkul empty ho chuki ho
-        // On-chain actual single claim extraction for self fallback (Never cumulative lifetime)
-        const selfTotalNum = Number(ethers.formatUnits(selfTotalClaimedWei, 18));
-        const fallbackFormatted = selfTotalNum > 0 ? (selfTotalNum > 10 ? (selfTotalNum * 0.08).toFixed(2) : selfTotalNum.toFixed(2)) : '0.00';
-        const persistentClaimSec = Math.max(selfRegSec + 120, Math.floor(Date.now() / 1000) - 600);
-        const persistentClaimTime = formatPremiumDate(persistentClaimSec);
-
-        realTransactions.push({
-          id: `self-claim-onchain-${targetWallet}`,
-          memberWallet: targetWallet,
-          userId: selfId,
-          packageAmount: `+${fallbackFormatted} MBTTC`,
-          amount: `+${fallbackFormatted} MBTTC`,
-          status: 'Confirmed',
-          txHash: buildTxHash(targetWallet, 'SELF_CLAIM_VERIFIED', persistentClaimSec),
-          date: persistentClaimTime,
-          activityType: 'MBTTC Referral Pool Claim',
-          details: `Referral yield claimed to wallet`,
-          timestamp: persistentClaimTime,
-          isRealData: true,
-          rawTime: persistentClaimSec,
-        });
-      }
-
-      if (realTransactions.length > 0) {
-        realTransactions.sort((a, b) => b.rawTime - a.rawTime);
-        return {
-          isRealData: true,
-          transactions: realTransactions.map(({ rawTime, ...record }) => record),
+        }
+        const labelByEvent: Record<string, string> = {
+          Registered: 'Team Member Registration',
+          PackageActivated: 'Package Activation',
+          PackageActivatedDetailed: 'Package Activation',
+          ReferralClaimed: 'Referral Claim',
+          PackageClaimed: 'Package Claim',
+          ProgramExecutionReported: 'Program Execution',
         };
+        const activityType = labelByEvent[name] || name;
+        const humanAmount = amount ? `${amount} (on-chain event)` : activityType;
+        const id = `${network.chainId}:${hubAddress.toLowerCase()}:${hash.toLowerCase()}:${log.index}`;
+        records.push({
+          id,
+          memberWallet: eventWallet,
+          userId: eventWallet === target ? 'Your Account' : `Member ••••${eventWallet.slice(-4)}`,
+          packageAmount: humanAmount,
+          amount: humanAmount,
+          status: 'Confirmed',
+          txHash: hash,
+          date,
+          activityType,
+          details: `${name} event emitted by the configured hub contract${depth > 0 ? ` · Team level ${depth}` : ''}`,
+          timestamp: date,
+          isRealData: true,
+          __block: log.blockNumber,
+          __log: log.index,
+        });
       }
 
+      records.sort((a, b) => b.__block - a.__block || b.__log - a.__log);
       return {
         isRealData: true,
-        transactions: [],
+        transactions: records.map(({ __block, __log, ...record }) => record),
       };
     } catch (err) {
-      console.error('[MDefiHub] Activity resolution error:', err);
-      return {
-        isRealData: false,
-        transactions: [],
-      };
+      console.error('[MDefiHub] Historical on-chain event scan failed:', err);
+      return { isRealData: false, transactions: [] };
     }
   }
 
@@ -604,8 +355,8 @@ export class MDefiHubMockService implements IMDefiHubService {
     const telemetry = await contractAdapter.getMbttcTokenTelemetry();
     return {
       ...mbttcTokenStats,
-      totalBurned: telemetry.burnDeadBalance ? `${telemetry.burnDeadBalance.toLocaleString()} MBTTC` : mbttcTokenStats.totalBurned,
-      circulatingSupply: telemetry.mintedAmount ? `${telemetry.mintedAmount.toLocaleString()} MBTTC` : mbttcTokenStats.circulatingSupply,
+      totalBurned: `${Number(telemetry.burnDeadBalance || 0).toLocaleString()} MBTTC`,
+      circulatingSupply: `${Number(telemetry.mintedAmount || 0).toLocaleString()} MBTTC`,
     };
   }
 
