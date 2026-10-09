@@ -5,7 +5,6 @@ import {
   getNotificationDeduplicationKey, 
   normalizeAndDeduplicateActivities 
 } from '../utils/notificationDeduplication';
-import { initialTeamMembers } from '../data/mockData';
 
 /**
  * MDeFi Contract Ecosystem Architecture Identifiers
@@ -216,16 +215,16 @@ class CentralEventSyncService {
   }
 
   private loadInitialState(): SynchronizedEcosystemState {
-    const starterSettled = this.getNumberStorage('mdefi_starter_total_settled', 1240.00);
-    const premiumSettled = this.getNumberStorage('mdefi_premium_total_settled', 3510.00);
-    const salarySettled = this.getNumberStorage('mdefi_salary_total_settled', 150.00);
+    const starterSettled = this.getNumberStorage('mdefi_starter_total_settled_v2', 0);
+    const premiumSettled = this.getNumberStorage('mdefi_premium_total_settled_v2', 0);
+    const salarySettled = this.getNumberStorage('mdefi_salary_total_settled_v2', 0);
 
-    // Initial base team members from verified dataset
-    const baseMembers: TeamMember[] = initialTeamMembers.map((m) => ({ ...m }));
-    const directCount = baseMembers.filter((m) => m.isDirect || m.level === 1).length;
-    const totalCount = baseMembers.length;
-    const activeCount = baseMembers.filter((m) => m.status === 'Active').length;
-    const inactiveCount = baseMembers.filter((m) => m.status === 'Inactive').length;
+    // Start empty: team and settled totals must come from confirmed contract events.
+    const baseMembers: TeamMember[] = [];
+    const directCount = 0;
+    const totalCount = 0;
+    const activeCount = 0;
+    const inactiveCount = 0;
 
     return {
       activities: [],
@@ -306,13 +305,13 @@ class CentralEventSyncService {
    * Format masked wallet address for public activity (e.g., "••••4821")
    */
   public formatMaskedMember(address?: string): string {
-    if (!address) return '••••4821';
+    if (!address) return 'Unknown';
     const clean = address.trim();
     if (clean.includes('••••')) return clean;
     if (clean.length > 4) {
       return `••••${clean.slice(-4)}`;
     }
-    return '••••4821';
+    return 'Unknown';
   }
 
   /**
@@ -334,6 +333,20 @@ class CentralEventSyncService {
    * ALL AFFECTED UI SECTIONS
    */
   public dispatchAction(payload: ProtocolActionPayload): { success: boolean; isDuplicate: boolean } {
+    const amountRequiredActions: ProtocolActionType[] = [
+      'STARTER_CLAIM',
+      'PREMIUM_CLAIM',
+      'SALARY_CLAIM',
+      'S4_ACTIVATION',
+    ];
+    if (
+      amountRequiredActions.includes(payload.actionType)
+      && (payload.amountUsdt === undefined || !Number.isFinite(Number(payload.amountUsdt)) || Number(payload.amountUsdt) <= 0)
+    ) {
+      console.warn(`[CentralEventSync] Ignoring ${payload.actionType}: missing or invalid confirmed amount; event ignored.`);
+      return { success: false, isDuplicate: false };
+    }
+
     const eventKey = this.generateEventKey(payload);
 
     // Strict deduplication: never process the exact same event twice
@@ -357,7 +370,7 @@ class CentralEventSyncService {
     switch (payload.actionType) {
       case 'REGISTRATION': {
         const uId = payload.userId || 'MDF-User';
-        const sId = payload.sponsorId || 'MDF-10389';
+        const sId = payload.sponsorId || '';
         
         // Correlated user notification: registration + node placement + welcome bonus
         userActivityItem = {
@@ -368,7 +381,7 @@ class CentralEventSyncService {
           date: dateStr,
           status: 'Confirmed',
           txHash: tx,
-          details: `Account ${uId} registered under sponsor ${sId}. Node placement confirmed on BSC. Welcome bonus of 30.00 MBTTC credited to vault.`,
+          details: `Account ${uId} registered${sId ? ` under sponsor ${sId}` : ''}. Account remains inactive until the $10 first package is confirmed. Registration MBTTC tokens can be claimed from the wallet.`,
           walletAddress: wallet,
           read: false,
         };
@@ -397,7 +410,7 @@ class CentralEventSyncService {
           status: 'Confirmed',
           date: 'Just now',
           timestamp: 'Just now',
-          details: `Frontline direct partner joined under sponsor ${sId}`,
+          details: sId ? `Registered frontline partner under sponsor ${sId}; awaiting $10 first-package activation` : 'Registered member; awaiting $10 first-package activation',
           txHash: tx,
         };
 
@@ -406,21 +419,32 @@ class CentralEventSyncService {
           id: `tm-${uId}`,
           address: wallet,
           userId: uId,
-          package: 'Tier 1 Node',
-          status: 'Active',
+          package: 'Not Activated',
+          status: 'Inactive',
           joinedDate: new Date().toISOString().split('T')[0],
-          volumeUSDT: 10,
-          isDirect: true,
+          volumeUSDT: 0,
+          isDirect: Boolean(sId),
           directPartners: 0,
           sponsor: sId,
-          level: 1,
-          activePackages: 1,
+          level: sId ? 1 : 0,
+          activePackages: 0,
         };
 
-        this.state.teamMembers = [newMember, ...this.state.teamMembers];
-        this.state.directTeamCount += 1;
-        this.state.totalTeamCount += 1;
-        this.state.activeTeamCount += 1;
+        // Registration creates an account only; it does not activate the member.
+        const existingMemberIndex = this.state.teamMembers.findIndex(
+          (member) => member.userId.toLowerCase() === uId.toLowerCase()
+            || (wallet && member.address.toLowerCase() === wallet.toLowerCase())
+        );
+        if (existingMemberIndex >= 0) {
+          this.state.teamMembers = this.state.teamMembers.map((member, index) =>
+            index === existingMemberIndex ? { ...member, ...newMember } : member
+          );
+        } else {
+          this.state.teamMembers = [newMember, ...this.state.teamMembers];
+          this.state.totalTeamCount += 1;
+          if (newMember.isDirect) this.state.directTeamCount += 1;
+          this.state.inactiveTeamCount += 1;
+        }
         break;
       }
 
@@ -539,7 +563,33 @@ class CentralEventSyncService {
 
       case 'S4_ACTIVATION': {
         const pkgName = payload.packageName || 'S4 Node';
-        const price = payload.amountUsdt || 10;
+        const price = Number(payload.amountUsdt ?? 0);
+
+        // Only a confirmed $10 first package activates the account.
+        if (price === 10) {
+          const memberIndex = this.state.teamMembers.findIndex((member) =>
+            (payload.userId && member.userId.toLowerCase() === payload.userId.toLowerCase())
+            || (wallet && member.address.toLowerCase() === wallet.toLowerCase())
+          );
+          if (memberIndex >= 0) {
+            const member = this.state.teamMembers[memberIndex];
+            if (member.status !== 'Active') {
+              this.state.activeTeamCount += 1;
+              this.state.inactiveTeamCount = Math.max(0, this.state.inactiveTeamCount - 1);
+            }
+            this.state.teamMembers = this.state.teamMembers.map((item, index) =>
+              index === memberIndex
+                ? {
+                    ...item,
+                    package: pkgName,
+                    status: 'Active',
+                    volumeUSDT: Math.max(item.volumeUSDT || 0, 10),
+                    activePackages: Math.max(item.activePackages || 0, 1),
+                  }
+                : item
+            );
+          }
+        }
         
         userActivityItem = {
           id: `s4-${tx}`,
@@ -669,14 +719,14 @@ class CentralEventSyncService {
       }
 
       case 'STARTER_CLAIM': {
-        const claimed = payload.amountUsdt || 185.00;
+        const claimed = Number(payload.amountUsdt ?? 0);
         const prevTotal = this.state.starterTotalSettled;
         const newTotal = prevTotal + claimed;
         this.state.starterTotalSettled = newTotal;
         this.state.grandTotalSettled = newTotal + this.state.premiumTotalSettled + this.state.salaryTotalSettled;
 
         try {
-          localStorage.setItem('mdefi_starter_total_settled', newTotal.toString());
+          localStorage.setItem('mdefi_starter_total_settled_v2', newTotal.toString());
         } catch {}
 
         // Standardized title matching user requirements
@@ -722,14 +772,14 @@ class CentralEventSyncService {
       }
 
       case 'PREMIUM_CLAIM': {
-        const claimed = payload.amountUsdt || 340.00;
+        const claimed = Number(payload.amountUsdt ?? 0);
         const prevTotal = this.state.premiumTotalSettled;
         const newTotal = prevTotal + claimed;
         this.state.premiumTotalSettled = newTotal;
         this.state.grandTotalSettled = this.state.starterTotalSettled + newTotal + this.state.salaryTotalSettled;
 
         try {
-          localStorage.setItem('mdefi_premium_total_settled', newTotal.toString());
+          localStorage.setItem('mdefi_premium_total_settled_v2', newTotal.toString());
         } catch {}
 
         // Standardized title matching user requirements
@@ -775,14 +825,14 @@ class CentralEventSyncService {
       }
 
       case 'SALARY_CLAIM': {
-        const claimed = payload.amountUsdt || 30.00;
+        const claimed = Number(payload.amountUsdt ?? 0);
         const prevTotal = this.state.salaryTotalSettled;
         const newTotal = prevTotal + claimed;
         this.state.salaryTotalSettled = newTotal;
         this.state.grandTotalSettled = this.state.starterTotalSettled + this.state.premiumTotalSettled + newTotal;
 
         try {
-          localStorage.setItem('mdefi_salary_total_settled', newTotal.toString());
+          localStorage.setItem('mdefi_salary_total_settled_v2', newTotal.toString());
         } catch {}
 
         // Standardized title matching user requirements
