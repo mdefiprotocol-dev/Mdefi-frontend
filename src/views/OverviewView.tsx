@@ -26,6 +26,7 @@ import {
 import { MbttcCoin3D } from '../components/MbttcCoin3D';
 import { MdefiTradingTerminalChart } from '../components/TradingChart/MdefiTradingTerminal';
 import { CommunityActivityFeed } from '../components/CommunityActivityFeed';
+import { centralEventSyncService } from '../services/centralEventSyncService';
 import { CommunityRatingSection } from '../components/CommunityRatingSection';
 import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
 import { calculateEcosystemIncome, calculateTotalEcosystemIncome } from '../data/incomeData';
@@ -888,7 +889,11 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
       </div>
 
       {/* 9. COMMUNITY FEEDS & REPUTATION */}
-      <CommunityActivityFeed onNavigate={onNavigate} userActivities={activities} walletAddress={user.walletAddress} />
+      <CommunityActivityFeed 
+  onNavigate={onNavigate} 
+  userActivities={activities && activities.length > 0 ? activities : centralEventSyncService.getState().activities} 
+  walletAddress={user.walletAddress || (typeof window !== 'undefined' ? (window as any).ethereum?.selectedAddress : '')} 
+/>
       <CommunityRatingSection userWallet={user.walletAddress} />
     </div>
   );
