@@ -25,6 +25,7 @@ import {
   teamRecentActivities 
 } from '../data/mockData';
 import { contractAdapter } from './contractAdapter';
+import { centralEventSyncService } from './centralEventSyncService';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
@@ -351,6 +352,12 @@ export class MDefiHubMockService implements IMDefiHubService {
         try {
           localStorage.setItem(`mdefi_verified_txs_${target}`, JSON.stringify(finalRecords));
         } catch {}
+
+        // सेंट्रल सिंक सर्विस में सीधे ऐतिहासिक रिकॉर्ड्स पुश करें
+        try {
+          centralEventSyncService.mergeHistoricalTeamTransactions(finalRecords);
+        } catch {}
+
         return {
           isRealData: true,
           transactions: finalRecords,

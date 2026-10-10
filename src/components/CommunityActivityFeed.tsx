@@ -19,8 +19,8 @@ import {
 import { ActivityItem, NavPage } from '../types';
 import { mdefiService } from '../services/mdefiService';
 import { contractAdapter } from '../services/contractAdapter';
+import { centralEventSyncService } from '../services/centralEventSyncService';
 import { copyFullAddress } from '../utils/formatAddress';
-import { getNotificationDeduplicationKey } from '../utils/notificationDeduplication';
 import { ResponsivePagination } from './common/ResponsivePagination';
 import { groupActivitiesInPairs } from './activity/CompactActivityRow';
 
@@ -257,30 +257,25 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
       setIsLoading(true);
     }
     
-    // Priority 1: Direct Prop Pass
-    let activeWallet: string = (walletAddress && walletAddress.startsWith('0x')) ? walletAddress.toLowerCase() : '';
-
-    if (!activeWallet && typeof window !== 'undefined') {
-      // Priority 2: ContractAdapter Global Memory
+    let targetAddr = (walletAddress || '').trim().toLowerCase();
+    if (!targetAddr && typeof window !== 'undefined') {
       try {
         const adw = (contractAdapter as any)?.getActiveWallet?.() || (contractAdapter as any)?.currentWallet;
         if (typeof adw === 'string' && adw.startsWith('0x')) {
-          activeWallet = adw.toLowerCase();
+          targetAddr = adw.toLowerCase();
         }
       } catch {}
 
-      // Priority 3: Injected Provider
-      if (!activeWallet) {
+      if (!targetAddr) {
         const eth = (window as any).ethereum;
         if (typeof eth?.selectedAddress === 'string') {
-          activeWallet = eth.selectedAddress.toLowerCase();
+          targetAddr = eth.selectedAddress.toLowerCase();
         } else if (Array.isArray(eth?.accounts) && typeof eth.accounts[0] === 'string') {
-          activeWallet = eth.accounts[0].toLowerCase();
+          targetAddr = eth.accounts[0].toLowerCase();
         }
       }
 
-      // Priority 4: All localStorage Stores (Wagmi, Web3Modal, AppKit)
-      if (!activeWallet) {
+      if (!targetAddr) {
         for (let i = 0; i < localStorage.length; i++) {
           try {
             const key = localStorage.key(i) || '';
@@ -288,7 +283,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
             if (val.length < 42) continue;
             const match = val.match(/0x[a-fA-F0-9]{40}/);
             if (match && match[0]) {
-              activeWallet = match[0].toLowerCase();
+              targetAddr = match[0].toLowerCase();
               break;
             }
           } catch {}
@@ -297,20 +292,33 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     }
 
     try {
-      const res = await mdefiService.getTeamTransactions(activeWallet);
-      if (res && Array.isArray(res.transactions) && res.transactions.length > 0) {
-        const mapped: ActivityItem[] = res.transactions.map((tx:any) => {
+      const res = await mdefiService.getTeamTransactions(targetAddr);
+      const serviceTxs = res?.transactions || [];
+      const syncTxs = centralEventSyncService.getState().teamTransactions || [];
+      const mergedRaw = [...syncTxs, ...serviceTxs];
+
+      const uniqueTxMap = new Map<string, any>();
+      mergedRaw.forEach((tx) => {
+        if (tx && tx.id) {
+          uniqueTxMap.set(tx.id, tx);
+        }
+      });
+
+      const uniqueTxs = Array.from(uniqueTxMap.values());
+
+      if (uniqueTxs.length > 0) {
+        const mapped: ActivityItem[] = uniqueTxs.map((tx: any) => {
           const actLower = (tx.activityType || '').toLowerCase();
           const amtLower = (tx.amount || '').toLowerCase();
 
           let resolvedType: any = 'Income';
-          if (actLower.includes('registration') || actLower.includes('register') || amtLower.includes('node active') || amtLower.includes('node registered')) {
+          if (actLower.includes('registration') || actLower.includes('register') || amtLower.includes('node active')) {
             resolvedType = 'Registration';
           } else if (actLower.includes('package') || actLower.includes('node activation')) {
             resolvedType = 'Package Activation';
           } else if (actLower.includes('claim')) {
             resolvedType = 'MBTTC Claim';
-          } else if (actLower.includes('mbttc') || amtLower.includes('mbttc') || actLower.includes('yield') || actLower.includes('airdrop') || actLower.includes('mint')) {
+          } else if (actLower.includes('mbttc') || amtLower.includes('mbttc') || actLower.includes('yield') || actLower.includes('mint')) {
             resolvedType = 'MBTTC Credit';
           } else if (actLower.includes('salary')) {
             resolvedType = 'Weekly Salary';
@@ -321,16 +329,17 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
           return {
             id: tx.id,
             type: resolvedType,
-            title: tx.activityType,
-            amount: tx.amount,
-            date: tx.timestamp || tx.date || 'Just now',
+            title: tx.activityType || 'On-Chain Activity',
+            amount: tx.amount || 'Confirmed',
+            date: tx.timestamp || tx.date || 'On-Chain Verified',
             status: 'Confirmed',
             txHash: tx.txHash || '',
             details: tx.details || tx.packageName || 'Confirmed on protocol smart contract.',
-            walletAddress: tx.memberWallet || tx.userId || 'Team Member',
+            walletAddress: tx.memberWallet || tx.userId || 'Direct Partner',
             read: true,
           };
         });
+
         setOnChainTeamItems(mapped);
       }
     } catch (err) {
@@ -350,6 +359,11 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
     const unsubscribeAdapter = contractAdapter.onDataRefresh(() => {
       loadOnChainFeed(false);
     });
+    
+    const unsubscribeSync = centralEventSyncService.subscribe(() => {
+      loadOnChainFeed(false);
+    });
+
     const sAny = mdefiService as any;
     const unsubscribeService = typeof sAny?.onFeedRefresh === 'function'
       ? sAny.onFeedRefresh(() => loadOnChainFeed(false))
@@ -357,31 +371,25 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
 
     const timer1 = setTimeout(() => {
       loadOnChainFeed(false);
-    }, 800);
-    const timer2 = setTimeout(() => {
-      loadOnChainFeed(false);
-    }, 2200);
+    }, 500);
 
     return () => {
       clearTimeout(timer1);
-      clearTimeout(timer2);
       unsubscribeAdapter();
+      unsubscribeSync();
       unsubscribeService();
     };
   }, [loadOnChainFeed]);
 
   const allFeedItems = useMemo(() => {
     const combined = [...onChainTeamItems, ...(userActivities || [])];
-    if (combined.length > 0) {
-      const seen = new Set<string>();
-      return combined.filter((item) => {
-        const key = item.id || getNotificationDeduplicationKey(item);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    }
-    return [];
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      const key = item.id || `${item.txHash}-${item.type}-${item.amount}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }, [onChainTeamItems, userActivities]);
 
   const filteredItems = useMemo(() => {
@@ -527,7 +535,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                     key={act.id || `feed-item-${index}`}
                     className="relative z-10 p-3 sm:p-3.5 hover:bg-zinc-900/40 transition-colors"
                   >
-                    {/* TOP ROW: Icon + Category Badge + Title on Left, Amount on Right */}
+                    {/* TOP ROW */}
                     <div className="flex items-start sm:items-center justify-between gap-2.5">
                       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <div className="relative shrink-0 mt-0.5 sm:mt-0">
@@ -557,7 +565,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                       </div>
                     </div>
 
-                    {/* MIDDLE ROW: Details with bold highlighted MDF IDs */}
+                    {/* MIDDLE ROW */}
                     <div className="mt-1.5 sm:mt-1 pl-9 sm:pl-11">
                       <p className="text-[11px] sm:text-xs text-zinc-300 leading-normal line-clamp-2">
                         {act.details ? (
@@ -576,7 +584,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
                       </p>
                     </div>
 
-                    {/* BOTTOM ROW: Address, Timestamp & Copy Action */}
+                    {/* BOTTOM ROW */}
                     <div className="mt-2 pl-9 sm:pl-11 flex items-center justify-between gap-2 flex-wrap text-[10px] sm:text-[11px] font-mono text-zinc-500">
                       <div className="flex items-center gap-2 flex-wrap">
                         {act.walletAddress && (

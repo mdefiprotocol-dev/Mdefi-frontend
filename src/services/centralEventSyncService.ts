@@ -1092,6 +1092,36 @@ class CentralEventSyncService {
   public getGrandTotalSettled(): number {
     return this.state.grandTotalSettled;
   }
+
+  /**
+   * On-Chain Historical Records Bridge:
+   * Merges verified contract transactions into the central source of truth without duplicates
+   */
+  public mergeHistoricalTeamTransactions(transactions: TeamTransactionRecord[]): void {
+    if (!Array.isArray(transactions) || transactions.length === 0) return;
+
+    const currentMap = new Map<string, TeamTransactionRecord>();
+    
+    // 1. Keep existing state records
+    this.state.teamTransactions.forEach((tx) => {
+      if (tx && tx.id) currentMap.set(tx.id, tx);
+    });
+
+    // 2. Safely merge new verified on-chain records
+    transactions.forEach((tx) => {
+      if (tx && tx.id) {
+        currentMap.set(tx.id, tx);
+        this.processedEventIds.add(tx.id);
+      }
+    });
+
+    // 3. Update central state and broadcast to UI
+    this.state.teamTransactions = Array.from(currentMap.values());
+    this.state.lastSyncTimestamp = Date.now();
+    this.notifySubscribers();
+  }
 }
 
 export const centralEventSyncService = new CentralEventSyncService();
+
+
