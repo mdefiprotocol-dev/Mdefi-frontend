@@ -226,10 +226,11 @@ export class MDefiHubMockService implements IMDefiHubService {
       const iface = new ethers.Interface(HUB_ABI as any);
       const latestBlock = await provider.getBlockNumber();
 
-      // RPC Safe Window: 30,000 blocks (~24-36 hours) split into 5,000 block windows
-      const lookback = 30000;
-      const startBlock = Math.max(0, latestBlock - lookback);
-      const CHUNK_SIZE = 5000;
+      // Permanent On-Chain History Floor: Contract creation block se lekar latest block tak
+      // BSC Testnet deployment block base (~13400000)
+      const DEPLOYMENT_BLOCK = 13400000;
+      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 500000);
+      const CHUNK_SIZE = 10000;
       const rawLogs: ethers.Log[] = [];
 
       for (let from = startBlock; from <= latestBlock; from += CHUNK_SIZE) {
@@ -244,7 +245,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawLogs.push(...logs);
           }
         } catch {
-          // Chunk level failover: loop crash nahi karega
+          // Individual chunk retry failure logged silently
         }
       }
 
@@ -290,7 +291,8 @@ export class MDefiHubMockService implements IMDefiHubService {
           args.user ?? args.claimant ?? args.account ?? args.member ?? args[0] ?? ''
         ).toLowerCase();
 
-        if (!candidateAddress || !directPartners.has(candidateAddress)) {
+        // Direct comparison: Candidate must be target wallet itself OR in verified directPartners
+        if (!candidateAddress || (candidateAddress !== target && !directPartners.has(candidateAddress))) {
           continue;
         }
 
