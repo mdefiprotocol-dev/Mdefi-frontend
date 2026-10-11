@@ -31,6 +31,7 @@ import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
 // Reliable BSC Testnet Node that allows eth_getLogs
 const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
+const BSCSCAN_API_KEY = 'B717482NP483F32JMXAMHB9J9QEE21BB8R';
 
 type LedgerItem = TeamTransactionRecord & { rawTime: number };
 
@@ -222,47 +223,27 @@ export class MDefiHubMockService implements IMDefiHubService {
     };
 
     try {
-      const provider = this.getReliableProvider();
       const iface = new ethers.Interface(HUB_ABI as any);
-      const latestBlock = await provider.getBlockNumber();
+      const rawLogs: any[] = [];
 
-      // Self-Updating Incremental Cursor (Scans only delta on subsequent loads)
-      const cursorKey = `mdefi_last_synced_block_${target}`;
-      let lastSynced = 0;
+      // Guaranteed Archive Indexing via BscScan API (Day-1 Genesis 131894856 se lekar Latest Block tak)
       try {
-        lastSynced = Number(localStorage.getItem(cursorKey)) || 0;
-      } catch {}
+        const bscScanUrl = `https://api-testnet.bscscan.com/api?module=logs&action=getLogs&fromBlock=131894856&toBlock=latest&address=${hubAddress}&apikey=${BSCSCAN_API_KEY}`;
+        const apiRes = await fetch(bscScanUrl).then((r) => r.json());
 
-      // Optimized Safe Sync: Focused 50k window, max 2 chunks to completely eliminate 429
-      const GENESIS_FLOOR = 135700000; // Covers verified event block 135704901
-      const startBlock = lastSynced > 0 ? lastSynced + 1 : GENESIS_FLOOR;
-      const CHUNK_SIZE = 25000;
-      const rawLogs: ethers.Log[] = [];
-
-      // Strictly limit to max 2 chunks per execution cycle
-      const maxTargetBlock = Math.min(latestBlock, startBlock + (CHUNK_SIZE * 2));
-
-      if (startBlock <= maxTargetBlock) {
-        for (let from = startBlock; from <= maxTargetBlock; from += CHUNK_SIZE) {
-          const to = Math.min(from + CHUNK_SIZE - 1, maxTargetBlock);
-          try {
-            const logs = await provider.getLogs({
-              address: hubAddress,
-              fromBlock: from,
-              toBlock: to,
+        if (apiRes && apiRes.status === '1' && Array.isArray(apiRes.result)) {
+          for (const item of apiRes.result) {
+            rawLogs.push({
+              topics: [item.topics[0], item.topics[1], item.topics[2], item.topics[3]].filter(Boolean),
+              data: item.data,
+              transactionHash: item.transactionHash,
+              blockNumber: parseInt(item.blockNumber, 16) || Number(item.blockNumber),
+              index: parseInt(item.logIndex, 16) || Number(item.logIndex) || 0,
             });
-            if (Array.isArray(logs) && logs.length > 0) {
-              rawLogs.push(...logs);
-            }
-          } catch {
-            // Chunk level fail-safe
           }
         }
-
-        // Lock cursor immediately
-        try {
-          localStorage.setItem(cursorKey, String(maxTargetBlock));
-        } catch {}
+      } catch (apiErr) {
+        console.warn('[MDefiHub] BscScan API fetch error, fallback to cache:', apiErr);
       }
 
       const directPartners = new Set<string>();
