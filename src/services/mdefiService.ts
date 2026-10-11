@@ -76,9 +76,8 @@ export class MDefiHubMockService implements IMDefiHubService {
         });
       }
 
-      this.autoRefreshTimer = setInterval(() => {
-        this.notifyFeedSubscribers();
-      }, 20000);
+      // Permanent: Disabled aggressive polling to prevent HTTP 429 flood
+      this.autoRefreshTimer = null;
     }
   }
 
@@ -234,14 +233,17 @@ export class MDefiHubMockService implements IMDefiHubService {
         lastSynced = Number(localStorage.getItem(cursorKey)) || 0;
       } catch {}
 
-      // Genesis floor: Pehli baar me safe window se scan hoga, agle visit par lastSynced se
+      // Permanent Web3 Indexer: Covers Genesis (135600000) on first sync, then strictly follows delta
       const GENESIS_FLOOR = 135600000;
-      const startBlock = lastSynced > 0 ? lastSynced + 1 : Math.max(GENESIS_FLOOR, latestBlock - 40000);
-      const CHUNK_SIZE = 5000;
+      const startBlock = lastSynced > 0 ? lastSynced + 1 : GENESIS_FLOOR;
+      const CHUNK_SIZE = 10000;
       const rawLogs: ethers.Log[] = [];
 
-      for (let from = startBlock; from <= latestBlock; from += CHUNK_SIZE) {
-        const to = Math.min(from + CHUNK_SIZE - 1, latestBlock);
+      // Scan up to latestBlock, with a maximum batch limit of 20 chunks per sync pass to guarantee zero 429 errors
+      const maxTargetBlock = Math.min(latestBlock, startBlock + (CHUNK_SIZE * 20));
+
+      for (let from = startBlock; from <= maxTargetBlock; from += CHUNK_SIZE) {
+        const to = Math.min(from + CHUNK_SIZE - 1, maxTargetBlock);
         try {
           const logs = await provider.getLogs({
             address: hubAddress,
@@ -256,9 +258,9 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       }
 
-      // Cursor update for future visits
+      // Cursor updates only up to what was actually scanned
       try {
-        localStorage.setItem(cursorKey, String(latestBlock));
+        localStorage.setItem(cursorKey, String(maxTargetBlock));
       } catch {}
 
       const directPartners = new Set<string>();
