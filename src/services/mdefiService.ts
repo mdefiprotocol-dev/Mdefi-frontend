@@ -395,7 +395,9 @@ export class MDefiHubMockService implements IMDefiHubService {
               const regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
 
               if (onChainId && Number(onChainId) > 0) {
-                dynamicUserId = `MDF-${onChainId}`;
+                const numericId = Number(onChainId);
+                const displayId = numericId < 100000 ? 248160 + numericId : numericId;
+                dynamicUserId = `MDF-${displayId}`;
               }
 
               if (regTimestampSec && regTimestampSec > 0) {
