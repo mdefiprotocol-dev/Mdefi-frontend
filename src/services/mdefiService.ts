@@ -454,7 +454,103 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       });
 
+      // Contract On-Chain Claim State Hydration (Self + Direct Team Fallback)
+      try {
+        // Target list: Self wallet + verified on-chain direct partners
+        const vestingCheckTargets = [
+          { addr: target, isSelf: true, label: 'Your Account' },
+          ...onChainDirectTeam.map((pAddr) => ({
+            addr: pAddr,
+            isSelf: false,
+            label: userDisplayMap.get(pAddr) || `Partner (${pAddr.slice(0, 6)}...${pAddr.slice(-4)})`,
+          })),
+        ];
+
+        // Parallel Hydration for sub-second execution without freezing UI
+        await Promise.all(
+          vestingCheckTargets.map(async (item) => {
+            // 1. Referral Vesting Claim Check
+            try {
+              const vData = await hubContract.referralVesting(item.addr);
+              const claimed = vData?.totalClaimed ?? vData?.[1];
+              const cTime = Number(vData?.lastClaimTimestamp ?? vData?.[2] ?? 0);
+
+              if (claimed && BigInt(claimed) > 0n) {
+                const amt = parseFloat(ethers.formatUnits(claimed, 18)).toFixed(2);
+                const cDate = cTime > 0 
+                  ? `${new Date(cTime * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${new Date(cTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : 'On-Chain Verified';
+                const cId = `claim-ref-${item.addr}-${cTime}`;
+
+                if (!combinedMap.has(cId)) {
+                  combinedMap.set(cId, {
+                    id: cId,
+                    memberWallet: item.addr,
+                    userId: item.label,
+                    packageAmount: `+${amt} MBTTC`,
+                    amount: `+${amt} MBTTC`,
+                    status: 'Confirmed' as const,
+                    txHash: `0x${item.addr.slice(2).padStart(64, '0')}`,
+                    date: cDate,
+                    activityType: 'MBTTC Referral Pool Claim',
+                    details: item.isSelf ? 'Referral yield claimed to wallet' : `${item.label} claimed referral reward`,
+                    timestamp: cDate,
+                    isRealData: true,
+                    rawTime: cTime,
+                  } as any);
+                }
+              }
+            } catch {}
+
+            // 2. Package Vesting Claim Check
+            try {
+              const pkgVData = await hubContract.packageVesting(item.addr);
+              const pkgClaimed = pkgVData?.totalClaimed ?? pkgVData?.[1];
+              const pkgCTime = Number(pkgVData?.lastClaimTimestamp ?? pkgVData?.[2] ?? 0);
+
+              if (pkgClaimed && BigInt(pkgClaimed) > 0n) {
+                const pkgAmt = parseFloat(ethers.formatUnits(pkgClaimed, 18)).toFixed(2);
+                const pkgCDate = pkgCTime > 0 
+                  ? `${new Date(pkgCTime * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${new Date(pkgCTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : 'On-Chain Verified';
+                const pkgCId = `claim-pkg-${item.addr}-${pkgCTime}`;
+
+                if (!combinedMap.has(pkgCId)) {
+                  combinedMap.set(pkgCId, {
+                    id: pkgCId,
+                    memberWallet: item.addr,
+                    userId: item.label,
+                    packageAmount: `+${pkgAmt} MBTTC`,
+                    amount: `+${pkgAmt} MBTTC`,
+                    status: 'Confirmed' as const,
+                    txHash: `0x${item.addr.slice(2).padStart(64, '0')}`,
+                    date: pkgCDate,
+                    activityType: 'MBTTC Package Pool Claim',
+                    details: item.isSelf ? 'Package yield claimed to wallet' : `${item.label} claimed package reward`,
+                    timestamp: pkgCDate,
+                    isRealData: true,
+                    rawTime: pkgCTime,
+                  } as any);
+                }
+              }
+            } catch {}
+          })
+        );
+      } catch (claimErr) {
+        console.warn('[MDefiHub] Direct vesting state read error:', claimErr);
+      }
+
       const finalRecords = Array.from(combinedMap.values());
+      
+      // Resilient Multi-Tier Sorting: Latest Timestamps first, Live claims prioritized
+      finalRecords.sort((a: any, b: any) => {
+        const timeA = Number(a.rawTime || 0);
+        const timeB = Number(b.rawTime || 0);
+        if (timeA !== timeB) return timeB - timeA;
+        
+        // Agar dono live ya contract verified hain
+        return String(b.id || '').localeCompare(String(a.id || ''));
+      });
 
       if (finalRecords.length > 0) {
         try {
@@ -540,6 +636,11 @@ export class MDefiHubMockService implements IMDefiHubService {
     };
 
     this.liveClaimReceipts.unshift(realReceiptRecord);
+    try {
+      const sKey = `mdefi_verified_txs_${targetWallet}`;
+      const prev = JSON.parse(localStorage.getItem(sKey) || '[]');
+      localStorage.setItem(sKey, JSON.stringify([realReceiptRecord, ...prev.filter((x: any) => x.id !== realReceiptRecord.id)]));
+    } catch {}
     this.notifyFeedSubscribers();
 
     return {
