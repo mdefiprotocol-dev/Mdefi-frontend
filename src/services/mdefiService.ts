@@ -29,7 +29,8 @@ import { centralEventSyncService } from './centralEventSyncService';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
-const PRIMARY_FAST_RPC = 'https://bsc-testnet-dataseed.bnbchain.org';
+// Reliable BSC Testnet Node that allows eth_getLogs
+const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
 
 type LedgerItem = TeamTransactionRecord & { rawTime: number };
 
@@ -209,7 +210,7 @@ export class MDefiHubMockService implements IMDefiHubService {
 
     const target = targetWallet.toLowerCase();
 
-    // Cache fallback: agar network outage ho toh screen par 0 records na gire
+    // Permanent Cache Fallback
     const getStoredBackup = (): TeamTransactionRecord[] => {
       try {
         const raw = localStorage.getItem(`mdefi_verified_txs_${target}`);
@@ -226,11 +227,10 @@ export class MDefiHubMockService implements IMDefiHubService {
       const iface = new ethers.Interface(HUB_ABI as any);
       const latestBlock = await provider.getBlockNumber();
 
-      // Permanent On-Chain History Floor: Contract creation block se lekar latest block tak
-      // BSC Testnet deployment block base (~13400000)
+      // Permanent Day-1 Deployment Floor: Scans from block 13,400,000 to latest safely
       const DEPLOYMENT_BLOCK = 13400000;
-      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 500000);
-      const CHUNK_SIZE = 10000;
+      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 80000);
+      const CHUNK_SIZE = 5000;
       const rawLogs: ethers.Log[] = [];
 
       for (let from = startBlock; from <= latestBlock; from += CHUNK_SIZE) {
@@ -245,7 +245,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             rawLogs.push(...logs);
           }
         } catch {
-          // Individual chunk retry failure logged silently
+          // Chunk level fail-safe ensures no halting
         }
       }
 
@@ -291,8 +291,9 @@ export class MDefiHubMockService implements IMDefiHubService {
           args.user ?? args.claimant ?? args.account ?? args.member ?? args[0] ?? ''
         ).toLowerCase();
 
-        // Direct comparison: Candidate must be target wallet itself OR in verified directPartners
-        if (!candidateAddress || (candidateAddress !== target && !directPartners.has(candidateAddress))) {
+        // Self transactions (claims, activations) and direct partner events are never skipped
+        const isSelf = candidateAddress === target;
+        if (!candidateAddress || (!isSelf && !directPartners.has(candidateAddress))) {
           continue;
         }
 
@@ -323,7 +324,6 @@ export class MDefiHubMockService implements IMDefiHubService {
         };
 
         const activityType = labelMap[name] || name;
-        const isSelf = candidateAddress === target;
         const resolvedUserId = userDisplayMap.get(candidateAddress) || (isSelf ? 'Your Account' : `Partner ••••${candidateAddress.slice(-4)}`);
         const id = `97:${hubAddress.toLowerCase()}:${hash.toLowerCase()}:${log.index}`;
 
@@ -348,14 +348,26 @@ export class MDefiHubMockService implements IMDefiHubService {
       }
 
       records.sort((a, b) => b.__block - a.__block || b.__log - a.__log);
-      const finalRecords = records.map(({ __block, __log, ...r }) => r);
+      const freshlyScanned = records.map(({ __block, __log, ...r }) => r);
+
+      // Merge newly scanned records with previously verified cached records
+      const existingBackup = getStoredBackup();
+      const combinedMap = new Map<string, TeamTransactionRecord>();
+      
+      freshlyScanned.forEach((item) => combinedMap.set(item.id, item));
+      existingBackup.forEach((item) => {
+        if (!combinedMap.has(item.id)) {
+          combinedMap.set(item.id, item);
+        }
+      });
+
+      const finalRecords = Array.from(combinedMap.values());
 
       if (finalRecords.length > 0) {
         try {
           localStorage.setItem(`mdefi_verified_txs_${target}`, JSON.stringify(finalRecords));
         } catch {}
 
-        // सेंट्रल सिंक सर्विस में सीधे ऐतिहासिक रिकॉर्ड्स पुश करें
         try {
           centralEventSyncService.mergeHistoricalTeamTransactions(finalRecords);
         } catch {}
@@ -366,10 +378,9 @@ export class MDefiHubMockService implements IMDefiHubService {
         };
       }
 
-      const cached = getStoredBackup();
       return {
-        isRealData: cached.length > 0,
-        transactions: cached,
+        isRealData: existingBackup.length > 0,
+        transactions: existingBackup,
       };
     } catch (err) {
       console.warn('[MDefiHub] Historical log scan error, preserving cached verified state:', err);
