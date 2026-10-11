@@ -30,7 +30,7 @@ import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
 // Reliable BSC Testnet Node that allows eth_getLogs
-const PRIMARY_FAST_RPC = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
+const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
 
 type LedgerItem = TeamTransactionRecord & { rawTime: number };
 
@@ -227,9 +227,16 @@ export class MDefiHubMockService implements IMDefiHubService {
       const iface = new ethers.Interface(HUB_ABI as any);
       const latestBlock = await provider.getBlockNumber();
 
-      // Permanent Day-1 Deployment Floor: Scans historical transactions safely
-      const DEPLOYMENT_BLOCK = 134800000;
-      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 1200000);
+      // Self-Updating Incremental Cursor (Scans only delta on subsequent loads)
+      const cursorKey = `mdefi_last_synced_block_${target}`;
+      let lastSynced = 0;
+      try {
+        lastSynced = Number(localStorage.getItem(cursorKey)) || 0;
+      } catch {}
+
+      // Genesis floor: Pehli baar me safe window se scan hoga, agle visit par lastSynced se
+      const GENESIS_FLOOR = 135600000;
+      const startBlock = lastSynced > 0 ? lastSynced + 1 : Math.max(GENESIS_FLOOR, latestBlock - 40000);
       const CHUNK_SIZE = 5000;
       const rawLogs: ethers.Log[] = [];
 
@@ -248,6 +255,11 @@ export class MDefiHubMockService implements IMDefiHubService {
           // Chunk level fail-safe ensures no halting
         }
       }
+
+      // Cursor update for future visits
+      try {
+        localStorage.setItem(cursorKey, String(latestBlock));
+      } catch {}
 
       const directPartners = new Set<string>();
       directPartners.add(target);
