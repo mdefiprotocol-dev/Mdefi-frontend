@@ -30,7 +30,7 @@ import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 
 // Reliable BSC Testnet Node that allows eth_getLogs
-const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
+const PRIMARY_FAST_RPC = 'https://data-seed-prebsc-1-s1.bnbchain.org:8545';
 
 type LedgerItem = TeamTransactionRecord & { rawTime: number };
 
@@ -227,9 +227,9 @@ export class MDefiHubMockService implements IMDefiHubService {
       const iface = new ethers.Interface(HUB_ABI as any);
       const latestBlock = await provider.getBlockNumber();
 
-      // Permanent Day-1 Deployment Floor: Scans from block 13,400,000 to latest safely
-      const DEPLOYMENT_BLOCK = 13400000;
-      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 80000);
+      // Permanent Day-1 Deployment Floor: Scans historical transactions safely
+      const DEPLOYMENT_BLOCK = 134800000;
+      const startBlock = Math.max(DEPLOYMENT_BLOCK, latestBlock - 1200000);
       const CHUNK_SIZE = 5000;
       const rawLogs: ethers.Log[] = [];
 
@@ -288,12 +288,13 @@ export class MDefiHubMockService implements IMDefiHubService {
         const args: any = parsed.args;
 
         const candidateAddress = String(
-          args.user ?? args.claimant ?? args.account ?? args.member ?? args[0] ?? ''
+          args.leader ?? args.user ?? args.claimant ?? args.receiver ?? args.recipient ?? args.account ?? args.member ?? args[0] ?? ''
         ).toLowerCase();
 
-        // Self transactions (claims, activations) and direct partner events are never skipped
+        // Keep verified on-chain activity without dropping valid network events
         const isSelf = candidateAddress === target;
-        if (!candidateAddress || (!isSelf && !directPartners.has(candidateAddress))) {
+        const isTeam = directPartners.has(candidateAddress);
+        if (!candidateAddress || !ethers.isAddress(candidateAddress)) {
           continue;
         }
 
