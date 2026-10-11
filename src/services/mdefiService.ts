@@ -233,35 +233,37 @@ export class MDefiHubMockService implements IMDefiHubService {
         lastSynced = Number(localStorage.getItem(cursorKey)) || 0;
       } catch {}
 
-      // Permanent Web3 Indexer: Covers Genesis (135600000) on first sync, then strictly follows delta
-      const GENESIS_FLOOR = 135600000;
+      // Optimized Safe Sync: Focused 50k window, max 2 chunks to completely eliminate 429
+      const GENESIS_FLOOR = 135700000; // Covers verified event block 135704901
       const startBlock = lastSynced > 0 ? lastSynced + 1 : GENESIS_FLOOR;
-      const CHUNK_SIZE = 10000;
+      const CHUNK_SIZE = 25000;
       const rawLogs: ethers.Log[] = [];
 
-      // Scan up to latestBlock, with a maximum batch limit of 20 chunks per sync pass to guarantee zero 429 errors
-      const maxTargetBlock = Math.min(latestBlock, startBlock + (CHUNK_SIZE * 20));
+      // Strictly limit to max 2 chunks per execution cycle
+      const maxTargetBlock = Math.min(latestBlock, startBlock + (CHUNK_SIZE * 2));
 
-      for (let from = startBlock; from <= maxTargetBlock; from += CHUNK_SIZE) {
-        const to = Math.min(from + CHUNK_SIZE - 1, maxTargetBlock);
-        try {
-          const logs = await provider.getLogs({
-            address: hubAddress,
-            fromBlock: from,
-            toBlock: to,
-          });
-          if (Array.isArray(logs) && logs.length > 0) {
-            rawLogs.push(...logs);
+      if (startBlock <= maxTargetBlock) {
+        for (let from = startBlock; from <= maxTargetBlock; from += CHUNK_SIZE) {
+          const to = Math.min(from + CHUNK_SIZE - 1, maxTargetBlock);
+          try {
+            const logs = await provider.getLogs({
+              address: hubAddress,
+              fromBlock: from,
+              toBlock: to,
+            });
+            if (Array.isArray(logs) && logs.length > 0) {
+              rawLogs.push(...logs);
+            }
+          } catch {
+            // Chunk level fail-safe
           }
-        } catch {
-          // Chunk level fail-safe ensures no halting
         }
-      }
 
-      // Cursor updates only up to what was actually scanned
-      try {
-        localStorage.setItem(cursorKey, String(maxTargetBlock));
-      } catch {}
+        // Lock cursor immediately
+        try {
+          localStorage.setItem(cursorKey, String(maxTargetBlock));
+        } catch {}
+      }
 
       const directPartners = new Set<string>();
       directPartners.add(target);
@@ -339,7 +341,10 @@ export class MDefiHubMockService implements IMDefiHubService {
         };
 
         const activityType = labelMap[name] || name;
-        const resolvedUserId = userDisplayMap.get(candidateAddress) || (isSelf ? 'Your Account' : `Partner ••••${candidateAddress.slice(-4)}`);
+        const shortAddr = `${candidateAddress.slice(0, 6)}...${candidateAddress.slice(-4)}`;
+        const resolvedUserId = isSelf 
+          ? 'Your Account' 
+          : (userDisplayMap.get(candidateAddress) || `Node (${shortAddr})`);
         const id = `97:${hubAddress.toLowerCase()}:${hash.toLowerCase()}:${log.index}`;
 
         records.push({
@@ -353,8 +358,8 @@ export class MDefiHubMockService implements IMDefiHubService {
           date: 'On-Chain Verified',
           activityType,
           details: isSelf 
-            ? `${activityType} confirmed on BSC`
-            : `Direct partner (${resolvedUserId}) ${activityType.toLowerCase()} on-chain`,
+            ? `${activityType} executed by your wallet` 
+            : `${activityType} confirmed for ${resolvedUserId}`,
           timestamp: 'On-Chain Verified',
           isRealData: true,
           __block: log.blockNumber,
