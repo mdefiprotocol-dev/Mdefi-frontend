@@ -288,7 +288,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         } catch {}
       }
 
-      const records: Array<TeamTransactionRecord & { __block: number; __log: number; rawTime?: number }> = [];
+      const records: Array<TeamTransactionRecord & { __block: number; __log: number }> = [];
 
       for (const log of rawLogs) {
         let parsed: ethers.LogDescription | null = null;
@@ -317,7 +317,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         if (!hash || !/^0x[0-9a-fA-F]{64}$/.test(hash)) continue;
 
         let amount = '';
-        const amountKeys = ['amount', 'rewardAmount', 'claimAmount', 'price', 'packageAmount', 'usdtCollected', 1];
+        const amountKeys = ['amount', 'rewardAmount', 'claimAmount', 'price', 'packageAmount', 'usdtCollected'];
         for (const key of amountKeys) {
           const val = args[key];
           if (val !== undefined && val !== null) {
@@ -335,8 +335,8 @@ export class MDefiHubMockService implements IMDefiHubService {
           Registered: 'Team Member Registration',
           PackageActivated: 'Package Activation',
           PackageActivatedDetailed: 'Package Activation',
-          ReferralClaimed: 'Referral Claim',
-          PackageClaimed: 'Package Claim',
+          ReferralClaimed: 'MBTTC Referral Pool Claim',
+          PackageClaimed: 'MBTTC Package Pool Claim',
         };
 
         const activityType = labelMap[name] || name;
@@ -361,7 +361,6 @@ export class MDefiHubMockService implements IMDefiHubService {
             : `${activityType} confirmed for ${resolvedUserId}`,
           timestamp: 'On-Chain Verified',
           isRealData: true,
-          rawTime: Math.floor(Date.now() / 1000),
           __block: log.blockNumber,
           __log: log.index,
         });
@@ -392,13 +391,12 @@ export class MDefiHubMockService implements IMDefiHubService {
 
           let dynamicUserId = `Partner (${partnerAddr.slice(0, 6)}...${partnerAddr.slice(-4)})`;
           let dynamicDate = 'On-Chain Verified';
-          let regTimestampSec = 0;
 
           try {
             const pNode = await hubContract.getUserNode(partnerAddr);
             if (pNode) {
               const onChainId = pNode.id ?? pNode[0];
-              regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
+              const regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
 
               if (onChainId && Number(onChainId) > 0) {
                 const numericId = Number(onChainId);
@@ -428,7 +426,6 @@ export class MDefiHubMockService implements IMDefiHubService {
             details: `Direct partner (${dynamicUserId}) registered on-chain`,
             timestamp: dynamicDate,
             isRealData: true,
-            rawTime: regTimestampSec || 0,
           };
         });
 
@@ -546,19 +543,11 @@ export class MDefiHubMockService implements IMDefiHubService {
       
       // Resilient Multi-Tier Sorting: Latest Timestamps first, Live claims prioritized
       finalRecords.sort((a: any, b: any) => {
-        const parseTime = (item: any): number => {
-          if (item.rawTime && Number(item.rawTime) > 0) return Number(item.rawTime);
-          if (item.date && item.date !== 'On-Chain Verified' && item.date !== 'Just now') {
-            const parsed = Date.parse(item.date.replace('·', ''));
-            if (!isNaN(parsed)) return Math.floor(parsed / 1000);
-          }
-          return 0;
-        };
-
-        const timeA = parseTime(a);
-        const timeB = parseTime(b);
+        const timeA = Number(a.rawTime || 0);
+        const timeB = Number(b.rawTime || 0);
         if (timeA !== timeB) return timeB - timeA;
         
+        // Agar dono live ya contract verified hain
         return String(b.id || '').localeCompare(String(a.id || ''));
       });
 
