@@ -260,11 +260,15 @@ export class MDefiHubMockService implements IMDefiHubService {
         // Safe fallback
       }
 
-      const directPartners = new Set<string>();
+      const directPartners = new Set<string>(onChainDirectTeam.map((a: string) => a.toLowerCase()));
       directPartners.add(target);
 
       const userDisplayMap = new Map<string, string>();
       userDisplayMap.set(target, 'Your Account');
+      onChainDirectTeam.forEach((pAddr: string) => {
+        const norm = pAddr.toLowerCase();
+        userDisplayMap.set(norm, `Partner (${norm.slice(0, 6)}...${norm.slice(-4)})`);
+      });
 
       for (const log of rawLogs) {
         try {
@@ -299,12 +303,12 @@ export class MDefiHubMockService implements IMDefiHubService {
         const args: any = parsed.args;
 
         const candidateAddress = String(
-          args.leader ?? args.user ?? args.claimant ?? args.receiver ?? args.recipient ?? args.account ?? args.member ?? args[0] ?? ''
+          args.leader || args.user || args.claimant || args.account || args[0] || ''
         ).toLowerCase();
 
-        // Keep verified on-chain activity without dropping valid network events
+        // Guaranteed Match: Connected User OR On-Chain Direct Team Member
         const isSelf = candidateAddress === target;
-        const isTeam = directPartners.has(candidateAddress);
+        const isTeam = directPartners.has(candidateAddress) || onChainDirectTeam.some((a) => a.toLowerCase() === candidateAddress);
         if (!candidateAddress || !ethers.isAddress(candidateAddress) || (!isSelf && !isTeam)) {
           continue;
         }
