@@ -305,7 +305,7 @@ export class MDefiHubMockService implements IMDefiHubService {
         // Keep verified on-chain activity without dropping valid network events
         const isSelf = candidateAddress === target;
         const isTeam = directPartners.has(candidateAddress);
-        if (!candidateAddress || !ethers.isAddress(candidateAddress)) {
+        if (!candidateAddress || !ethers.isAddress(candidateAddress) || (!isSelf && !isTeam)) {
           continue;
         }
 
@@ -456,14 +456,9 @@ export class MDefiHubMockService implements IMDefiHubService {
 
       // Contract On-Chain Claim State Hydration (Self + Direct Team Fallback)
       try {
-        // Target list: Self wallet + verified on-chain direct partners
+        // Target list: Self-only direct fallback (Team claims are populated via real on-chain events above)
         const vestingCheckTargets = [
           { addr: target, isSelf: true, label: 'Your Account' },
-          ...onChainDirectTeam.map((pAddr) => ({
-            addr: pAddr,
-            isSelf: false,
-            label: userDisplayMap.get(pAddr) || `Partner (${pAddr.slice(0, 6)}...${pAddr.slice(-4)})`,
-          })),
         ];
 
         // Parallel Hydration for sub-second execution without freezing UI
