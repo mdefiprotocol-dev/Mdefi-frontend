@@ -391,12 +391,13 @@ export class MDefiHubMockService implements IMDefiHubService {
 
           let dynamicUserId = `Partner (${partnerAddr.slice(0, 6)}...${partnerAddr.slice(-4)})`;
           let dynamicDate = 'On-Chain Verified';
+          let regTimestampSec = 0;
 
           try {
             const pNode = await hubContract.getUserNode(partnerAddr);
             if (pNode) {
               const onChainId = pNode.id ?? pNode[0];
-              const regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
+              regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
 
               if (onChainId && Number(onChainId) > 0) {
                 const numericId = Number(onChainId);
@@ -426,6 +427,7 @@ export class MDefiHubMockService implements IMDefiHubService {
             details: `Direct partner (${dynamicUserId}) registered on-chain`,
             timestamp: dynamicDate,
             isRealData: true,
+            rawTime: regTimestampSec || 0,
           };
         });
 
