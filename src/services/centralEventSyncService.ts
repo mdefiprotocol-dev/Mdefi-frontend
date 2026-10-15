@@ -1101,6 +1101,7 @@ class CentralEventSyncService {
     if (!Array.isArray(transactions) || transactions.length === 0) return;
 
     const currentMap = new Map<string, TeamTransactionRecord>();
+    let hasNewRecords = false;
     
     // 1. Keep existing state records
     this.state.teamTransactions.forEach((tx) => {
@@ -1110,12 +1111,21 @@ class CentralEventSyncService {
     // 2. Safely merge new verified on-chain records
     transactions.forEach((tx) => {
       if (tx && tx.id) {
+        if (!currentMap.has(tx.id)) {
+          hasNewRecords = true; // Flag ONLY if truly a new record
+        }
         currentMap.set(tx.id, tx);
         this.processedEventIds.add(tx.id);
       }
     });
 
-    // 3. Update central state and broadcast to UI
+    // CIRCUIT BREAKER: Agar koi naya record nahi aaya hai, toh UI ko dobara notify mat karo!
+    // Isse React component ka infinite re-render loop turant band ho jayega.
+    if (!hasNewRecords && currentMap.size === this.state.teamTransactions.length) {
+      return;
+    }
+
+    // 3. Update central state and broadcast to UI ONLY on actual diff
     this.state.teamTransactions = Array.from(currentMap.values());
     this.state.lastSyncTimestamp = Date.now();
     this.notifySubscribers();

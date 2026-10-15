@@ -33,6 +33,24 @@ import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
 const BSCSCAN_API_KEY = 'B717482NP483F32JMXAMHB9J9QEE21BB8R';
 
+// Standard Multicall3 Contract for BSC Testnet (97) & Mainnet (56)
+const MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11';
+const MULTICALL3_ABI = [
+  'function aggregate3(tuple(address target, bool allowFailure, bytes callData)[] calls) view returns (tuple(bool success, bytes returnData)[] returnData)'
+];
+
+// Network-scoped verification cache so we verify bytecode once per network
+const verifiedMulticallByChain = new Map<string, boolean>();
+
+// Constants for bounded incremental scanning to guard free public node limits
+const MAX_SCAN_SPAN_BLOCKS = 2000;
+const REORG_SAFETY_BLOCKS = 5;
+const COLD_START_SCAN_WINDOW = 2500;
+
+// Module-level cache to guard against rapid duplicate calls (Zero-syntax risk)
+let lastTeamFetchTime = 0;
+let cachedTeamResult: { isRealData: boolean; transactions: TeamTransactionRecord[] } | null = null;
+
 type LedgerItem = TeamTransactionRecord & { rawTime: number };
 
 export interface IMDefiHubService {
@@ -210,6 +228,12 @@ export class MDefiHubMockService implements IMDefiHubService {
 
     const target = targetWallet.toLowerCase();
 
+    // 5-Second Cooldown: Agar pichhle 5 second me data manga gaya hai, to wahi return karo (0 RPC call!)
+    const now = Date.now();
+    if (cachedTeamResult && (now - lastTeamFetchTime < 5000)) {
+      return cachedTeamResult;
+    }
+
     // Permanent Cache Fallback
     const getStoredBackup = (): TeamTransactionRecord[] => {
       try {
@@ -244,20 +268,53 @@ export class MDefiHubMockService implements IMDefiHubService {
         console.warn('[MDefiHub] Direct getUserNode read warn:', err);
       }
 
-      // 2. Safe Recent Delta Scan (Only past 5,000 blocks to prevent 429 and memory prune issues)
+      // 2. Safe Bounded-Chunk Incremental Delta Scan
       try {
+        const network = await provider.getNetwork();
+        const chainId = Number(network.chainId);
         const latestBlock = await provider.getBlockNumber();
-        const fromSafeBlock = Math.max(0, latestBlock - 5000);
-        const logs = await provider.getLogs({
-          address: hubAddress,
-          fromBlock: fromSafeBlock,
-          toBlock: latestBlock,
-        });
-        if (Array.isArray(logs) && logs.length > 0) {
-          rawLogs.push(...logs);
+        const cursorKey = `mdefi_scan_cursor_${chainId}_${hubAddress.toLowerCase()}_${target}`;
+        
+        const rawCursor = sessionStorage.getItem(cursorKey);
+        const storedCursor = rawCursor ? Number(rawCursor) : 0;
+
+        let fromTargetBlock = storedCursor > 0 
+          ? Math.max(0, storedCursor - REORG_SAFETY_BLOCKS)
+          : Math.max(0, latestBlock - COLD_START_SCAN_WINDOW);
+
+        // Prevent invalid forwards range
+        if (fromTargetBlock > latestBlock) {
+          fromTargetBlock = Math.max(0, latestBlock - 500);
         }
-      } catch {
-        // Safe fallback
+
+        let currentFrom = fromTargetBlock;
+
+        // Process in bounded chunks of MAX_SCAN_SPAN_BLOCKS to prevent 429 and response truncation
+        while (currentFrom < latestBlock) {
+          const currentTo = Math.min(currentFrom + MAX_SCAN_SPAN_BLOCKS, latestBlock);
+          
+          try {
+            const chunkLogs = await provider.getLogs({
+              address: hubAddress,
+              fromBlock: currentFrom,
+              toBlock: currentTo,
+            });
+
+            if (Array.isArray(chunkLogs) && chunkLogs.length > 0) {
+              rawLogs.push(...chunkLogs);
+            }
+
+            // ATOMIC COMMIT: Commit cursor only after this specific chunk has been fetched
+            sessionStorage.setItem(cursorKey, String(currentTo));
+            currentFrom = currentTo + 1;
+          } catch (chunkErr: any) {
+            console.warn(`[MDefiHub] Chunk scan failed (${currentFrom}-${currentTo}), preserving cursor:`, chunkErr?.message || chunkErr);
+            // Break loop gracefully so already processed chunks are kept and cursor resumes here on next run
+            break;
+          }
+        }
+      } catch (err: any) {
+        console.warn('[MDefiHub] Incremental event scan setup warn:', err?.message || err);
       }
 
       const directPartners = new Set<string>(onChainDirectTeam.map((a: string) => a.toLowerCase()));
@@ -369,9 +426,8 @@ export class MDefiHubMockService implements IMDefiHubService {
       records.sort((a, b) => b.__block - a.__block || b.__log - a.__log);
       const freshlyScanned = records.map(({ __block, __log, ...r }) => r);
 
-      // 3. 100% Dynamic ABI-Driven Direct Team Hydration (Zero Hardcoding)
+      // 3. 100% Dynamic ABI-Driven Direct Team Hydration (Multicall3 Optimized)
       if (onChainDirectTeam.length > 0) {
-        // Dynamic Value 1: Smart contract getPhaseRewards() se real reward nikalna
         let dynamicRegReward = '0.00 MBTTC';
         try {
           const phaseRewards = await hubContract.getPhaseRewards();
@@ -384,57 +440,139 @@ export class MDefiHubMockService implements IMDefiHubService {
           console.warn('[MDefiHub] Dynamic getPhaseRewards fetch warn:', err);
         }
 
-        // Dynamic Value 2: Smart contract getUserNode() se real timestamp aur real MDF ID nikalna
-        const partnerHydrations = onChainDirectTeam.map(async (partnerAddr) => {
-          // Agar yeh address already blockchain logs se scan ho chuka hai toh skip karein
-          if (records.some((r) => r.memberWallet === partnerAddr)) return null;
+        // Only hydrate partners not already found in the scanned event logs
+        const pendingPartners = onChainDirectTeam.filter(
+          (addr) => !records.some((r) => r.memberWallet.toLowerCase() === addr.toLowerCase())
+        );
 
-          let dynamicUserId = `Partner (${partnerAddr.slice(0, 6)}...${partnerAddr.slice(-4)})`;
-          let dynamicDate = 'On-Chain Verified';
-          let regTimestampSec = 0;
+        if (pendingPartners.length > 0) {
+          const network = await provider.getNetwork();
+          const chainId = Number(network.chainId);
+          const verificationKey = `${chainId}:${MULTICALL3_ADDRESS.toLowerCase()}`;
 
-          try {
-            const pNode = await hubContract.getUserNode(partnerAddr);
-            if (pNode) {
-              const onChainId = pNode.id ?? pNode[0];
-              regTimestampSec = Number(pNode.registrationTime ?? pNode[1]);
-
-              if (onChainId && Number(onChainId) > 0) {
-                const numericId = Number(onChainId);
-                const displayId = numericId < 100000 ? 248160 + numericId : numericId;
-                dynamicUserId = `MDF-${displayId}`;
-              }
-
-              if (regTimestampSec && regTimestampSec > 0) {
-                const d = new Date(regTimestampSec * 1000);
-                dynamicDate = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-              }
+          // Verify bytecode for this specific chain once
+          if (!verifiedMulticallByChain.has(verificationKey)) {
+            try {
+              const code = await provider.getCode(MULTICALL3_ADDRESS);
+              const isValidBytecode = typeof code === 'string' && code.length > 2 && code !== '0x' && code !== '0x0';
+              verifiedMulticallByChain.set(verificationKey, isValidBytecode);
+            } catch {
+              verifiedMulticallByChain.set(verificationKey, false);
             }
-          } catch (nodeErr) {
-            console.warn('[MDefiHub] Dynamic getUserNode fetch warn:', nodeErr);
           }
 
-          return {
-            id: `onchain-team-${partnerAddr}`,
-            memberWallet: partnerAddr,
-            userId: dynamicUserId,
-            packageAmount: dynamicRegReward,
-            amount: dynamicRegReward,
-            status: 'Confirmed' as const,
-            txHash: `0x${partnerAddr.slice(2).padStart(64, '0')}`,
-            date: dynamicDate,
-            activityType: 'Team Member Registration',
-            details: `Direct partner (${dynamicUserId}) registered on-chain`,
-            timestamp: dynamicDate,
-            isRealData: true,
-            rawTime: regTimestampSec || 0,
-          };
-        });
+          const isMulticallUsable = verifiedMulticallByChain.get(verificationKey) === true;
+          let batchSuccess = false;
 
-        const dynamicCards = await Promise.all(partnerHydrations);
-        dynamicCards.forEach((card) => {
-          if (card) freshlyScanned.push(card);
-        });
+          if (isMulticallUsable) {
+            try {
+              const multicallContract = new ethers.Contract(MULTICALL3_ADDRESS, MULTICALL3_ABI, provider);
+              const MULTICALL_BATCH_SIZE = 50;
+
+              for (let i = 0; i < pendingPartners.length; i += MULTICALL_BATCH_SIZE) {
+                const partnerChunk = pendingPartners.slice(i, i + MULTICALL_BATCH_SIZE);
+                const calls = partnerChunk.map((addr) => ({
+                  target: hubAddress,
+                  allowFailure: true,
+                  callData: iface.encodeFunctionData('getUserNode', [addr]),
+                }));
+
+                const returnTuple: Array<{ success: boolean; returnData: string }> = await multicallContract.aggregate3(calls);
+
+                returnTuple.forEach((item, idx) => {
+                  const partnerAddr = partnerChunk[idx];
+                  if (!item.success || !item.returnData || item.returnData === '0x') return;
+
+                  try {
+                    const decoded = iface.decodeFunctionResult('getUserNode', item.returnData);
+                    const pNode = decoded[0] ?? decoded;
+                    const onChainId = pNode.id ?? pNode[0];
+                    const regTimestampSec = Number(pNode.registrationTime ?? pNode[1] ?? 0);
+
+                    // STRICT VALIDATION: Require valid registered node
+                    if (!onChainId || Number(onChainId) <= 0 || regTimestampSec <= 0) {
+                      return;
+                    }
+
+                    const numericId = Number(onChainId);
+                    const displayId = numericId < 100000 ? 248160 + numericId : numericId;
+                    const dynamicUserId = `MDF-${displayId}`;
+
+                    const d = new Date(regTimestampSec * 1000);
+                    const dynamicDate = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+                    freshlyScanned.push({
+                      id: `node-${partnerAddr.toLowerCase()}`,
+                      memberWallet: partnerAddr,
+                      userId: dynamicUserId,
+                      packageAmount: dynamicRegReward,
+                      amount: dynamicRegReward,
+                      status: 'Confirmed' as const,
+                      txHash: '', // Zero synthetic hash: clean representation for contract state reads
+                      date: dynamicDate,
+                      activityType: 'Team Member Registration',
+                      details: `Direct partner (${dynamicUserId}) registered on-chain`,
+                      timestamp: dynamicDate,
+                      isRealData: true,
+                      rawTime: regTimestampSec,
+                    } as any);
+                  } catch (decodeErr) {
+                    console.warn(`[MDefiHub] Node decode failed for ${partnerAddr}:`, decodeErr);
+                  }
+                });
+              }
+              batchSuccess = true;
+            } catch (mcErr) {
+              console.warn('[MDefiHub] Multicall3 execution failed, falling back to throttled micro-batches:', mcErr);
+              batchSuccess = false;
+            }
+          }
+
+          // Controlled Sequential Fallback (3 partners per micro-batch, 50ms pacing)
+          if (!batchSuccess) {
+            const FALLBACK_BATCH = 3;
+            for (let i = 0; i < pendingPartners.length; i += FALLBACK_BATCH) {
+              const slice = pendingPartners.slice(i, i + FALLBACK_BATCH);
+              await Promise.all(
+                slice.map(async (partnerAddr) => {
+                  try {
+                    const pNode = await hubContract.getUserNode(partnerAddr);
+                    if (!pNode) return;
+
+                    const onChainId = pNode.id ?? pNode[0];
+                    const regTimestampSec = Number(pNode.registrationTime ?? pNode[1] ?? 0);
+
+                    if (!onChainId || Number(onChainId) <= 0 || regTimestampSec <= 0) return;
+
+                    const numericId = Number(onChainId);
+                    const displayId = numericId < 100000 ? 248160 + numericId : numericId;
+                    const dynamicUserId = `MDF-${displayId}`;
+
+                    const d = new Date(regTimestampSec * 1000);
+                    const dynamicDate = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+                    freshlyScanned.push({
+                      id: `node-${partnerAddr.toLowerCase()}`,
+                      memberWallet: partnerAddr,
+                      userId: dynamicUserId,
+                      packageAmount: dynamicRegReward,
+                      amount: dynamicRegReward,
+                      status: 'Confirmed' as const,
+                      txHash: '',
+                      date: dynamicDate,
+                      activityType: 'Team Member Registration',
+                      details: `Direct partner (${dynamicUserId}) registered on-chain`,
+                      timestamp: dynamicDate,
+                      isRealData: true,
+                      rawTime: regTimestampSec,
+                    } as any);
+                  } catch {}
+                })
+              );
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          }
+        }
       }
 
       // 4. Merge: Real-time Live Claim Cards + Dynamic On-Chain Direct Team + Local Storage Backup
@@ -553,6 +691,11 @@ export class MDefiHubMockService implements IMDefiHubService {
         return String(b.id || '').localeCompare(String(a.id || ''));
       });
 
+      let finalOutput = {
+        isRealData: existingBackup.length > 0,
+        transactions: existingBackup,
+      };
+
       if (finalRecords.length > 0) {
         try {
           localStorage.setItem(`mdefi_verified_txs_${target}`, JSON.stringify(finalRecords));
@@ -562,16 +705,16 @@ export class MDefiHubMockService implements IMDefiHubService {
           centralEventSyncService.mergeHistoricalTeamTransactions(finalRecords);
         } catch {}
 
-        return {
+        finalOutput = {
           isRealData: true,
           transactions: finalRecords,
         };
       }
 
-      return {
-        isRealData: existingBackup.length > 0,
-        transactions: existingBackup,
-      };
+      // Update cache timestamp and value
+      lastTeamFetchTime = Date.now();
+      cachedTeamResult = finalOutput;
+      return finalOutput;
     } catch (err) {
       console.warn('[MDefiHub] Historical log scan error, preserving cached verified state:', err);
       const cached = getStoredBackup();
@@ -642,6 +785,22 @@ export class MDefiHubMockService implements IMDefiHubService {
       const prev = JSON.parse(localStorage.getItem(sKey) || '[]');
       localStorage.setItem(sKey, JSON.stringify([realReceiptRecord, ...prev.filter((x: any) => x.id !== realReceiptRecord.id)]));
     } catch {}
+
+    // Surgical Cursor Rollback: Roll back cursor slightly by 10 blocks so the immediate subsequent scan catches the newly mined event on-chain
+    try {
+      const hubAddr = CONTRACT_ADDRESSES?.mdefiHub?.toLowerCase();
+      const provider = this.getReliableProvider();
+      const network = await provider.getNetwork();
+      const chainId = Number(network.chainId);
+      const cursorKey = `mdefi_scan_cursor_${chainId}_${hubAddr}_${targetWallet}`;
+      const cur = Number(sessionStorage.getItem(cursorKey) || 0);
+      if (cur > 10) {
+        sessionStorage.setItem(cursorKey, String(cur - 10));
+      }
+    } catch (cursorErr) {
+      console.warn('[MDefiHub] Surgical cursor rollback warn:', cursorErr);
+    }
+
     this.notifyFeedSubscribers();
 
     return {

@@ -189,7 +189,28 @@ export class ContractAdapter {
     };
   }
 
+  private lastRefreshTimestamp: number = 0;
+  private pendingRefreshTimeout: any = null;
+
   public triggerDataRefresh(): void {
+    const now = Date.now();
+    // 3-second debounce throttle: Ek sath aane wali multiple refresh calls ko merge karta hai
+    if (now - this.lastRefreshTimestamp < 3000) {
+      if (!this.pendingRefreshTimeout) {
+        this.pendingRefreshTimeout = setTimeout(() => {
+          this.pendingRefreshTimeout = null;
+          this.lastRefreshTimestamp = Date.now();
+          this.executeDataRefresh();
+        }, 1500);
+      }
+      return;
+    }
+
+    this.lastRefreshTimestamp = now;
+    this.executeDataRefresh();
+  }
+
+  private executeDataRefresh(): void {
     this.refreshListeners.forEach((cb) => {
       try {
         cb();
