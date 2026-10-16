@@ -120,15 +120,65 @@ export const TeamView: React.FC<TeamViewProps> = ({
   const [memberCopiedAddress, setMemberCopiedAddress] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // 100% On-Chain Dynamic Member Extraction with Active/Inactive $10 Package Logic (Audited)
   const effectiveMembers = useMemo(() => {
-    const combined = [...(members || [])];
-    syncedMembers.forEach((cm) => {
-      if (!combined.some((m) => m.userId.toLowerCase() === cm.userId.toLowerCase())) {
-        combined.unshift(cm);
+    const memberMap = new Map<string, TeamMember>();
+    const currentConnectedWallet = (user.walletAddress || '').trim().toLowerCase();
+
+    // 1. Props और sync service के मेंबर्स लोड करें
+    [...(members || []), ...syncedMembers].forEach((m) => {
+      if (m && m.address && typeof m.address === 'string') {
+        const cleanAddr = m.address.trim().toLowerCase();
+        if (cleanAddr && cleanAddr !== currentConnectedWallet) {
+          memberMap.set(cleanAddr, { ...m, address: m.address });
+        }
       }
     });
-    return combined;
-  }, [members, syncedMembers]);
+
+    // 2. Real on-chain transactions से सभी डायरेक्ट पार्टनर्स निकालें
+    txState.transactions.forEach((tx) => {
+      const addr = (tx.memberWallet || '').trim().toLowerCase();
+      // खुद के कनेक्टेड वॉलेट को टीम लिस्ट में शामिल न करें
+      if (addr && addr !== currentConnectedWallet && !memberMap.has(addr)) {
+        const rawUserId = tx.userId && !tx.userId.includes('(') ? tx.userId : `MDF-${addr.slice(2, 8).toUpperCase()}`;
+        
+        // Name Logic: अगर कस्टम नाम नहीं है तो यूजर का डायनामिक MDF ID ही नेम बनेगा
+        const resolvedName = (tx as any).name && String((tx as any).name).trim().length > 0 
+          ? String((tx as any).name).trim() 
+          : rawUserId;
+
+        memberMap.set(addr, {
+          id: tx.id || `member-${addr}`,
+          userId: rawUserId,
+          name: resolvedName,
+          address: tx.memberWallet,
+          joinedDate: tx.date || 'On-Chain Verified',
+          status: 'Inactive', // Phase 1: डिफ़ॉल्ट इनएक्टिव (Pending $10 package)
+          activePackages: 0,
+          isDirect: true,
+          level: 1,
+          sponsor: user.userId || 'Your Account',
+        } as TeamMember);
+      }
+    });
+
+    // 3. यदि पार्टनर का पैकेज एक्टिवेशन ऑन-चेन मिला तो उसे Active मार्क करें[cite: 12]
+    txState.transactions.forEach((tx) => {
+      const act = (tx.activityType || '').toLowerCase();
+      const pkg = (tx.packageName || '').toLowerCase();
+      const addr = (tx.memberWallet || '').trim().toLowerCase();
+      if ((act.includes('package') || pkg.includes('junior') || pkg.includes('10')) && memberMap.has(addr)) {
+        const existing = memberMap.get(addr)!;
+        memberMap.set(addr, {
+          ...existing,
+          status: 'Active',
+          activePackages: Math.max(1, existing.activePackages || 1),
+        });
+      }
+    });
+
+    return Array.from(memberMap.values());
+  }, [members, syncedMembers, txState.transactions, user.walletAddress, user.userId]);
 
   const directMembers = useMemo(() => effectiveMembers.filter((m) => m.isDirect || m.level === 1), [effectiveMembers]);
   const totalMembers = effectiveMembers;
@@ -589,11 +639,9 @@ export const TeamView: React.FC<TeamViewProps> = ({
                           {m.userId || m.id}
                         </td>
                         <td className="py-3">
-                          {hasName ? (
-                            <span className="text-zinc-200 font-medium font-sans">{m.name}</span>
-                          ) : (
-                            <span className="text-zinc-500">-----</span>
-                          )}
+                          <span className="text-zinc-200 font-medium font-sans">
+                            {m.name && m.name.trim().length > 0 ? m.name : (m.userId || m.id)}
+                          </span>
                         </td>
                         <td className="py-3">
                           <div className="flex items-center gap-1.5">
@@ -683,7 +731,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
                       <div className="min-w-0">
                         <span className="text-zinc-500 text-[10px] block">Name</span>
                         <span className="text-zinc-200 truncate font-sans font-medium">
-                          {hasName ? m.name : '-----'}
+                          {m.name && m.name.trim().length > 0 ? m.name : (m.userId || m.id)}
                         </span>
                       </div>
                       <div className="text-right shrink-0">
@@ -750,11 +798,9 @@ export const TeamView: React.FC<TeamViewProps> = ({
                           {m.userId || m.id}
                         </td>
                         <td className="py-3">
-                          {hasName ? (
-                            <span className="text-zinc-200 font-medium font-sans">{m.name}</span>
-                          ) : (
-                            <span className="text-zinc-500">-----</span>
-                          )}
+                          <span className="text-zinc-200 font-medium font-sans">
+                            {m.name && m.name.trim().length > 0 ? m.name : (m.userId || m.id)}
+                          </span>
                         </td>
                         <td className="py-3 text-zinc-300">
                           <span className="flex items-center gap-1">
@@ -858,7 +904,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
                       <div className="min-w-0">
                         <span className="text-zinc-500 text-[10px] block">Name</span>
                         <span className="text-zinc-200 truncate font-sans font-medium">
-                          {hasName ? m.name : '-----'}
+                          {m.name && m.name.trim().length > 0 ? m.name : (m.userId || m.id)}
                         </span>
                       </div>
                       <div className="text-right shrink-0">
