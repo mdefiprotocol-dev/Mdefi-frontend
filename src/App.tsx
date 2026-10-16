@@ -34,7 +34,6 @@ import { MbttcView } from './views/MbttcView';
 import { TeamView } from './views/TeamView';
 import { PackagesView } from './views/PackagesView';
 import { IncomeView } from './views/IncomeView';
-import { TransactionsView } from './views/TransactionsView';
 import { ProfileView } from './views/ProfileView';
 import { HubView } from './views/HubView';
 import { S4MatrixView } from './views/S4MatrixView';
@@ -954,11 +953,7 @@ function MainApp() {
                 />
               )}
 
-              {currentPage === 'transactions' && (
-                <TransactionsView
-                  activities={activities}
-                />
-              )}
+              
 
               {currentPage === 'profile' && (
                 <ProfileView

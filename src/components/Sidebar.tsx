@@ -93,7 +93,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'team', label: t('nav_team', 'My Team'), icon: Users },
     { id: 'packages', label: t('nav_packages', 'Packages'), icon: Layers },
     { id: 'income', label: t('nav_income', 'Income'), icon: TrendingUp },
-    { id: 'transactions', label: t('nav_transactions', 'Transactions'), icon: ArrowLeftRight },
     { id: 'profile', label: t('nav_profile', 'Profile'), icon: UserCheck },
   ];
 

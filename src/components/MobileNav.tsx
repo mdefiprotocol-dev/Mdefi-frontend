@@ -125,14 +125,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       iconColor: 'text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.5)]',
     },
     { 
-      id: 'transactions', 
-      label: t('nav_transactions', 'Transactions'), 
-      desc: t('nav_transactions_desc', 'Transaction history and verified activity'), 
-      icon: ArrowLeftRight,
-      accentClass: 'bg-teal-500/10 border-teal-500/30 shadow-[0_0_14px_rgba(20,184,166,0.2)]',
-      iconColor: 'text-teal-400 drop-shadow-[0_0_6px_rgba(45,212,191,0.5)]',
-    },
-    { 
       id: 'profile', 
       label: t('nav_profile', 'Profile'), 
       desc: t('nav_profile_desc', 'Account, wallet and preferences'), 
@@ -156,7 +148,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     'weekly_passive_salary',
     'packages', 
     'income', 
-    'transactions', 
     'profile'
   ].includes(currentPage);
 
