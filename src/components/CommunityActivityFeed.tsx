@@ -644,7 +644,7 @@ export const CommunityActivityFeed: React.FC<CommunityActivityFeedProps> = ({
 
         <button
           type="button"
-          onClick={() => onNavigate('transactions')}
+          onClick={() => onNavigate('team')}
           className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black text-xs font-mono font-black tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>VIEW ALL ACTIVITY</span>
