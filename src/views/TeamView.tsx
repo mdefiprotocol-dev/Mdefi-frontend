@@ -185,10 +185,15 @@ export const TeamView: React.FC<TeamViewProps> = ({
   const activeMembers = useMemo(() => effectiveMembers.filter((m) => m.status === 'Active'), [effectiveMembers]);
   const inactiveMembers = useMemo(() => effectiveMembers.filter((m) => m.status === 'Inactive'), [effectiveMembers]);
 
-  const directCount = directMembers.length;
-  const totalCount = totalMembers.length;
+  const directCount = user.directTeamCount !== undefined && user.directTeamCount > 0 
+    ? user.directTeamCount 
+    : directMembers.length;
+  // Bug Fix: Overview की तरह Hub Smart Contract का रियल Total Team Count (e.g. 16) रेंडर होगा
+  const totalCount = user.totalTeamCount !== undefined && user.totalTeamCount > 0 
+    ? user.totalTeamCount 
+    : Math.max(totalMembers.length, directCount);
   const activeCount = activeMembers.length;
-  const inactiveCount = inactiveMembers.length;
+  const inactiveCount = Math.max(0, totalCount - activeCount);
 
   const handleSelectCategory = (cat: TeamCategory) => {
     setSelectedCategory(cat);
@@ -241,7 +246,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
     });
   }, [activeCategoryList, memberSearchQuery]);
 
-  const memberPageSize = selectedCategory === 'inactive' ? 4 : 5;
+  const memberPageSize = 15;
   const memberTotalPages = Math.ceil(filteredMembers.length / memberPageSize);
   const currentMemberPage = Math.min(memberPage, Math.max(1, memberTotalPages));
 
@@ -251,7 +256,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
   }, [filteredMembers, currentMemberPage, memberPageSize]);
 
   const [txPage, setTxPage] = useState<number>(1);
-  const txPageSize = 6;
+  const txPageSize = 15;
 
   useEffect(() => {
     setTxPage(1);
