@@ -196,7 +196,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
             id: downlineUniqueKey,
             userId: generatedId,
             name: generatedId,
-            address: `${parentMember.address.slice(0, 6)}...${(1000 + i).toString(16)}`,
+            address: `${parentMember.address.slice(0, 36)}${(1000 + i).toString(16).padStart(6, '0')}`,
             joinedDate: parentMember.joinedDate || 'On-Chain Verified',
             status: 'Inactive',
             activePackages: 0,

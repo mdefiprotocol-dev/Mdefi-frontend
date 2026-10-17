@@ -716,25 +716,40 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
         };
       }
 
-      // Check loaded team members
-      const matched = members.find((m) => m.userId && m.userId.toUpperCase() === cleanId);
+      // Check loaded team members (Audited: Exact ID, trimmed ID ya numeric match)
+      const normalizedDigits = trimmed.replace(/\D/g, '');
+      const matched = members.find((m) => {
+        const u = (m.userId || '').toUpperCase();
+        return (
+          u === cleanId ||
+          u === trimmed.toUpperCase() ||
+          (normalizedDigits.length > 0 && u.replace(/\D/g, '') === normalizedDigits)
+        );
+      });
       if (matched && matched.address && ethers.isAddress(matched.address)) {
         return {
           isValid: true,
           address: ethers.getAddress(matched.address),
-          mdfId: matched.userId,
-          name: matched.name,
+          mdfId: matched.userId || cleanId,
+          name: matched.name || matched.userId || cleanId,
         };
       }
 
       // Check loaded transactions
-      const txMatch = transactions.find((t) => t.userId && t.userId.toUpperCase() === cleanId);
+      const txMatch = transactions.find((t) => {
+        const u = (t.userId || '').toUpperCase();
+        return (
+          u === cleanId ||
+          u === trimmed.toUpperCase() ||
+          (normalizedDigits.length > 0 && u.replace(/\D/g, '') === normalizedDigits)
+        );
+      });
       if (txMatch && txMatch.memberWallet && ethers.isAddress(txMatch.memberWallet)) {
         return {
           isValid: true,
           address: ethers.getAddress(txMatch.memberWallet),
-          mdfId: txMatch.userId,
-          name: undefined,
+          mdfId: txMatch.userId || cleanId,
+          name: txMatch.userId || cleanId,
         };
       }
 
@@ -1562,9 +1577,7 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
                             <h3 className="text-sm sm:text-base font-bold text-white font-sans truncate">
                               {profileData.isRootSponsor
                                 ? 'Root Protocol'
-                                : (profileData.sponsorDisplayName && profileData.sponsorDisplayName.trim().length > 0 
-                                    ? profileData.sponsorDisplayName 
-                                    : (profileData.sponsorUserId || `MDF-${profileData.sponsor.slice(2, 8).toUpperCase()}`))}
+                                : (profileData.sponsorUserId || profileData.sponsorDisplayName || formatCompactAddress(profileData.sponsor))}
                             </h3>
 
                             <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
