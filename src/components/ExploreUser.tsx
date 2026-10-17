@@ -87,20 +87,27 @@ const HUB_DASHBOARD_ABI = [
     inputs: [{ internalType: 'address', name: '_user', type: 'address' }],
     name: 'getUserDashboard',
     outputs: [
-      { internalType: 'uint256', name: 'userId', type: 'uint256' },
-      { internalType: 'address', name: 'wallet', type: 'address' },
-      { internalType: 'address', name: 'sponsor', type: 'address' },
-      { internalType: 'uint256', name: 'registrationTime', type: 'uint256' },
-      { internalType: 'uint256', name: 'directTeamCount', type: 'uint256' },
-      { internalType: 'uint256', name: 'totalTeamCount', type: 'uint256' },
-      { internalType: 'bool', name: 'isBlocked', type: 'bool' },
-      { internalType: 'uint256', name: 'referralTotalEarned', type: 'uint256' },
-      { internalType: 'uint256', name: 'referralTotalClaimed', type: 'uint256' },
-      { internalType: 'uint256', name: 'referralClaimable', type: 'uint256' },
-      { internalType: 'uint256', name: 'packageTotalEarned', type: 'uint256' },
-      { internalType: 'uint256', name: 'packageTotalClaimed', type: 'uint256' },
-      { internalType: 'uint256', name: 'packageClaimable', type: 'uint256' },
-      { internalType: 'uint256', name: 'activePackageCount', type: 'uint256' }
+      {
+        components: [
+          { internalType: 'uint256', name: 'userId', type: 'uint256' },
+          { internalType: 'address', name: 'wallet', type: 'address' },
+          { internalType: 'address', name: 'sponsor', type: 'address' },
+          { internalType: 'uint256', name: 'registrationTime', type: 'uint256' },
+          { internalType: 'uint256', name: 'directTeamCount', type: 'uint256' },
+          { internalType: 'uint256', name: 'totalTeamCount', type: 'uint256' },
+          { internalType: 'bool', name: 'isBlocked', type: 'bool' },
+          { internalType: 'uint256', name: 'referralTotalEarned', type: 'uint256' },
+          { internalType: 'uint256', name: 'referralTotalClaimed', type: 'uint256' },
+          { internalType: 'uint256', name: 'referralClaimable', type: 'uint256' },
+          { internalType: 'uint256', name: 'packageTotalEarned', type: 'uint256' },
+          { internalType: 'uint256', name: 'packageTotalClaimed', type: 'uint256' },
+          { internalType: 'uint256', name: 'packageClaimable', type: 'uint256' },
+          { internalType: 'uint256', name: 'activePackageCount', type: 'uint256' }
+        ],
+        internalType: 'struct MDEFIEnterpriseHubUnified.MasterUserDashboard',
+        name: 'dashboard',
+        type: 'tuple'
+      }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -871,7 +878,10 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
         const fullAbi = [...HUB_ABI, ...HUB_DASHBOARD_ABI];
         const hubContract = new ethers.Contract(hubAddress, fullAbi, provider);
 
-        const raw = await hubContract.getUserDashboard(targetWallet);
+        const res = await hubContract.getUserDashboard(targetWallet);
+        // Tuple/Struct un-wrapping safety check for Ethers.js v6
+        const raw = (res && res.dashboard) ? res.dashboard : ((res && res.userId !== undefined) ? res : (res && res[0] ? res[0] : res));
+
         if (!raw || raw.userId === undefined) {
           throw new Error('Malformed response from Hub contract getUserDashboard.');
         }
