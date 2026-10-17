@@ -753,29 +753,9 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
         };
       }
 
-      // Check Sample Preview User MDF-24816
-      if (cleanId === 'MDF-24816' || cleanId === 'MDF-024816' || cleanId === '24816') {
-        return {
-          isValid: true,
-          address: '0x7282E5E883C2aDBa46E45437cF37A7aEA617C',
-          mdfId: 'MDF-24816',
-          name: 'Alex Morgan',
-        };
-      }
-
-      // Check Sample Preview Sponsor MDF-24815
-      if (cleanId === 'MDF-24815' || cleanId === '24815') {
-        return {
-          isValid: true,
-          address: '0x544d00000000000000000000000000000000cbbd',
-          mdfId: 'MDF-24815',
-          name: 'Jordon Pix',
-        };
-      }
-
       return {
         isValid: false,
-        error: 'User ID could not be resolved to a wallet address.',
+        error: 'Please search with a valid 42-character wallet address (0x...) for on-chain query.',
       };
     }
 
@@ -811,18 +791,9 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
         };
       }
 
-      if ('0x7282e5e883c2adba46e45437cf37a7aea617c'.includes(searchHex)) {
-        return {
-          isValid: true,
-          address: '0x7282E5E883C2aDBa46E45437cF37A7aEA617C',
-          mdfId: 'MDF-24816',
-          name: 'Alex Morgan',
-        };
-      }
-
       return {
         isValid: false,
-        error: 'Partial wallet address could not be resolved from loaded team data. Please enter the full 42-character address.',
+        error: 'Partial wallet address could not be resolved. Please enter the full 42-character address (0x...).',
       };
     }
 
