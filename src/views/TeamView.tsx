@@ -30,6 +30,7 @@ import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
 import { getTransactionVisual } from '../utils/transactionVisuals';
 import { ResponsivePagination } from '../components/common/ResponsivePagination';
 import { groupActivitiesInPairs } from '../components/activity/CompactActivityRow';
+import { ExploreUser } from '../components/ExploreUser';
 
 interface TeamViewProps {
   user: UserProfile;
@@ -610,24 +611,15 @@ export const TeamView: React.FC<TeamViewProps> = ({
             </button>
           </div>
 
-          <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={memberSearchQuery}
-              onChange={(e) => setMemberSearchQuery(e.target.value)}
-              placeholder="Search by User ID or wallet address..."
-              className="w-full bg-zinc-950/80 border border-emerald-500/20 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-400 transition-colors font-mono"
+          {/* Web3 Live Explore User & Smart Search */}
+          <div className="w-full md:w-auto">
+            <ExploreUser
+              user={user}
+              members={effectiveMembers}
+              transactions={txState.transactions}
+              searchQuery={memberSearchQuery}
+              onSearchChange={setMemberSearchQuery}
             />
-            {memberSearchQuery && (
-              <button
-                type="button"
-                onClick={() => setMemberSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
