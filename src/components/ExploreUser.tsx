@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ethers } from 'ethers';
 import { 
   Search, 
@@ -1289,15 +1290,15 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
 
       {/* ========================================================
           USER INTELLIGENCE PROFILE MODAL
-          RENDERED VIA PORTAL DIRECTLY TO document.body (Z-INDEX 99999)
+          RENDERED DIRECTLY TO BODY TO FIX STACKING CONTEXT / LAYER BUG
           ======================================================== */}
-      {isModalOpen && (
+      {typeof document !== 'undefined' && isModalOpen && createPortal(
         <div 
           role="dialog"
           aria-modal="true"
           aria-labelledby="explore-user-modal-title"
           className="explore-user-modal-portal fixed inset-0 flex items-center justify-center p-2.5 sm:p-4 md:p-6 overflow-hidden select-none animate-in fade-in duration-200"
-          style={{ position: 'fixed', inset: 0, zIndex: 99999 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 999999 }}
         >
           {/* Full-screen backdrop overlay covering application viewport */}
           <div
@@ -1800,7 +1801,8 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
               <span>{copyToast}</span>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
