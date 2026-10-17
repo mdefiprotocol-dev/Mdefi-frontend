@@ -426,8 +426,11 @@ const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
 
       {/* 3D Coin Body (Continuously Rotating) */}
       <div 
-        className="relative w-full h-full flex items-center justify-center animate-coin-rotate-3d"
-        style={{ transformStyle: 'preserve-3d' }}
+        className="relative w-full h-full flex items-center justify-center mdefi-coin-3d-spin"
+        style={{ 
+          transformStyle: 'preserve-3d',
+          animation: 'coin3dSpinLoop 6s linear infinite'
+        }}
       >
         {/* ================= THICK METALLIC RIM SLICES (Z-Depth) ================= */}
         {[-3, -2, -1, 0, 1, 2, 3].map((zOffset) => (
@@ -1058,20 +1061,20 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
           backdrop-filter: blur(18px);
         }
 
-        /* 3D Coin Continuous Smooth Rotation */
-        @keyframes coin-rotate-3d {
+        @keyframes coin3dSpinLoop {
           0% {
-            transform: rotateY(0deg) rotateX(10deg);
+            transform: rotateY(0deg) rotateX(8deg);
           }
           50% {
-            transform: rotateY(180deg) rotateX(-10deg);
+            transform: rotateY(180deg) rotateX(-8deg);
           }
           100% {
-            transform: rotateY(360deg) rotateX(10deg);
+            transform: rotateY(360deg) rotateX(8deg);
           }
         }
-        .animate-coin-rotate-3d {
-          animation: coin-rotate-3d 6.5s linear infinite;
+        .mdefi-coin-3d-spin {
+          animation: coin3dSpinLoop 6s linear infinite !important;
+          transform-style: preserve-3d !important;
         }
 
         /* Coin Specular Sheen Sweep */
@@ -1747,20 +1750,9 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
                     <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-[#061224]/90 via-[#07162d]/80 to-zinc-950/90 border border-blue-500/30 relative overflow-hidden group hover:border-blue-400/50 transition-all shadow-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          {profileData.lifetimeYieldUsdt ? (
-                            <div className="text-2xl sm:text-3xl md:text-4xl font-black text-blue-400 font-mono tracking-tight drop-shadow-[0_2px_10px_rgba(59,130,246,0.35)]">
-                              {profileData.lifetimeYieldUsdt}
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="text-lg sm:text-xl font-bold text-zinc-400 font-mono">
-                                Data source unavailable
-                              </div>
-                              <span className="text-[10px] text-zinc-500 font-mono">
-                                (Contract Hub provides native MBTTC yield ledger)
-                              </span>
-                            </div>
-                          )}
+                          <div className="text-2xl sm:text-3xl md:text-4xl font-black text-blue-400 font-mono tracking-tight drop-shadow-[0_2px_10px_rgba(59,130,246,0.35)]">
+                            {profileData.lifetimeYieldUsdt || '0.00 USDT'}
+                          </div>
                           <span className="text-[11px] font-mono text-blue-300/80 block mt-0.5">
                             Total Protocol Yield Distributed
                           </span>
