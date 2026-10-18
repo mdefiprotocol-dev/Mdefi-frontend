@@ -632,38 +632,70 @@ export const TeamView: React.FC<TeamViewProps> = ({
             />
           </div>
         </div>
-        {/* Level 1 to 10 Selector Bar */}
-        <div className="flex items-center gap-1.5 p-2 rounded-2xl bg-zinc-950/80 border border-emerald-500/30 overflow-x-auto scrollbar-none shadow-lg my-3">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold px-2 whitespace-nowrap">
-            Filter Level:
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedLevel('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer ${
-              selectedLevel === 'all'
-                ? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-                : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
-          >
-            All Tiers (1-10)
-          </button>
+        {/* Level 1 to 10 Premium Grid/Scrollable Filter Bar (Yeh sirf 'Total Team' par dikhega) */}
+        {selectedCategory === 'total' && (
+          <div className="p-3 rounded-2xl bg-zinc-950/90 border border-emerald-500/40 shadow-xl space-y-2.5 my-3 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-2">
+                <Network className="w-4 h-4 text-emerald-400 animate-pulse" />
+                Select Team Depth Tier (Level 1 - 10)
+              </span>
+              {selectedLevel !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('all')}
+                  className="text-[11px] font-mono text-zinc-400 hover:text-emerald-300 underline cursor-pointer transition-colors"
+                >
+                  Show All Tiers
+                </button>
+              )}
+            </div>
 
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((lvl) => (
-            <button
-              key={lvl}
-              type="button"
-              onClick={() => setSelectedLevel(lvl)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer ${
-                selectedLevel === lvl
-                  ? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800'
-              }`}
-            >
-              <span>Lvl {lvl}</span>
-            </button>
-          ))}
-        </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-11 gap-2">
+              {/* All Tiers Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedLevel('all')}
+                className={`p-2.5 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer border ${
+                  selectedLevel === 'all'
+                    ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-[1.02]'
+                    : 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:border-emerald-500/30'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>All Tiers</span>
+              </button>
+
+              {/* Level 1 to 10 Boxes with Unique Icons */}
+              {[
+                { lvl: 1, label: 'Level 1', icon: Users, color: 'text-cyan-400' },
+                { lvl: 2, label: 'Level 2', icon: UserCheck, color: 'text-emerald-400' },
+                { lvl: 3, label: 'Level 3', icon: ShieldCheck, color: 'text-yellow-400' },
+                { lvl: 4, label: 'Level 4', icon: Award, color: 'text-amber-400' },
+                { lvl: 5, label: 'Level 5', icon: Sparkles, color: 'text-purple-400' },
+                { lvl: 6, label: 'Level 6', icon: Network, color: 'text-blue-400' },
+                { lvl: 7, label: 'Level 7', icon: Cpu, color: 'text-rose-400' },
+                { lvl: 8, label: 'Level 8', icon: Box, color: 'text-indigo-400' },
+                { lvl: 9, label: 'Level 9', icon: UserPlus, color: 'text-teal-400' },
+                { lvl: 10, label: 'Level 10', icon: CheckCircle2, color: 'text-emerald-300' },
+              ].map(({ lvl, label, icon: IconComp, color }) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setSelectedLevel(lvl)}
+                  className={`p-2.5 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer border ${
+                    selectedLevel === lvl
+                      ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-[1.02]'
+                      : 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:border-emerald-500/30'
+                  }`}
+                >
+                  <IconComp className={`w-4 h-4 ${selectedLevel === lvl ? 'text-zinc-950' : color}`} />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {filteredMembers.length === 0 ? (
           <div className="text-center py-12 px-4 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-800">
