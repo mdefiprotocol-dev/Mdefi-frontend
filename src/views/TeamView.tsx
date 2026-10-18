@@ -118,7 +118,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<TeamCategory>('direct');
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>('');
   // Naya state level filter ke liye (default 'all' rahega)
-  const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
+  const [selectedLevel, setSelectedLevel] = useState<number>(1);
   const [memberPage, setMemberPage] = useState<number>(1);
   const [memberCopiedAddress, setMemberCopiedAddress] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -260,8 +260,8 @@ export const TeamView: React.FC<TeamViewProps> = ({
       list = totalMembers;
     }
 
-    // Naya Level Filter logic: Agar selectedCategory 'total' hai aur koi level select hai toh filter karein
-    if (selectedCategory === 'total' && selectedLevel !== 'all') {
+    // Strict Level Filter logic: Sirf specific selected level ka data dikhega (No 'All' option)
+    if (selectedCategory === 'total') {
       list = list.filter((m) => {
         const memberLevel = m.level || (m.isDirect ? 1 : 2);
         return memberLevel === selectedLevel;
@@ -632,7 +632,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
             />
           </div>
         </div>
-        {/* Level 1 to 10 Premium Grid/Scrollable Filter Bar (Yeh sirf 'Total Team' par dikhega) */}
+       {/* Level 1 to 10 Premium Grid Filter Bar (Strictly Level-by-Level) */}
         {selectedCategory === 'total' && (
           <div className="p-3 rounded-2xl bg-zinc-950/90 border border-emerald-500/40 shadow-xl space-y-2.5 my-3 animate-in fade-in duration-300">
             <div className="flex items-center justify-between px-1">
@@ -640,32 +640,10 @@ export const TeamView: React.FC<TeamViewProps> = ({
                 <Network className="w-4 h-4 text-emerald-400 animate-pulse" />
                 Select Team Depth Tier (Level 1 - 10)
               </span>
-              {selectedLevel !== 'all' && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('all')}
-                  className="text-[11px] font-mono text-zinc-400 hover:text-emerald-300 underline cursor-pointer transition-colors"
-                >
-                  Show All Tiers
-                </button>
-              )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-11 gap-2">
-              {/* All Tiers Button */}
-              <button
-                type="button"
-                onClick={() => setSelectedLevel('all')}
-                className={`p-2.5 rounded-xl text-xs font-mono font-bold transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer border ${
-                  selectedLevel === 'all'
-                    ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-[1.02]'
-                    : 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:border-emerald-500/30'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>All Tiers</span>
-              </button>
-
+            {/* lg:grid-cols-10 kiya gaya hai taaki 10 box ekdum perfect fit baithein */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
               {/* Level 1 to 10 Boxes with Unique Icons */}
               {[
                 { lvl: 1, label: 'Level 1', icon: Users, color: 'text-cyan-400' },
@@ -696,7 +674,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
             </div>
           </div>
         )}
-
+        
         {filteredMembers.length === 0 ? (
           <div className="text-center py-12 px-4 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-800">
             <Users className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
