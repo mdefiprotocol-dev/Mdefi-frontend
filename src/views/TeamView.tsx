@@ -117,6 +117,8 @@ export const TeamView: React.FC<TeamViewProps> = ({
   type TeamCategory = 'direct' | 'total' | 'active' | 'inactive';
   const [selectedCategory, setSelectedCategory] = useState<TeamCategory>('direct');
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>('');
+  // Naya state level filter ke liye (default 'all' rahega)
+  const [selectedLevel, setSelectedLevel] = useState<number | 'all'>('all');
   const [memberPage, setMemberPage] = useState<number>(1);
   const [memberCopiedAddress, setMemberCopiedAddress] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -258,12 +260,20 @@ export const TeamView: React.FC<TeamViewProps> = ({
       list = totalMembers;
     }
 
+    // Naya Level Filter logic: Agar selectedCategory 'total' hai aur koi level select hai toh filter karein
+    if (selectedCategory === 'total' && selectedLevel !== 'all') {
+      list = list.filter((m) => {
+        const memberLevel = m.level || (m.isDirect ? 1 : 2);
+        return memberLevel === selectedLevel;
+      });
+    }
+
     return [...list].sort((a, b) => {
       const timeA = new Date(a.joinedDate).getTime() || 0;
       const timeB = new Date(b.joinedDate).getTime() || 0;
       return timeB - timeA;
     });
-  }, [selectedCategory, directMembers, activeMembers, inactiveMembers, totalMembers]);
+  }, [selectedCategory, selectedLevel, directMembers, activeMembers, inactiveMembers, totalMembers]);
 
   const filteredMembers = useMemo(() => {
     if (!memberSearchQuery.trim()) return activeCategoryList;
@@ -621,6 +631,38 @@ export const TeamView: React.FC<TeamViewProps> = ({
               onSearchChange={setMemberSearchQuery}
             />
           </div>
+        </div>
+        {/* Level 1 to 10 Selector Bar */}
+        <div className="flex items-center gap-1.5 p-2 rounded-2xl bg-zinc-950/80 border border-emerald-500/30 overflow-x-auto scrollbar-none shadow-lg my-3">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold px-2 whitespace-nowrap">
+            Filter Level:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedLevel('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer ${
+              selectedLevel === 'all'
+                ? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'
+            }`}
+          >
+            All Tiers (1-10)
+          </button>
+
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((lvl) => (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => setSelectedLevel(lvl)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer ${
+                selectedLevel === lvl
+                  ? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800'
+              }`}
+            >
+              <span>Lvl {lvl}</span>
+            </button>
+          ))}
         </div>
 
         {filteredMembers.length === 0 ? (
