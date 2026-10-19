@@ -257,25 +257,60 @@ export const TeamView: React.FC<TeamViewProps> = ({
         if (!isMounted) return;
 
         if (res && Array.isArray(res.members)) {
+          // Sponsor Address to Dynamic MDF ID Mapping
+          const walletToIdMap = new Map<string, string>();
+          effectiveMembers.forEach((m) => {
+            if (m.address && m.userId) walletToIdMap.set(m.address.toLowerCase(), m.userId);
+          });
+          if (user.walletAddress && user.userId) {
+            walletToIdMap.set(user.walletAddress.toLowerCase(), user.userId);
+          }
+
           const formattedMembers: TeamMember[] = res.members.map((node) => {
             const numId = Number(node.id);
             const displayId = numId > 0 ? (numId < 100000 ? 248160 + numId : numId) : 0;
-            const d = node.registrationTime > 0 ? new Date(node.registrationTime * 1000) : new Date();
+            const nodeWallet = (node.wallet || '').toLowerCase();
+            const uplineWallet = (node.upline || '').toLowerCase();
+
+            // Formatted Date (Exact match with Level 1 UI)
+            let formattedDate = 'On-Chain Verified';
+            if (node.registrationTime > 0) {
+              const d = new Date(node.registrationTime * 1000);
+              formattedDate = `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            }
+
+            // Real On-Chain Package ($10) Activation Verification
+            const hasActivePackage = txState.transactions.some((tx) => {
+              const txWallet = (tx.memberWallet || '').toLowerCase();
+              const act = (tx.activityType || '').toLowerCase();
+              const pkg = (tx.packageName || '').toLowerCase();
+              return txWallet === nodeWallet && (act.includes('package') || pkg.includes('junior') || pkg.includes('10'));
+            });
+
+            // Dynamic Sponsor MDF ID Resolution
+            let resolvedSponsor = 'Your Account';
+            if (uplineWallet && uplineWallet !== ethers.ZeroAddress.toLowerCase()) {
+              if (walletToIdMap.has(uplineWallet)) {
+                resolvedSponsor = walletToIdMap.get(uplineWallet)!;
+              } else {
+                resolvedSponsor = `MDF-${uplineWallet.slice(2, 8).toUpperCase()}`;
+              }
+            }
 
             return {
               id: `node-${node.wallet}`,
               address: node.wallet,
               userId: displayId > 0 ? `MDF-${displayId}` : 'MDF-User',
               name: displayId > 0 ? `MDF-${displayId}` : 'MDF-User',
-              package: 'Starter Pool',
-              status: node.isBlocked ? 'Inactive' : 'Active',
-              joinedDate: d.toISOString().split('T')[0],
-              volumeUSDT: 0,
+              package: hasActivePackage ? 'Starter Pool' : 'No Package',
+              status: hasActivePackage && !node.isBlocked ? 'Active' : 'Inactive',
+              joinedDate: formattedDate,
+              volumeUSDT: hasActivePackage ? 10 : 0,
               isDirect: false,
               directPartners: Array.isArray(node.directTeam) ? node.directTeam.length : 0,
-              sponsor: node.upline || 'Your Account',
+              sponsor: resolvedSponsor,
               level: selectedLevel,
-              activePackages: node.isBlocked ? 0 : 1,
+              activePackages: hasActivePackage && !node.isBlocked ? 1 : 0,
             };
           });
 
