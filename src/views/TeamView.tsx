@@ -196,7 +196,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
     }
 
     return Array.from(memberMap.values());
-  }, [members, syncedMembers, txState.transactions, user.walletAddress, user.userId, user.totalTeamCount]);
+  }, [members, syncedMembers, txState.transactions, user.walletAddress, user.userId, user.totalTeamCount, selectedLevel, levelMembersMap]);
 
   const directMembers = useMemo(() => effectiveMembers.filter((m) => m.isDirect || m.level === 1), [effectiveMembers]);
   const totalMembers = effectiveMembers;
@@ -312,11 +312,17 @@ export const TeamView: React.FC<TeamViewProps> = ({
       list = totalMembers;
     }
 
-    // Strict Level Filter logic: Selected level ke members ko filter kare
-    list = list.filter((m) => {
-      const memberLevel = m.level || (m.isDirect ? 1 : 2);
-      return memberLevel === selectedLevel;
-    });
+    // Level Filter Engine (Levels 1 to 10 Permanent Coverage)
+    // 1. Agar category 'direct' hai, toh hamesha Level 1 (frontline) hi rahega
+    if (selectedCategory === 'direct') {
+      list = list.filter((m) => (m.level === 1 || m.isDirect));
+    } else {
+      // 2. Total, Active, Inactive me strictly selectedLevel (1 se 10) ka member hi filter hoga
+      list = list.filter((m) => {
+        const memberLevel = Number(m.level || (m.isDirect ? 1 : 2));
+        return memberLevel === selectedLevel;
+      });
+    }
 
     return [...list].sort((a, b) => {
       const timeA = new Date(a.joinedDate).getTime() || 0;
