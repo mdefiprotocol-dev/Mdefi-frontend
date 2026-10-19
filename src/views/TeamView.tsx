@@ -31,6 +31,8 @@ import { getTransactionVisual } from '../utils/transactionVisuals';
 import { ResponsivePagination } from '../components/common/ResponsivePagination';
 import { groupActivitiesInPairs } from '../components/activity/CompactActivityRow';
 import { ExploreUser } from '../components/ExploreUser';
+import { ethers } from 'ethers';
+import { getTeamLevelOnChain } from '../services/teamLevelService';
 
 interface TeamViewProps {
   user: UserProfile;
@@ -119,6 +121,8 @@ export const TeamView: React.FC<TeamViewProps> = ({
   const [memberSearchQuery, setMemberSearchQuery] = useState<string>('');
   // Naya state level filter ke liye (default 'all' rahega)
   const [selectedLevel, setSelectedLevel] = useState<number>(1);
+  const [levelMembersMap, setLevelMembersMap] = useState<Record<number, TeamMember[]>>({});
+  const [isLevelLoading, setIsLevelLoading] = useState<boolean>(false);
   const [memberPage, setMemberPage] = useState<number>(1);
   const [memberCopiedAddress, setMemberCopiedAddress] = useState<string | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -180,34 +184,15 @@ export const TeamView: React.FC<TeamViewProps> = ({
       }
     });
 
-    // 4. Multi-Tier Dynamic Downline Expansion (Level 2 to Level 10 - Zero RPC Load)
-    const expectedTotal = Number(user.totalTeamCount || 0);
-    const directList = Array.from(memberMap.values()).filter((m) => m.isDirect || m.level === 1);
-    
-    // Agar on-chain dashboard ka total team count directs se bada hai, toh downlines ko dynamically link karein
-    if (expectedTotal > memberMap.size && directList.length > 0) {
-      const remainingSlots = expectedTotal - memberMap.size;
-      for (let i = 0; i < remainingSlots; i++) {
-        const parentMember = directList[i % directList.length];
-        const assignedLevel = Math.min(10, 2 + Math.floor(i / directList.length));
-        const downlineUniqueKey = `downline-${parentMember.address.slice(2, 6)}-${i + 1}`;
-        
-        if (!memberMap.has(downlineUniqueKey)) {
-          const generatedId = `MDF-${(Number(parentMember.userId?.replace(/\D/g, '') || 248170) + i + 1)}`;
-          memberMap.set(downlineUniqueKey, {
-            id: downlineUniqueKey,
-            userId: generatedId,
-            name: generatedId,
-            address: `${parentMember.address.slice(0, 36)}${(1000 + i).toString(16).padStart(6, '0')}`,
-            joinedDate: parentMember.joinedDate || 'On-Chain Verified',
-            status: 'Inactive',
-            activePackages: 0,
-            isDirect: false,
-            level: assignedLevel,
-            sponsor: parentMember.userId || parentMember.address,
-          } as TeamMember);
+    // 4. Multi-Tier Real On-Chain Downline Injection (Level 2 to Level 10)
+    // Agar user ne Level 2 se 10 select kiya hai aur uska real data fetch ho chuka hai, toh usko inject karein
+    if (selectedLevel >= 2 && levelMembersMap[selectedLevel]) {
+      levelMembersMap[selectedLevel].forEach((m) => {
+        const cleanAddr = (m.address || '').trim().toLowerCase();
+        if (cleanAddr && cleanAddr !== currentConnectedWallet && !memberMap.has(cleanAddr)) {
+          memberMap.set(cleanAddr, m);
         }
-      }
+      });
     }
 
     return Array.from(memberMap.values());
@@ -248,6 +233,73 @@ export const TeamView: React.FC<TeamViewProps> = ({
     setMemberPage(1);
   }, [selectedCategory, memberSearchQuery]);
 
+  // ON-DEMAND LEVEL FETCHING (LEVEL 2 TO 10): ZERO-RPC FLOOD
+  useEffect(() => {
+    let isMounted = true;
+    const cleanWallet = (user.walletAddress || '').trim().toLowerCase();
+
+    // 1. Agar Level 1 hai ya wallet connect nahi hai, toh traversal ki zaroorat nahi
+    if (selectedLevel < 2 || !cleanWallet || !ethers.isAddress(cleanWallet)) {
+      return;
+    }
+
+    // 2. Agar is level ka data pehle se memory me aa chuka hai, toh dobara 0 RPC call
+    if (levelMembersMap[selectedLevel] && levelMembersMap[selectedLevel].length > 0) {
+      return;
+    }
+
+    const fetchLevelData = async () => {
+      try {
+        setIsLevelLoading(true);
+        const provider = new ethers.JsonRpcProvider('https://bsc-testnet.publicnode.com', undefined, { staticNetwork: true });
+        const res = await getTeamLevelOnChain(provider, cleanWallet, selectedLevel);
+
+        if (!isMounted) return;
+
+        if (res && Array.isArray(res.members)) {
+          const formattedMembers: TeamMember[] = res.members.map((node) => {
+            const numId = Number(node.id);
+            const displayId = numId > 0 ? (numId < 100000 ? 248160 + numId : numId) : 0;
+            const d = node.registrationTime > 0 ? new Date(node.registrationTime * 1000) : new Date();
+
+            return {
+              id: `node-${node.wallet}`,
+              address: node.wallet,
+              userId: displayId > 0 ? `MDF-${displayId}` : 'MDF-User',
+              name: displayId > 0 ? `MDF-${displayId}` : 'MDF-User',
+              package: 'Starter Pool',
+              status: node.isBlocked ? 'Inactive' : 'Active',
+              joinedDate: d.toISOString().split('T')[0],
+              volumeUSDT: 0,
+              isDirect: false,
+              directPartners: Array.isArray(node.directTeam) ? node.directTeam.length : 0,
+              sponsor: node.upline || 'Your Account',
+              level: selectedLevel,
+              activePackages: node.isBlocked ? 0 : 1,
+            };
+          });
+
+          setLevelMembersMap((prev) => ({
+            ...prev,
+            [selectedLevel]: formattedMembers,
+          }));
+        }
+      } catch (err) {
+        console.warn(`[TeamView] On-demand Level ${selectedLevel} fetch notice:`, err);
+      } finally {
+        if (isMounted) {
+          setIsLevelLoading(false);
+        }
+      }
+    };
+
+    fetchLevelData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedLevel, user.walletAddress]);
+
   const activeCategoryList = useMemo(() => {
     let list: TeamMember[] = [];
     if (selectedCategory === 'direct') {
@@ -260,13 +312,11 @@ export const TeamView: React.FC<TeamViewProps> = ({
       list = totalMembers;
     }
 
-    // Strict Level Filter logic: Sirf specific selected level ka data dikhega (No 'All' option)
-    if (selectedCategory === 'total') {
-      list = list.filter((m) => {
-        const memberLevel = m.level || (m.isDirect ? 1 : 2);
-        return memberLevel === selectedLevel;
-      });
-    }
+    // Strict Level Filter logic: Selected level ke members ko filter kare
+    list = list.filter((m) => {
+      const memberLevel = m.level || (m.isDirect ? 1 : 2);
+      return memberLevel === selectedLevel;
+    });
 
     return [...list].sort((a, b) => {
       const timeA = new Date(a.joinedDate).getTime() || 0;
@@ -675,7 +725,18 @@ export const TeamView: React.FC<TeamViewProps> = ({
           </div>
         )}
         
-        {filteredMembers.length === 0 ? (
+        {isLevelLoading ? (
+          <div className="text-center py-16 px-4 rounded-2xl bg-zinc-950/60 border border-emerald-500/30 backdrop-blur-xl flex flex-col items-center justify-center space-y-3 animate-in fade-in duration-200">
+            <div className="relative w-10 h-10">
+              <div className="absolute inset-0 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin" />
+              <Network className="w-5 h-5 text-emerald-400 absolute inset-0 m-auto animate-pulse" />
+            </div>
+            <div>
+              <p className="text-sm font-bold font-mono text-emerald-300">Fetching On-Chain Level {selectedLevel} Data...</p>
+              <p className="text-[11px] font-mono text-zinc-400 mt-0.5">Scanning Multicall3 node contracts directly from BSC Testnet</p>
+            </div>
+          </div>
+        ) : filteredMembers.length === 0 ? (
           <div className="text-center py-12 px-4 rounded-2xl bg-zinc-950/40 border border-dashed border-zinc-800">
             <Users className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
             <p className="text-sm font-semibold text-zinc-300">No members found</p>
