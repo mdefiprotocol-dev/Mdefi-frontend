@@ -21,7 +21,11 @@ import {
   UserPlus, 
   Box, 
   X, 
-  User as UserIcon 
+  User as UserIcon,
+  Zap,
+  Crown,
+  TrendingUp,
+  Briefcase
 } from 'lucide-react';
 import { TeamMember, UserProfile, TeamTransactionRecord } from '../types';
 import { mdefiService } from '../services/mdefiService';
@@ -394,13 +398,57 @@ export const TeamView: React.FC<TeamViewProps> = ({
     setTxPage(1);
   }, [txFilter, txSearchQuery]);
 
+  const txFilterTabs = [
+    { label: 'All', icon: Layers, color: 'text-zinc-400', activeGlow: 'from-zinc-800 to-zinc-900 border-zinc-600' },
+    { label: 'Register User', icon: UserPlus, color: 'text-cyan-400', activeGlow: 'from-cyan-950/80 to-zinc-900 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]' },
+    { label: 'MBTTC MINTS', icon: Sparkles, color: 'text-amber-400', activeGlow: 'from-amber-950/80 to-zinc-900 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },
+    { label: 'ACTIVATE NODES', icon: Cpu, color: 'text-emerald-400', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
+    { label: 'DIRECT INCOME', icon: TrendingUp, color: 'text-lime-400', activeGlow: 'from-lime-950/80 to-zinc-900 border-lime-500/50 shadow-[0_0_15px_rgba(132,204,22,0.3)]' },
+    { label: 'MATRIX INCOME', icon: Network, color: 'text-purple-400', activeGlow: 'from-purple-950/80 to-zinc-900 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' },
+    { label: 'MAGIC CASHBACK', icon: Zap, color: 'text-rose-400', activeGlow: 'from-rose-950/80 to-zinc-900 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]' },
+    { label: 'WEEKLY REWARD 1', icon: Award, color: 'text-sky-400', activeGlow: 'from-sky-950/80 to-zinc-900 border-sky-500/50 shadow-[0_0_15px_rgba(14,165,233,0.3)]' },
+    { label: 'WEEKLY REWARD 2', icon: Crown, color: 'text-yellow-300', activeGlow: 'from-yellow-950/80 to-zinc-900 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.3)]' },
+    { label: 'WEEKLY SALARY', icon: Briefcase, color: 'text-emerald-300', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-400/50 shadow-[0_0_15px_rgba(52,211,153,0.3)]' },
+  ];
+
   const filteredTransactions = useMemo(() => {
     return txState.transactions.filter((tx) => {
       if (txFilter !== 'All') {
-        const typeNormalized = (tx.activityType || '').toLowerCase();
-        const filterNormalized = txFilter.toLowerCase();
-        if (!typeNormalized.includes(filterNormalized)) {
-          return false;
+        const type = (tx.activityType || '').toLowerCase();
+        const details = (tx.details || '').toLowerCase();
+        const pkg = (tx.packageName || '').toLowerCase();
+        const combined = `${type} ${details} ${pkg}`;
+
+        switch (txFilter) {
+          case 'Register User':
+            if (!combined.includes('register') && !combined.includes('registration')) return false;
+            break;
+          case 'MBTTC MINTS':
+            if (!combined.includes('mint') && !combined.includes('claim')) return false;
+            break;
+          case 'ACTIVATE NODES':
+            if (!combined.includes('package') && !combined.includes('activate') && !combined.includes('node')) return false;
+            break;
+          case 'DIRECT INCOME':
+            if (!combined.includes('direct') && !combined.includes('referral')) return false;
+            break;
+          case 'MATRIX INCOME':
+            if (!combined.includes('matrix')) return false;
+            break;
+          case 'MAGIC CASHBACK':
+            if (!combined.includes('cashback') && !combined.includes('magic')) return false;
+            break;
+          case 'WEEKLY REWARD 1':
+            if (!combined.includes('reward') && !combined.includes('weekly 1')) return false;
+            break;
+          case 'WEEKLY REWARD 2':
+            if (!combined.includes('premium reward') && !combined.includes('weekly 2')) return false;
+            break;
+          case 'WEEKLY SALARY':
+            if (!combined.includes('salary') && !combined.includes('passive')) return false;
+            break;
+          default:
+            if (!combined.includes(txFilter.toLowerCase())) return false;
         }
       }
 
@@ -429,8 +477,6 @@ export const TeamView: React.FC<TeamViewProps> = ({
   const mobileTxPairs = useMemo(() => {
     return groupActivitiesInPairs(pagedTransactions);
   }, [pagedTransactions]);
-
-  const txFilterTabs = ['All', 'Package Activation', 'Direct Referral', 'Matrix Income', 'Weekly Reward', 'Weekly Salary'];
 
   return (
     <div className="space-y-7 animate-in fade-in duration-300 pb-28 lg:pb-12">
@@ -1184,20 +1230,31 @@ export const TeamView: React.FC<TeamViewProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950/80 border border-zinc-800 overflow-x-auto max-w-full">
-            {txFilterTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setTxFilter(tab)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                  txFilter === tab
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-zinc-950/90 border border-emerald-500/20 overflow-x-auto scrollbar-none max-w-full backdrop-blur-md">
+            {txFilterTabs.map(({ label, icon: TabIcon, color, activeGlow }) => {
+              const isActive = txFilter === label;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setTxFilter(label)}
+                  className={`group relative px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all duration-300 whitespace-nowrap shrink-0 flex items-center gap-2 cursor-pointer border ${
+                    isActive
+                      ? `bg-gradient-to-r ${activeGlow} text-white scale-[1.02]`
+                      : 'bg-zinc-900/60 text-zinc-400 border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 hover:border-zinc-700'
+                  }`}
+                >
+                  <TabIcon
+                    className={`w-3.5 h-3.5 transition-all duration-300 ${
+                      isActive
+                        ? `${color} animate-pulse drop-shadow-[0_0_8px_currentColor]`
+                        : `${color} opacity-70 group-hover:opacity-100 group-hover:scale-110`
+                    }`}
+                  />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="relative">
@@ -1212,121 +1269,128 @@ export const TeamView: React.FC<TeamViewProps> = ({
           </div>
         </div>
 
-        {/* Desktop Transactions Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-xs">
+       {/* Desktop / Laptop / Tablet Transactions Table */}
+        <div className="hidden md:block overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+          <table className="w-full text-left text-xs min-w-[900px] border-collapse">
             <thead>
-              <tr className="border-b border-zinc-800 text-zinc-400 uppercase tracking-wider font-mono text-[11px]">
-                <th className="pb-3 font-semibold pl-2">Date & Time</th>
-                <th className="pb-3 font-semibold">Activity Type</th>
-                <th className="pb-3 font-semibold">Member / Wallet</th>
-                <th className="pb-3 font-semibold">Package / Details</th>
-                <th className="pb-3 font-semibold">Amount</th>
-                <th className="pb-3 font-semibold">Status</th>
-                <th className="pb-3 font-semibold text-right pr-2">Tx Hash</th>
+              <tr className="border-b border-zinc-800/80 text-zinc-400 uppercase tracking-wider font-mono text-[11px]">
+                <th className="pb-3.5 pl-3 font-semibold w-[160px]">Date & Time</th>
+                <th className="pb-3.5 font-semibold w-[220px]">Activity Type</th>
+                <th className="pb-3.5 font-semibold w-[200px]">Member / Wallet</th>
+                <th className="pb-3.5 font-semibold">Package / Details</th>
+                <th className="pb-3.5 font-semibold w-[140px]">Amount</th>
+                <th className="pb-3.5 font-semibold w-[110px]">Status</th>
+                <th className="pb-3.5 font-semibold text-right pr-3 w-[150px]">Tx Hash</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-850">
+            <tbody className="divide-y divide-zinc-850/60 font-mono">
               {pagedTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-zinc-500 text-xs font-mono">
-                    No on-chain team transactions found for this account. Real contract transactions will appear here.
+                  <td colSpan={7} className="py-12 text-center text-zinc-500 text-xs font-mono bg-zinc-950/20 rounded-2xl">
+                    <Clock className="w-8 h-8 text-zinc-600 mx-auto mb-2 opacity-50" />
+                    No on-chain team activities found for this category.
                   </td>
                 </tr>
               ) : (
                 pagedTransactions.map((tx) => {
                   const visual = getTransactionVisual(tx.activityType, tx.status, tx.amount);
                   const IconComp = visual.icon;
-                  const isCopied = copiedHash === tx.txHash;
+                  const isWalletCopied = copiedHash === tx.memberWallet;
+                  const isHashCopied = copiedHash === tx.txHash;
 
                   return (
-                    <tr key={tx.id} className="hover:bg-zinc-900/50 transition-colors group">
-                      <td className="py-3.5 pl-2 text-zinc-400 font-mono text-[11px] whitespace-nowrap">
-                        {tx.date}
+                    <tr key={tx.id} className="hover:bg-zinc-850/40 transition-colors group">
+                      {/* Date & Time */}
+                      <td className="py-4 pl-3 text-zinc-400 text-[11px] whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-zinc-600" />
+                          <span>{tx.date}</span>
+                        </span>
                       </td>
 
-                      <td className="py-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full ${visual.dotClass}`} />
-                          <div className={`p-1.5 rounded-lg border ${visual.iconBgClass} ${visual.iconTextClass}`}>
+                      {/* Activity Type Badge */}
+                      <td className="py-4 pr-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`p-1.5 rounded-xl border shrink-0 ${visual.iconBgClass} ${visual.iconTextClass} shadow-sm`}>
                             <IconComp className="w-3.5 h-3.5" />
                           </div>
-                          <span className="font-semibold text-zinc-100">
+                          <span className="font-semibold text-zinc-100 text-xs truncate" title={tx.activityType}>
                             {tx.activityType}
                           </span>
                         </div>
                       </td>
 
-                      <td className="py-3.5 whitespace-nowrap font-mono text-[11px]">
-                        <div className="flex items-center gap-2">
-                          <div>
-                            {tx.userId && (
-                              <span className="text-emerald-400 font-bold block">
+                      {/* Member / Wallet */}
+                      <td className="py-4 pr-3">
+                        <div className="flex items-center gap-1.5">
+                          <div className="min-w-0">
+                            {tx.userId ? (
+                              <span className="text-emerald-400 font-bold block text-xs truncate">
                                 {tx.userId}
                               </span>
-                            )}
-                            <span className="text-zinc-400">
+                            ) : null}
+                            <span className="text-zinc-400 text-[11px] block truncate">
                               {formatCompactAddress(tx.memberWallet)}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleCopy(tx.memberWallet)}
-                            className="p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            className="p-1 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer shrink-0"
                             title="Copy Wallet Address"
                           >
-                            {copiedHash === tx.memberWallet ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            {isWalletCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                           </button>
                         </div>
                       </td>
 
-                      <td className="py-3.5 text-zinc-300 text-xs">
-                        {tx.packageName ? (
-                          <div className="space-y-0.5">
-                            <span className="font-semibold text-emerald-300 block">
+                      {/* Package / Details */}
+                      <td className="py-4 pr-3">
+                        <div className="space-y-0.5 max-w-[260px]">
+                          {tx.packageName ? (
+                            <span className="font-semibold text-emerald-300 text-xs block truncate">
                               {tx.packageName}
                             </span>
-                            <span className="text-[11px] text-zinc-500">
-                              {tx.details || 'Smart contract package registration'}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-400 text-xs">
-                            {tx.details || 'Community network referral reward'}
+                          ) : null}
+                          <span className="text-[11px] text-zinc-400 block line-clamp-2 leading-relaxed" title={tx.details || ''}>
+                            {tx.details || 'On-chain protocol reward distribution'}
                           </span>
-                        )}
+                        </div>
                       </td>
 
-                      <td className="py-3.5 whitespace-nowrap font-mono font-bold">
-                        <span className={visual.amountClass}>
+                      {/* Amount */}
+                      <td className="py-4 pr-3 whitespace-nowrap font-bold">
+                        <span className={`text-xs ${visual.amountClass}`}>
                           {tx.amount}
                         </span>
                       </td>
 
-                      <td className="py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
+                      {/* Status */}
+                      <td className="py-4 pr-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          {tx.status}
+                          <span>{tx.status}</span>
                         </span>
                       </td>
 
-                      <td className="py-3.5 pr-2 text-right whitespace-nowrap">
+                      {/* Tx Hash */}
+                      <td className="py-4 pr-3 text-right whitespace-nowrap">
                         {tx.txHash ? (
                           <div className="flex items-center justify-end gap-1.5">
-                            <span className="font-mono text-[11px] text-zinc-400 group-hover:text-emerald-300 transition-colors truncate max-w-[140px]" title={tx.txHash}>
+                            <span className="text-[11px] text-zinc-400 group-hover:text-emerald-300 transition-colors" title={tx.txHash}>
                               {formatCompactAddress(tx.txHash)}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleCopy(tx.txHash!)}
-                              className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                              className="p-1 rounded-lg bg-zinc-800/60 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
                               title="Copy Transaction Hash"
                             >
-                              {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              {isHashCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                             </button>
                           </div>
                         ) : (
-                          <span className="text-zinc-600 font-mono text-[11px]">—</span>
+                          <span className="text-zinc-600 text-[11px]">—</span>
                         )}
                       </td>
                     </tr>
@@ -1337,108 +1401,109 @@ export const TeamView: React.FC<TeamViewProps> = ({
           </table>
         </div>
 
-        {/* Mobile Responsive 2-in-1 Transaction Cards */}
-        <div className="md:hidden space-y-3">
+        {/* Mobile View: High-End Web3 Protocol Feed Cards */}
+        <div className="md:hidden space-y-3 font-mono">
           {pagedTransactions.length === 0 ? (
-            <div className="py-8 text-center text-zinc-500 text-xs font-mono">
-              No on-chain team transactions found for this account.
+            <div className="py-10 text-center text-zinc-500 text-xs bg-zinc-950/40 rounded-2xl border border-zinc-800/60">
+              No on-chain team activities found for this category.
             </div>
           ) : (
-            mobileTxPairs.map((pair, pIdx) => (
-              <div 
-                key={`team-pair-${pair[0]?.id || pIdx}`}
-                className="rounded-2xl bg-zinc-950/80 border border-emerald-500/20 divide-y divide-zinc-850/80 overflow-hidden shadow-sm font-mono"
-              >
-                {pair.map((tx) => {
-                  const visual = getTransactionVisual(tx.activityType, tx.status, tx.amount);
-                  const IconComp = visual.icon;
+            pagedTransactions.map((tx) => {
+              const visual = getTransactionVisual(tx.activityType, tx.status, tx.amount);
+              const IconComp = visual.icon;
+              const isWalletCopied = copiedHash === tx.memberWallet;
+              const isHashCopied = copiedHash === tx.txHash;
 
-                  return (
-                    <div 
-                      key={tx.id}
-                      className="p-3.5 space-y-2.5 hover:bg-zinc-900/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg border ${visual.iconBgClass} ${visual.iconTextClass}`}>
-                            <IconComp className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-xs text-white block">
-                              {tx.activityType}
-                            </span>
-                            {tx.packageName && (
-                              <span className="text-[10px] text-emerald-400 font-mono block">
-                                {tx.packageName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className={`font-mono font-bold text-xs ${visual.amountClass}`}>
-                            {tx.amount}
-                          </span>
-                        </div>
+              return (
+                <div 
+                  key={tx.id}
+                  className="p-4 rounded-2xl bg-zinc-950/80 border border-emerald-500/20 backdrop-blur-md space-y-3 shadow-md"
+                >
+                  {/* Top Bar: Icon, Activity, Amount */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`p-1.5 rounded-xl border shrink-0 ${visual.iconBgClass} ${visual.iconTextClass}`}>
+                        <IconComp className="w-3.5 h-3.5" />
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 p-1.5 px-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800 text-[11px] font-mono">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-zinc-500 text-[10px]">Partner:</span>
-                          {tx.userId && (
-                            <span className="text-emerald-400 font-bold text-[10px]">
-                              {tx.userId}
-                            </span>
-                          )}
-                          <span className="text-zinc-400 truncate text-[11px]">
-                            {formatCompactAddress(tx.memberWallet)}
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-white block truncate">
+                          {tx.activityType}
+                        </span>
+                        {tx.packageName ? (
+                          <span className="text-[10px] text-emerald-400 block truncate">
+                            {tx.packageName}
                           </span>
-                        </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className={`font-bold text-xs block ${visual.amountClass}`}>
+                        {tx.amount}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Partner / Details info card */}
+                  <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-zinc-500 text-[10px]">Partner:</span>
+                      <div className="flex items-center gap-1.5">
+                        {tx.userId ? (
+                          <span className="text-emerald-400 font-bold text-[10px]">
+                            {tx.userId}
+                          </span>
+                        ) : null}
+                        <span className="text-zinc-400">
+                          {formatCompactAddress(tx.memberWallet)}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(tx.memberWallet)}
-                          className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer shrink-0"
-                          title="Copy Partner Address"
+                          className="p-1 rounded text-zinc-400 hover:text-emerald-400 cursor-pointer"
+                          title="Copy Address"
                         >
-                          {copiedHash === tx.memberWallet ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {isWalletCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         </button>
                       </div>
-
-                      {tx.details && (
-                        <p className="text-[11px] text-zinc-400 leading-relaxed truncate">
-                          {tx.details}
-                        </p>
-                      )}
-
-                      <div className="pt-1.5 border-t border-zinc-900 flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 text-emerald-400 font-bold px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-500/30 text-[10px]">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>{tx.status}</span>
-                          </span>
-                          <span>{tx.date}</span>
-                        </div>
-
-                        {tx.txHash && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(tx.txHash!)}
-                            className="inline-flex items-center gap-1 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
-                            title="Copy Tx Hash"
-                          >
-                            <span>{formatCompactAddress(tx.txHash)}</span>
-                            {copiedHash === tx.txHash ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        )}
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            ))
+
+                    {tx.details ? (
+                      <p className="text-[10px] text-zinc-400 pt-1 border-t border-zinc-800/60 line-clamp-2 leading-relaxed">
+                        {tx.details}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Bottom Bar: Status, Date, TxHash */}
+                  <div className="flex items-center justify-between gap-2 pt-1 text-[10px] text-zinc-400">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>{tx.status}</span>
+                      </span>
+                      <span>{tx.date}</span>
+                    </div>
+
+                    {tx.txHash ? (
+                      <div className="flex items-center gap-1">
+                        <span>{formatCompactAddress(tx.txHash)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(tx.txHash!)}
+                          className="p-1 rounded text-zinc-400 hover:text-emerald-400 cursor-pointer"
+                          title="Copy Hash"
+                        >
+                          {isHashCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
-
         {filteredTransactions.length > txPageSize && (
           <div className="pt-2 border-t border-zinc-850">
             <ResponsivePagination
