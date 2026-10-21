@@ -42,7 +42,7 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
   const txFilterTabs = [
     { label: 'All', icon: Layers, color: 'text-zinc-400', activeGlow: 'from-zinc-800 to-zinc-900 border-zinc-600' },
     { label: 'Register User', icon: UserPlus, color: 'text-cyan-400', activeGlow: 'from-cyan-950/80 to-zinc-900 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]' },
-    { label: 'MBTTC MINTS', icon: Rotating3DMbttcCoin as any, color: 'text-amber-400', activeGlow: 'from-amber-950/80 to-zinc-900 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },    { label: 'ACTIVATE NODES', icon: Cpu, color: 'text-emerald-400', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
+    { label: 'MBTTC MINTS', icon: Sparkles, color: 'text-amber-400', activeGlow: 'from-amber-950/80 to-zinc-900 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },    { label: 'ACTIVATE NODES', icon: Cpu, color: 'text-emerald-400', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
     { label: 'DIRECT INCOME', icon: TrendingUp, color: 'text-lime-400', activeGlow: 'from-lime-950/80 to-zinc-900 border-lime-500/50 shadow-[0_0_15px_rgba(132,204,22,0.3)]' },
     { label: 'MATRIX INCOME', icon: Network, color: 'text-purple-400', activeGlow: 'from-purple-950/80 to-zinc-900 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' },
     { label: 'MAGIC CASHBACK', icon: Zap, color: 'text-rose-400', activeGlow: 'from-rose-950/80 to-zinc-900 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]' },
@@ -151,13 +151,17 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                     : 'bg-zinc-900/60 text-zinc-400 border-zinc-800/80 hover:bg-zinc-850 hover:text-zinc-200 hover:border-zinc-700'
                 }`}
               >
-                <TabIcon
-                  className={`w-3.5 h-3.5 transition-all duration-300 ${
-                    isActive
-                      ? `${color} animate-pulse drop-shadow-[0_0_8px_currentColor]`
-                      : `${color} opacity-70 group-hover:opacity-100 group-hover:scale-110`
-                  }`}
-                />
+                {label === 'MBTTC MINTS' ? (
+                  <Rotating3DMbttcCoin size={15} accent="amber" />
+                ) : (
+                  <TabIcon
+                    className={`w-3.5 h-3.5 transition-all duration-300 ${
+                      isActive
+                        ? `${color} animate-pulse drop-shadow-[0_0_8px_currentColor]`
+                        : `${color} opacity-70 group-hover:opacity-100 group-hover:scale-110`
+                    }`}
+                  />
+                )}
                 <span>{label}</span>
               </button>
             );
@@ -301,10 +305,13 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                     {/* 4. Activity Type & Dynamic Details + Context Icon */}
                     <td className="py-4 pr-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
+                        <div className={`p-1 rounded-xl border shrink-0 flex items-center justify-center ${iconBg}`}>
+                        {act.includes('mint') || act.includes('claim') || det.includes('yield') ? (
+                          <Rotating3DMbttcCoin size={26} accent="amber" />
+                        ) : (
                           <IconComp className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
+                        )}
+                      </div><div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-zinc-100 text-xs">
                               {activityTitle}
@@ -434,8 +441,12 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                 {/* 4. Activity Type with Icon & Light Green Amount Highlight */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
-                      <IconComp className="w-3.5 h-3.5" />
+                    <div className={`p-1 rounded-xl border shrink-0 flex items-center justify-center ${iconBg}`}>
+                      {act.includes('mint') || act.includes('claim') || det.includes('yield') ? (
+                        <Rotating3DMbttcCoin size={22} accent="amber" />
+                      ) : (
+                        <IconComp className="w-3.5 h-3.5" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <span className="font-bold text-xs text-white block truncate">{activityTitle}</span>
