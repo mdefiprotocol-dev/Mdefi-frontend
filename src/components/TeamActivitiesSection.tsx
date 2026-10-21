@@ -181,18 +181,19 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
         <table className="w-full text-left text-xs min-w-[900px] border-collapse font-mono">
           <thead>
             <tr className="border-b border-zinc-800/80 text-zinc-400 uppercase tracking-wider text-[11px]">
-              <th className="pb-3.5 pl-3 font-semibold w-[170px]">Date & Time</th>
-              <th className="pb-3.5 font-semibold">Activity & Details</th>
-              <th className="pb-3.5 font-semibold w-[210px]">Member / Node</th>
-              <th className="pb-3.5 font-semibold w-[150px]">Amount</th>
+              <th className="pb-3.5 pl-3 font-semibold w-[120px]">Member ID</th>
+              <th className="pb-3.5 font-semibold w-[130px]">Sponsor</th>
+              <th className="pb-3.5 font-semibold w-[170px]">User Address</th>
+              <th className="pb-3.5 font-semibold">Activity Type & Details</th>
+              <th className="pb-3.5 font-semibold w-[160px]">Date & Time</th>
               <th className="pb-3.5 font-semibold w-[110px]">Status</th>
-              <th className="pb-3.5 font-semibold text-right pr-3 w-[150px]">Tx Hash</th>
+              <th className="pb-3.5 font-semibold text-right pr-3 w-[140px]">Tx Hash</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-850/60">
             {pagedTransactions.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-zinc-500 text-xs bg-zinc-950/20 rounded-2xl">
+                <td colSpan={7} className="py-12 text-center text-zinc-500 text-xs bg-zinc-950/20 rounded-2xl">
                   <Clock className="w-8 h-8 text-zinc-600 mx-auto mb-2 opacity-50" />
                   No on-chain team activities found for this category.
                 </td>
@@ -201,86 +202,91 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
               pagedTransactions.map((tx) => {
                 const act = (tx.activityType || '').toLowerCase();
                 const det = (tx.details || '').toLowerCase();
+                const pkg = (tx.packageName || '').toLowerCase();
                 const isWalletCopied = copiedHash === tx.memberWallet;
                 const isHashCopied = copiedHash === tx.txHash;
 
+                // Dynamic Member ID & Sponsor Resolution
+                const rawMemberId = tx.userId || (tx.memberWallet ? `MDF-${tx.memberWallet.slice(2, 8).toUpperCase()}` : 'MDF-User');
+                const sponsorDisplay = (tx as any).sponsorId || (tx as any).sponsor || 'MDF-248161';
+
+                // Category & Situation Based Cyber Icons + Titles
                 let IconComp = Layers;
                 let iconBg = 'bg-zinc-800 text-zinc-300 border-zinc-700';
-                let badgeText = tx.activityType;
-                let subDetail = tx.packageName || 'Protocol activity recorded';
+                let activityTitle = tx.activityType || 'Protocol Activity';
+                let subDetail = tx.details || 'On-chain verified event';
 
                 if (act.includes('register') || det.includes('register')) {
                   IconComp = UserPlus;
-                  iconBg = 'bg-cyan-950/70 text-cyan-400 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]';
-                  badgeText = 'Registration';
-                  subDetail = 'Tier-1 Direct partner joined on-chain';
-                } else if (act.includes('mint') || act.includes('claim') || det.includes('yield')) {
+                  iconBg = 'bg-cyan-950/80 text-cyan-400 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]';
+                  activityTitle = `Register User (${tx.amount || '30.00 MBTTC'})`;
+                  subDetail = 'Direct partner registered on-chain';
+                } else if (act.includes('mint') || act.includes('claim') || det.includes('yield') || det.includes('claim')) {
                   IconComp = Sparkles;
-                  iconBg = 'bg-amber-950/70 text-amber-400 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]';
-                  badgeText = 'Referral Pool Claim';
-                  subDetail = 'Referral yield claimed to wallet';
-                } else if (act.includes('package') || act.includes('node') || det.includes('package')) {
+                  iconBg = 'bg-amber-950/80 text-amber-400 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]';
+                  activityTitle = act.includes('pool') || det.includes('referral')
+                    ? `Total Referral Claim (${tx.amount || '0 MBTTC'})`
+                    : `Package Claim (${tx.amount || '0 MBTTC'})`;
+                  subDetail = tx.packageName || 'Yield reward claimed to wallet';
+                } else if (act.includes('package') || act.includes('node') || pkg.includes('pool') || pkg.includes('10')) {
                   IconComp = Cpu;
-                  iconBg = 'bg-emerald-950/70 text-emerald-400 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
-                  badgeText = 'Node Activation';
-                  subDetail = tx.packageName || 'Starter Pool $10 Node';
+                  iconBg = 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
+                  activityTitle = `Node Activation (${tx.amount || '$10'})`;
+                  subDetail = tx.packageName || 'Starter Pool Node Active';
                 } else if (act.includes('direct') || det.includes('referral reward')) {
                   IconComp = TrendingUp;
-                  iconBg = 'bg-lime-950/70 text-lime-400 border-lime-500/40 shadow-[0_0_12px_rgba(132,204,22,0.25)]';
-                  badgeText = 'Direct Commission';
-                  subDetail = 'Frontline referral reward distributed';
+                  iconBg = 'bg-lime-950/80 text-lime-400 border-lime-500/40 shadow-[0_0_12px_rgba(132,204,22,0.25)]';
+                  activityTitle = `Direct Income (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Direct frontline sponsor commission';
                 } else if (act.includes('matrix')) {
                   IconComp = Network;
-                  iconBg = 'bg-purple-950/70 text-purple-400 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]';
-                  badgeText = 'Matrix Income';
-                  subDetail = 'Auto-placement matrix node income';
+                  iconBg = 'bg-purple-950/80 text-purple-400 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]';
+                  activityTitle = `Matrix Income (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Global matrix node yield distribution';
                 } else if (act.includes('cashback') || act.includes('magic')) {
                   IconComp = Zap;
-                  iconBg = 'bg-rose-950/70 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.25)]';
-                  badgeText = 'Magic Cashback';
-                  subDetail = 'Protocol daily volume cashback';
+                  iconBg = 'bg-rose-950/80 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.25)]';
+                  activityTitle = `Magic Cashback (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Daily volume magic cashback';
+                } else if (act.includes('reward 1') || act.includes('weekly 1')) {
+                  IconComp = Award;
+                  iconBg = 'bg-sky-950/80 text-sky-400 border-sky-500/40 shadow-[0_0_12px_rgba(14,165,233,0.25)]';
+                  activityTitle = `Weekly Reward 1 (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Tier performance community bonus';
+                } else if (act.includes('reward 2') || act.includes('weekly 2')) {
+                  IconComp = Crown;
+                  iconBg = 'bg-yellow-950/80 text-yellow-300 border-yellow-500/40 shadow-[0_0_12px_rgba(234,179,8,0.25)]';
+                  activityTitle = `Weekly Reward 2 (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Elite tier leadership incentive';
                 } else if (act.includes('salary') || det.includes('passive')) {
                   IconComp = Briefcase;
-                  iconBg = 'bg-teal-950/70 text-teal-300 border-teal-500/40 shadow-[0_0_12px_rgba(20,184,166,0.25)]';
-                  badgeText = 'Weekly Salary';
-                  subDetail = 'Leadership rank compensation';
+                  iconBg = 'bg-teal-950/80 text-teal-300 border-teal-500/40 shadow-[0_0_12px_rgba(20,184,166,0.25)]';
+                  activityTitle = `Weekly Salary (${tx.amount || '0 MBTTC'})`;
+                  subDetail = 'Weekly executive passive salary';
                 }
 
                 return (
                   <tr key={tx.id} className="hover:bg-zinc-850/40 transition-colors group">
-                    <td className="py-3.5 pl-3 text-zinc-400 text-[11px] whitespace-nowrap">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3 h-3 text-zinc-600" />
-                        <span>{tx.date}</span>
+                    {/* 1. Member ID */}
+                    <td className="py-4 pl-3 whitespace-nowrap">
+                      <span className="text-emerald-400 font-bold text-xs">
+                        {rawMemberId}
                       </span>
                     </td>
-                    <td className="py-3.5 pr-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
-                          <IconComp className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-bold text-zinc-100 text-xs block">
-                            {badgeText}
-                          </span>
-                          <span className="text-[11px] text-zinc-400 block truncate">
-                            {subDetail}
-                          </span>
-                        </div>
-                      </div>
+
+                    {/* 2. Sponsor (ID Number) */}
+                    <td className="py-4 whitespace-nowrap">
+                      <span className="text-zinc-300 text-xs">
+                        {sponsorDisplay}
+                      </span>
                     </td>
-                    <td className="py-3.5 pr-3">
+
+                    {/* 3. User Address */}
+                    <td className="py-4 pr-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <div className="min-w-0">
-                          {tx.userId ? (
-                            <span className="text-emerald-400 font-bold block text-xs">
-                              {tx.userId}
-                            </span>
-                          ) : null}
-                          <span className="text-zinc-400 text-[11px] block truncate">
-                            {formatCompactAddress(tx.memberWallet)}
-                          </span>
-                        </div>
+                        <span className="text-zinc-400 text-[11px]">
+                          {formatCompactAddress(tx.memberWallet)}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(tx.memberWallet)}
@@ -291,18 +297,42 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                         </button>
                       </div>
                     </td>
-                    <td className="py-3.5 pr-3 whitespace-nowrap font-bold">
-                      <span className="text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-2 py-0.5 rounded-md inline-block">
-                        {tx.amount}
+
+                    {/* 4. Activity Type & Dynamic Details + Context Icon */}
+                    <td className="py-4 pr-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
+                          <IconComp className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-bold text-zinc-100 text-xs block truncate">
+                            {activityTitle}
+                          </span>
+                          <span className="text-[11px] text-zinc-400 block truncate">
+                            {subDetail}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 5. Date & Time */}
+                    <td className="py-4 pr-3 text-zinc-400 text-[11px] whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-zinc-600" />
+                        <span>{tx.date}</span>
                       </span>
                     </td>
-                    <td className="py-3.5 pr-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
+
+                    {/* 6. Status with Confirmed Icon */}
+                    <td className="py-4 pr-3 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>{tx.status}</span>
+                        <span>{tx.status || 'Confirmed'}</span>
                       </span>
                     </td>
-                    <td className="py-3.5 pr-3 text-right whitespace-nowrap">
+
+                    {/* 7. Tx Hash */}
+                    <td className="py-4 pr-3 text-right whitespace-nowrap">
                       {tx.txHash ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="text-[11px] text-zinc-400 group-hover:text-emerald-300 transition-colors" title={tx.txHash}>
@@ -329,7 +359,7 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
         </table>
       </div>
 
-      {/* Mobile Card Feed */}
+      {/* Mobile Card Feed (7-Point Structured) */}
       <div className="md:hidden space-y-3 font-mono">
         {pagedTransactions.length === 0 ? (
           <div className="py-10 text-center text-zinc-500 text-xs bg-zinc-950/40 rounded-2xl border border-zinc-800/60">
@@ -339,71 +369,90 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
           pagedTransactions.map((tx) => {
             const act = (tx.activityType || '').toLowerCase();
             const det = (tx.details || '').toLowerCase();
+            const pkg = (tx.packageName || '').toLowerCase();
             const isWalletCopied = copiedHash === tx.memberWallet;
             const isHashCopied = copiedHash === tx.txHash;
 
+            const rawMemberId = tx.userId || (tx.memberWallet ? `MDF-${tx.memberWallet.slice(2, 8).toUpperCase()}` : 'MDF-User');
+            const sponsorDisplay = (tx as any).sponsorId || (tx as any).sponsor || 'MDF-248161';
+
             let IconComp = Layers;
             let iconBg = 'bg-zinc-800 text-zinc-300 border-zinc-700';
-            let badgeText = tx.activityType;
+            let activityTitle = tx.activityType || 'Activity';
 
             if (act.includes('register') || det.includes('register')) {
               IconComp = UserPlus;
-              iconBg = 'bg-cyan-950/70 text-cyan-400 border-cyan-500/40';
-              badgeText = 'Registration';
+              iconBg = 'bg-cyan-950/80 text-cyan-400 border-cyan-500/40';
+              activityTitle = `Register User (${tx.amount || '30.00 MBTTC'})`;
             } else if (act.includes('mint') || act.includes('claim')) {
               IconComp = Sparkles;
-              iconBg = 'bg-amber-950/70 text-amber-400 border-amber-500/40';
-              badgeText = 'Pool Claim';
-            } else if (act.includes('package') || act.includes('node')) {
+              iconBg = 'bg-amber-950/80 text-amber-400 border-amber-500/40';
+              activityTitle = act.includes('pool') ? `Referral Claim (${tx.amount || '0 MBTTC'})` : `Package Claim (${tx.amount || '0 MBTTC'})`;
+            } else if (act.includes('package') || act.includes('node') || pkg.includes('pool')) {
               IconComp = Cpu;
-              iconBg = 'bg-emerald-950/70 text-emerald-400 border-emerald-500/40';
-              badgeText = 'Node Activation';
+              iconBg = 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40';
+              activityTitle = `Node Activation (${tx.amount || '$10'})`;
             } else if (act.includes('direct')) {
               IconComp = TrendingUp;
-              iconBg = 'bg-lime-950/70 text-lime-400 border-lime-500/40';
-              badgeText = 'Direct Commission';
+              iconBg = 'bg-lime-950/80 text-lime-400 border-lime-500/40';
+              activityTitle = `Direct Income (${tx.amount || '0 MBTTC'})`;
             } else if (act.includes('matrix')) {
               IconComp = Network;
-              iconBg = 'bg-purple-950/70 text-purple-400 border-purple-500/40';
-              badgeText = 'Matrix Income';
+              iconBg = 'bg-purple-950/80 text-purple-400 border-purple-500/40';
+              activityTitle = `Matrix Income (${tx.amount || '0 MBTTC'})`;
             } else if (act.includes('cashback')) {
               IconComp = Zap;
-              iconBg = 'bg-rose-950/70 text-rose-400 border-rose-500/40';
-              badgeText = 'Magic Cashback';
+              iconBg = 'bg-rose-950/80 text-rose-400 border-rose-500/40';
+              activityTitle = `Magic Cashback (${tx.amount || '0 MBTTC'})`;
             } else if (act.includes('salary')) {
               IconComp = Briefcase;
-              iconBg = 'bg-teal-950/70 text-teal-300 border-teal-500/40';
-              badgeText = 'Weekly Salary';
+              iconBg = 'bg-teal-950/80 text-teal-300 border-teal-500/40';
+              activityTitle = `Weekly Salary (${tx.amount || '0 MBTTC'})`;
             }
 
             return (
               <div key={tx.id} className="p-4 rounded-2xl bg-zinc-950/80 border border-emerald-500/20 backdrop-blur-md space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
-                      <IconComp className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="font-bold text-xs text-white truncate">{badgeText}</span>
+                {/* 1. Member ID & 2. Sponsor */}
+                <div className="flex items-center justify-between text-xs pb-1 border-b border-zinc-900">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-500 text-[10px]">ID:</span>
+                    <span className="text-emerald-400 font-bold">{rawMemberId}</span>
                   </div>
-                  <span className="font-bold text-xs text-emerald-400">{tx.amount}</span>
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <span className="text-zinc-500 text-[10px]">Sponsor:</span>
+                    <span className="text-zinc-300">{sponsorDisplay}</span>
+                  </div>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-500 text-[10px]">Partner:</span>
-                    <div className="flex items-center gap-1.5">
-                      {tx.userId ? <span className="text-emerald-400 font-bold text-[10px]">{tx.userId}</span> : null}
-                      <span className="text-zinc-400">{formatCompactAddress(tx.memberWallet)}</span>
-                      <button type="button" onClick={() => handleCopy(tx.memberWallet)} className="p-1 text-zinc-400 hover:text-emerald-400">
-                        {isWalletCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
+                {/* 4. Activity Type with Icon */}
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
+                    <IconComp className="w-3.5 h-3.5" />
                   </div>
-                  {tx.details ? <p className="text-[10px] text-zinc-400 pt-1 border-t border-zinc-800/60 truncate">{tx.details}</p> : null}
+                  <div className="min-w-0">
+                    <span className="font-bold text-xs text-white block truncate">{activityTitle}</span>
+                    <span className="text-[10px] text-zinc-400 block truncate">{tx.details || 'On-chain event'}</span>
+                  </div>
                 </div>
 
+                {/* 3. Address & 5. Date */}
+                <div className="p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-850/80 flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-400">{formatCompactAddress(tx.memberWallet)}</span>
+                    <button type="button" onClick={() => handleCopy(tx.memberWallet)} className="p-1 text-zinc-400 hover:text-emerald-400">
+                      {isWalletCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-zinc-500">{tx.date}</span>
+                </div>
+
+                {/* 6. Status & 7. Tx Hash */}
                 <div className="flex items-center justify-between pt-1 text-[10px] text-zinc-400">
-                  <span>{tx.date}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{tx.status || 'Confirmed'}</span>
+                  </span>
+
                   {tx.txHash ? (
                     <div className="flex items-center gap-1">
                       <span>{formatCompactAddress(tx.txHash)}</span>
