@@ -18,6 +18,7 @@ import {
 import { TeamTransactionRecord } from '../types';
 import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
 import { ResponsivePagination } from './common/ResponsivePagination';
+import { Rotating3DMbttcCoin } from './common/Rotating3DMbttcCoin';
 
 interface TeamActivitiesSectionProps {
   transactions: TeamTransactionRecord[];
@@ -41,8 +42,7 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
   const txFilterTabs = [
     { label: 'All', icon: Layers, color: 'text-zinc-400', activeGlow: 'from-zinc-800 to-zinc-900 border-zinc-600' },
     { label: 'Register User', icon: UserPlus, color: 'text-cyan-400', activeGlow: 'from-cyan-950/80 to-zinc-900 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]' },
-    { label: 'MBTTC MINTS', icon: Sparkles, color: 'text-amber-400', activeGlow: 'from-amber-950/80 to-zinc-900 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },
-    { label: 'ACTIVATE NODES', icon: Cpu, color: 'text-emerald-400', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
+    { label: 'MBTTC MINTS', icon: Rotating3DMbttcCoin as any, color: 'text-amber-400', activeGlow: 'from-amber-950/80 to-zinc-900 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.3)]' },    { label: 'ACTIVATE NODES', icon: Cpu, color: 'text-emerald-400', activeGlow: 'from-emerald-950/80 to-zinc-900 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.3)]' },
     { label: 'DIRECT INCOME', icon: TrendingUp, color: 'text-lime-400', activeGlow: 'from-lime-950/80 to-zinc-900 border-lime-500/50 shadow-[0_0_15px_rgba(132,204,22,0.3)]' },
     { label: 'MATRIX INCOME', icon: Network, color: 'text-purple-400', activeGlow: 'from-purple-950/80 to-zinc-900 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]' },
     { label: 'MAGIC CASHBACK', icon: Zap, color: 'text-rose-400', activeGlow: 'from-rose-950/80 to-zinc-900 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.3)]' },
