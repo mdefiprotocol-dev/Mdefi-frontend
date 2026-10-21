@@ -219,49 +219,49 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                 if (act.includes('register') || det.includes('register')) {
                   IconComp = UserPlus;
                   iconBg = 'bg-cyan-950/80 text-cyan-400 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.25)]';
-                  activityTitle = `Register User (${tx.amount || '30.00 MBTTC'})`;
+                  activityTitle = 'Register User';
                   subDetail = 'Direct partner registered on-chain';
                 } else if (act.includes('mint') || act.includes('claim') || det.includes('yield') || det.includes('claim')) {
                   IconComp = Sparkles;
                   iconBg = 'bg-amber-950/80 text-amber-400 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]';
                   activityTitle = act.includes('pool') || det.includes('referral')
-                    ? `Total Referral Claim (${tx.amount || '0 MBTTC'})`
-                    : `Package Claim (${tx.amount || '0 MBTTC'})`;
+                    ? 'Total Referral Claim'
+                    : 'Package Claim';
                   subDetail = tx.packageName || 'Yield reward claimed to wallet';
                 } else if (act.includes('package') || act.includes('node') || pkg.includes('pool') || pkg.includes('10')) {
                   IconComp = Cpu;
                   iconBg = 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
-                  activityTitle = `Node Activation (${tx.amount || '$10'})`;
+                  activityTitle = 'Node Activation';
                   subDetail = tx.packageName || 'Starter Pool Node Active';
                 } else if (act.includes('direct') || det.includes('referral reward')) {
                   IconComp = TrendingUp;
                   iconBg = 'bg-lime-950/80 text-lime-400 border-lime-500/40 shadow-[0_0_12px_rgba(132,204,22,0.25)]';
-                  activityTitle = `Direct Income (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Direct Income';
                   subDetail = 'Direct frontline sponsor commission';
                 } else if (act.includes('matrix')) {
                   IconComp = Network;
                   iconBg = 'bg-purple-950/80 text-purple-400 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]';
-                  activityTitle = `Matrix Income (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Matrix Income';
                   subDetail = 'Global matrix node yield distribution';
                 } else if (act.includes('cashback') || act.includes('magic')) {
                   IconComp = Zap;
                   iconBg = 'bg-rose-950/80 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.25)]';
-                  activityTitle = `Magic Cashback (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Magic Cashback';
                   subDetail = 'Daily volume magic cashback';
                 } else if (act.includes('reward 1') || act.includes('weekly 1')) {
                   IconComp = Award;
                   iconBg = 'bg-sky-950/80 text-sky-400 border-sky-500/40 shadow-[0_0_12px_rgba(14,165,233,0.25)]';
-                  activityTitle = `Weekly Reward 1 (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Weekly Reward 1';
                   subDetail = 'Tier performance community bonus';
                 } else if (act.includes('reward 2') || act.includes('weekly 2')) {
                   IconComp = Crown;
                   iconBg = 'bg-yellow-950/80 text-yellow-300 border-yellow-500/40 shadow-[0_0_12px_rgba(234,179,8,0.25)]';
-                  activityTitle = `Weekly Reward 2 (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Weekly Reward 2';
                   subDetail = 'Elite tier leadership incentive';
                 } else if (act.includes('salary') || det.includes('passive')) {
                   IconComp = Briefcase;
                   iconBg = 'bg-teal-950/80 text-teal-300 border-teal-500/40 shadow-[0_0_12px_rgba(20,184,166,0.25)]';
-                  activityTitle = `Weekly Salary (${tx.amount || '0 MBTTC'})`;
+                  activityTitle = 'Weekly Salary';
                   subDetail = 'Weekly executive passive salary';
                 }
 
@@ -305,10 +305,17 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                           <IconComp className="w-3.5 h-3.5" />
                         </div>
                         <div className="min-w-0">
-                          <span className="font-bold text-zinc-100 text-xs block truncate">
-                            {activityTitle}
-                          </span>
-                          <span className="text-[11px] text-zinc-400 block truncate">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-zinc-100 text-xs">
+                              {activityTitle}
+                            </span>
+                            {tx.amount && (
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                                {tx.amount}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-zinc-400 block truncate mt-0.5">
                             {subDetail}
                           </span>
                         </div>
@@ -383,7 +390,7 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
             if (act.includes('register') || det.includes('register')) {
               IconComp = UserPlus;
               iconBg = 'bg-cyan-950/80 text-cyan-400 border-cyan-500/40';
-              activityTitle = `Register User (${tx.amount || '30.00 MBTTC'})`;
+              activityTitle = tx.amount ? `Register User (${tx.amount})` : 'Register User';
             } else if (act.includes('mint') || act.includes('claim')) {
               IconComp = Sparkles;
               iconBg = 'bg-amber-950/80 text-amber-400 border-amber-500/40';
@@ -424,15 +431,22 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                   </div>
                 </div>
 
-                {/* 4. Activity Type with Icon */}
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
-                    <IconComp className="w-3.5 h-3.5" />
+                {/* 4. Activity Type with Icon & Light Green Amount Highlight */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-xl border shrink-0 ${iconBg}`}>
+                      <IconComp className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-xs text-white block truncate">{activityTitle}</span>
+                      <span className="text-[10px] text-zinc-400 block truncate">{tx.details || 'On-chain event'}</span>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <span className="font-bold text-xs text-white block truncate">{activityTitle}</span>
-                    <span className="text-[10px] text-zinc-400 block truncate">{tx.details || 'On-chain event'}</span>
-                  </div>
+                  {tx.amount && (
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 shrink-0">
+                      {tx.amount}
+                    </span>
+                  )}
                 </div>
 
                 {/* 3. Address & 5. Date */}
