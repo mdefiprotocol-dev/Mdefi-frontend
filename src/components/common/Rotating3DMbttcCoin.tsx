@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 export interface Rotating3DMbttcCoinProps {
   size?: number;
@@ -8,226 +8,221 @@ export interface Rotating3DMbttcCoinProps {
 
 export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({ 
   size = 54, 
-  accent = 'emerald',
+  accent = 'amber',
   className = '' 
 }) => {
-  // Glow accent styling
+  const uniqueId = useId().replace(/:/g, '');
+
   const glowColor = accent === 'emerald'
-    ? 'rgba(16, 185, 129, 0.35)'
+    ? 'rgba(16, 185, 129, 0.45)'
     : accent === 'rose'
-      ? 'rgba(244, 63, 94, 0.35)'
+      ? 'rgba(244, 63, 94, 0.45)'
       : accent === 'sapphire'
-        ? 'rgba(59, 130, 246, 0.35)'
-        : 'rgba(245, 158, 11, 0.35)';
+        ? 'rgba(59, 130, 246, 0.45)'
+        : 'rgba(245, 158, 11, 0.45)';
+
+  // Scale proportional depth so small sizes stay crisp
+  const isSmall = size <= 28;
+  const zDepth = isSmall ? 2 : 4;
+  const rimSlices = isSmall ? [-1, 0, 1] : [-3, -2, -1, 0, 1, 2, 3];
 
   return (
     <div 
-      className={`relative flex items-center justify-center shrink-0 ${className}`}
+      className={`relative inline-flex items-center justify-center shrink-0 select-none ${className}`}
       style={{
         width: `${size}px`,
         height: `${size}px`,
-        perspective: '800px',
+        perspective: '1000px',
       }}
     >
-      {/* Component-scoped 3D Spin and Sheen Animations */}
       <style>{`
-        @keyframes coin3dSpinLoop {
-          0% {
-            transform: rotateY(0deg) rotateX(8deg);
-          }
-          50% {
-            transform: rotateY(180deg) rotateX(-8deg);
-          }
-          100% {
-            transform: rotateY(360deg) rotateX(8deg);
-          }
+        @keyframes mbttcCoinSpin3D {
+          0% { transform: rotateY(0deg) rotateX(6deg); }
+          50% { transform: rotateY(180deg) rotateX(-6deg); }
+          100% { transform: rotateY(360deg) rotateX(6deg); }
         }
-        @keyframes coin-sheen {
-          0% {
-            transform: translateX(-160%) skewX(-20deg);
-            opacity: 0;
-          }
-          30% {
-            opacity: 0.75;
-          }
-          60% {
-            transform: translateX(160%) skewX(-20deg);
-            opacity: 0;
-          }
-          100% {
-            transform: translateX(160%) skewX(-20deg);
-            opacity: 0;
-          }
+        @keyframes mbttcSpecularSheen {
+          0% { transform: translateX(-180%) skewX(-25deg); opacity: 0; }
+          20% { opacity: 0.9; }
+          45% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
+          100% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
         }
-        .mdefi-coin-3d-spin {
-          animation: coin3dSpinLoop 6s linear infinite !important;
+        .mbttc-3d-spin-core {
+          animation: mbttcCoinSpin3D 5.5s linear infinite !important;
           transform-style: preserve-3d !important;
+          will-change: transform;
         }
-        .animate-coin-sheen {
-          animation: coin-sheen 3.2s ease-in-out infinite;
+        .mbttc-sheen-sweep {
+          animation: mbttcSpecularSheen 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-          .mdefi-coin-3d-spin,
-          .animate-coin-sheen {
+          .mbttc-3d-spin-core,
+          .mbttc-sheen-sweep {
             animation: none !important;
           }
         }
       `}</style>
 
-      {/* Ambient soft backlight */}
+      {/* Dynamic Ambient Neon Core Glow */}
       <div 
-        className="absolute inset-0 rounded-full blur-md pointer-events-none transition-all duration-300"
-        style={{ backgroundColor: glowColor }}
+        className="absolute inset-0 rounded-full blur-[4px] pointer-events-none transition-opacity duration-300"
+        style={{ 
+          backgroundColor: glowColor,
+          transform: 'scale(0.92)'
+        }} 
       />
 
-      {/* 3D Coin Body (Continuously Rotating) */}
+      {/* 3D Spin Body with True Z-Depth */}
       <div 
-        className="relative w-full h-full flex items-center justify-center mdefi-coin-3d-spin"
-        style={{ 
-          transformStyle: 'preserve-3d',
-          animation: 'coin3dSpinLoop 6s linear infinite'
-        }}
+        className="relative w-full h-full flex items-center justify-center mbttc-3d-spin-core"
+        style={{ transformStyle: 'preserve-3d' }}
       >
-        {/* ================= THICK METALLIC RIM SLICES (Z-Depth) ================= */}
-        {[-3, -2, -1, 0, 1, 2, 3].map((zOffset) => (
+        {/* Layered Cylindrical Metallic Rim */}
+        {rimSlices.map((zOffset) => (
           <div 
             key={zOffset}
             className="absolute rounded-full pointer-events-none"
             style={{
-              width: `${size - 2}px`,
-              height: `${size - 2}px`,
+              width: `${Math.max(10, size - 1)}px`,
+              height: `${Math.max(10, size - 1)}px`,
               transform: `translateZ(${zOffset}px)`,
-              background: 'radial-gradient(circle, #78350f 40%, #b45309 70%, #d97706 95%, #f59e0b 100%)',
-              border: '1px solid #92400e',
-              opacity: zOffset === 0 ? 0.9 : 0.6,
+              background: 'radial-gradient(circle, #5e2806 30%, #9a3412 65%, #d97706 90%, #fef08a 100%)',
+              border: '0.5px solid #78350f',
+              opacity: zOffset === 0 ? 0.95 : 0.65,
             }}
           />
         ))}
 
-        {/* ================= FRONT COIN FACE (translateZ: +4px) ================= */}
+        {/* FRONT COIN FACE */}
         <div 
           className="absolute inset-0 flex items-center justify-center rounded-full overflow-hidden"
           style={{
-            transform: 'translateZ(4px)',
+            transform: `translateZ(${zDepth}px)`,
             backfaceVisibility: 'visible',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.65)',
           }}
         >
           <svg 
             width={size} 
             height={size} 
             viewBox="0 0 64 64" 
-            className="w-full h-full"
-            aria-label="3D MBTTC Token Front"
+            className="w-full h-full block"
+            shapeRendering="geometricPrecision"
+            aria-label="3D MBTTC Front"
           >
             <defs>
-              <radialGradient id="mbttcGoldBevelGrad" cx="35%" cy="30%" r="70%">
-                <stop offset="0%" stopColor="#fffbeb" />
-                <stop offset="20%" stopColor="#fef08a" />
-                <stop offset="50%" stopColor="#f59e0b" />
-                <stop offset="85%" stopColor="#b45309" />
-                <stop offset="100%" stopColor="#78350f" />
-              </radialGradient>
-
-              <radialGradient id="mbttcGoldInnerFloor" cx="35%" cy="30%" r="65%">
-                <stop offset="0%" stopColor="#fef3c7" />
-                <stop offset="35%" stopColor="#fbbf24" />
-                <stop offset="75%" stopColor="#b45309" />
+              <radialGradient id={`bevelGrad_${uniqueId}`} cx="32%" cy="28%" r="72%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="15%" stopColor="#fef08a" />
+                <stop offset="45%" stopColor="#f59e0b" />
+                <stop offset="80%" stopColor="#b45309" />
                 <stop offset="100%" stopColor="#451a03" />
               </radialGradient>
 
-              <linearGradient id="mbttcEmblemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <radialGradient id={`innerFloor_${uniqueId}`} cx="35%" cy="30%" r="68%">
+                <stop offset="0%" stopColor="#fffbeb" />
+                <stop offset="25%" stopColor="#fde047" />
+                <stop offset="60%" stopColor="#d97706" />
+                <stop offset="92%" stopColor="#78350f" />
+                <stop offset="100%" stopColor="#270e02" />
+              </radialGradient>
+
+              <linearGradient id={`emblemGrad_${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="30%" stopColor="#fef08a" />
-                <stop offset="70%" stopColor="#d97706" />
+                <stop offset="35%" stopColor="#fef08a" />
+                <stop offset="70%" stopColor="#ea580c" />
                 <stop offset="100%" stopColor="#78350f" />
               </linearGradient>
+
+              <filter id={`embossGlow_${uniqueId}`} x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1.2" stdDeviation="1" floodColor="#000000" floodOpacity="0.75" />
+              </filter>
             </defs>
 
-            {/* Outer Rim Ring */}
-            <circle cx="32" cy="32" r="30" fill="url(#mbttcGoldBevelGrad)" stroke="#fef08a" strokeWidth="1.2" />
+            {/* Outer Beveled Rim */}
+            <circle cx="32" cy="32" r="30.5" fill={`url(#bevelGrad_${uniqueId})`} stroke="#fef9c3" strokeWidth="1" />
 
-            {/* Milled Gear Ridges */}
-            <circle cx="32" cy="32" r="26.5" fill="none" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 2" opacity="0.65" />
+            {/* Milled Notched Track */}
+            <circle cx="32" cy="32" r="27" fill="none" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 1.5" opacity="0.7" />
 
-            {/* Recessed Face Floor */}
-            <circle cx="32" cy="32" r="23.5" fill="url(#mbttcGoldInnerFloor)" stroke="#fde68a" strokeWidth="1" />
+            {/* Recessed Center Core */}
+            <circle cx="32" cy="32" r="24" fill={`url(#innerFloor_${uniqueId})`} stroke="#fef08a" strokeWidth="0.8" />
 
-            {/* Precision Micro-Ring */}
-            <circle cx="32" cy="32" r="20" fill="none" stroke="#fef3c7" strokeWidth="0.8" opacity="0.5" />
+            {/* Inner Precision Halo */}
+            <circle cx="32" cy="32" r="20.5" fill="none" stroke="#ffffff" strokeWidth="0.6" opacity="0.55" />
 
-            {/* MDeFi / MBTTC Geometric Diamond Shield Emblem */}
-            <g transform="translate(16, 16) scale(0.5)">
+            {/* MDeFi Emblem (Sharp Diamond Shield Logo) */}
+            <g transform="translate(16, 16) scale(0.5)" filter={`url(#embossGlow_${uniqueId})`}>
               <path 
                 d="M 12 48 L 12 16 L 32 34 L 52 16 L 52 48 L 42 48 L 42 28 L 32 38 L 22 28 L 22 48 Z" 
-                fill="url(#mbttcEmblemGrad)" 
+                fill={`url(#emblemGrad_${uniqueId})`} 
                 stroke="#fffbeb" 
-                strokeWidth="1.5"
-                filter="drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
               />
               <polygon points="32,20 37,27 32,34 27,27" fill="#ffffff" />
             </g>
 
-            {/* Micro Star Points around Rim */}
-            <circle cx="32" cy="10" r="1.2" fill="#fffbeb" />
-            <circle cx="32" cy="54" r="1.2" fill="#fffbeb" />
-            <circle cx="10" cy="32" r="1.2" fill="#fffbeb" />
-            <circle cx="54" cy="32" r="1.2" fill="#fffbeb" />
+            {/* Cardinal Micro Stars */}
+            <circle cx="32" cy="9.5" r="1.3" fill="#ffffff" />
+            <circle cx="32" cy="54.5" r="1.3" fill="#ffffff" />
+            <circle cx="9.5" cy="32" r="1.3" fill="#ffffff" />
+            <circle cx="54.5" cy="32" r="1.3" fill="#ffffff" />
           </svg>
 
-          {/* Sweeping Specular Light Sheen */}
-          <div className="absolute inset-0 pointer-events-none animate-coin-sheen bg-gradient-to-tr from-transparent via-white/50 to-transparent" />
+          {/* Dynamic Light Reflection Sweep */}
+          <div className="absolute inset-0 pointer-events-none mbttc-sheen-sweep bg-gradient-to-r from-transparent via-white/55 to-transparent" />
         </div>
 
-        {/* ================= BACK COIN FACE (rotateY: 180deg, translateZ: -4px) ================= */}
+        {/* BACK COIN FACE */}
         <div 
           className="absolute inset-0 flex items-center justify-center rounded-full overflow-hidden"
           style={{
-            transform: 'rotateY(180deg) translateZ(4px)',
+            transform: `rotateY(180deg) translateZ(${zDepth}px)`,
             backfaceVisibility: 'visible',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.65)',
           }}
         >
           <svg 
             width={size} 
             height={size} 
             viewBox="0 0 64 64" 
-            className="w-full h-full"
-            aria-label="3D MBTTC Token Back"
+            className="w-full h-full block"
+            shapeRendering="geometricPrecision"
+            aria-label="3D MBTTC Back"
           >
-            {/* Outer Rim Ring */}
-            <circle cx="32" cy="32" r="30" fill="url(#mbttcGoldBevelGrad)" stroke="#fef08a" strokeWidth="1.2" />
+            {/* Outer Beveled Rim */}
+            <circle cx="32" cy="32" r="30.5" fill={`url(#bevelGrad_${uniqueId})`} stroke="#fef9c3" strokeWidth="1" />
 
-            {/* Milled Ridges */}
-            <circle cx="32" cy="32" r="26.5" fill="none" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 2" opacity="0.65" />
+            {/* Milled Track */}
+            <circle cx="32" cy="32" r="27" fill="none" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 1.5" opacity="0.7" />
 
-            {/* Recessed Face Floor */}
-            <circle cx="32" cy="32" r="23.5" fill="url(#mbttcGoldInnerFloor)" stroke="#fde68a" strokeWidth="1" />
+            {/* Recessed Center */}
+            <circle cx="32" cy="32" r="24" fill={`url(#innerFloor_${uniqueId})`} stroke="#fef08a" strokeWidth="0.8" />
 
-            {/* Reverse Protocol Monogram "MBTTC" */}
+            {/* Monogram MBTTC */}
             <text
               x="32"
               y="37"
               textAnchor="middle"
-              fontSize="12"
+              fontSize="12.5"
               fontWeight="900"
-              fontFamily="JetBrains Mono, monospace, sans-serif"
+              fontFamily="monospace"
               fill="#ffffff"
               style={{
-                textShadow: '0 2px 4px rgba(0,0,0,0.7)',
-                filter: 'drop-shadow(0 1px 2px #78350f)'
+                textShadow: '0 2px 4px rgba(0,0,0,0.85)',
+                filter: 'drop-shadow(0 1px 2px #451a03)'
               }}
             >
               MBTTC
             </text>
 
-            {/* Protocol Stars */}
-            <text x="32" y="24" textAnchor="middle" fontSize="8" fill="#fef08a">✦ ✦ ✦</text>
-            <text x="32" y="47" textAnchor="middle" fontSize="6.5" fontFamily="monospace" fill="#fde68a" opacity="0.8">ON-CHAIN</text>
+            <text x="32" y="23.5" textAnchor="middle" fontSize="7.5" fill="#fef08a" fontWeight="bold">✦ ✦ ✦</text>
+            <text x="32" y="47.5" textAnchor="middle" fontSize="6" fontFamily="monospace" fontWeight="bold" fill="#fde68a" letterSpacing="0.5">ON-CHAIN</text>
           </svg>
 
-          {/* Sweeping Specular Light Sheen */}
-          <div className="absolute inset-0 pointer-events-none animate-coin-sheen bg-gradient-to-tr from-transparent via-white/50 to-transparent" />
+          {/* Dynamic Light Reflection Sweep */}
+          <div className="absolute inset-0 pointer-events-none mbttc-sheen-sweep bg-gradient-to-r from-transparent via-white/55 to-transparent" />
         </div>
       </div>
     </div>
