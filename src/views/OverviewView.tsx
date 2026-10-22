@@ -23,7 +23,7 @@ import {
   ActivityItem, 
   NavPage 
 } from '../types';
-import { MbttcCoin3D } from '../components/MbttcCoin3D';
+import { Rotating3DMbttcCoin } from '../components/common/Rotating3DMbttcCoin';
 import { MdefiTradingTerminalChart } from '../components/TradingChart/MdefiTradingTerminal';
 
 import { centralEventSyncService } from '../services/centralEventSyncService';
@@ -394,8 +394,8 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
           className="lg:col-span-4 p-3.5 px-4 rounded-3xl bg-gradient-to-r from-zinc-900/60 to-[#0a140e] border border-emerald-500/25 hover:border-emerald-500/45 cursor-pointer transition-all flex items-center justify-between gap-3 group backdrop-blur-xl shadow-lg shadow-black/40"
         >
           <div className="flex items-center gap-3">
-            <div className="shrink-0 group-hover:scale-105 transition-transform">
-              <MbttcCoin3D size="sm" interactive={false} autoRotate={true} glow={true} />
+            <div className="shrink-0 group-hover:scale-110 transition-transform">
+              <Rotating3DMbttcCoin size={36} accent="emerald" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -590,9 +590,34 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
                 className="absolute w-36 h-36 sm:w-44 sm:h-44 rounded-full border border-teal-400/25 animate-[spin_12s_linear_infinite_reverse] pointer-events-none shadow-[0_0_15px_rgba(52,211,153,0.2)]" 
               />
 
-              {/* Centered 3D Spinning Coin */}
+              {/* Centered 3D Spinning Coin - Responsive Mobile/Tablet/PC Perfect Alignment */}
               <div className="relative z-10 flex items-center justify-center">
-                <MbttcCoin3D size="hero" interactive={true} autoRotate={true} glow={true} />
+                {/* Mobile View (Screen < 640px) */}
+                <div className="block sm:hidden">
+                  <Rotating3DMbttcCoin 
+                    size={120} 
+                    accent="emerald" 
+                    className="filter drop-shadow-[0_0_25px_rgba(16,185,129,0.5)]" 
+                  />
+                </div>
+
+                {/* Tablet View (640px to 1024px) */}
+                <div className="hidden sm:block lg:hidden">
+                  <Rotating3DMbttcCoin 
+                    size={140} 
+                    accent="emerald" 
+                    className="filter drop-shadow-[0_0_30px_rgba(16,185,129,0.55)]" 
+                  />
+                </div>
+
+                {/* Desktop / PC View (>= 1024px) */}
+                <div className="hidden lg:block">
+                  <Rotating3DMbttcCoin 
+                    size={160} 
+                    accent="emerald" 
+                    className="filter drop-shadow-[0_0_35px_rgba(16,185,129,0.6)] hover:scale-105 transition-transform duration-300" 
+                  />
+                </div>
               </div>
             </div>
 
