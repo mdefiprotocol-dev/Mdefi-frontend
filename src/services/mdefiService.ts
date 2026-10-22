@@ -28,6 +28,7 @@ import { contractAdapter } from './contractAdapter';
 import { centralEventSyncService } from './centralEventSyncService';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
+import { getTeamLevelOnChain } from './teamLevelService';
 
 // Reliable BSC Testnet Node that allows eth_getLogs
 const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
@@ -598,85 +599,146 @@ export class MDefiHubMockService implements IMDefiHubService {
         }
       });
 
-      // Contract On-Chain Claim State Hydration (Self + Direct Team Fallback)
+      // Contract On-Chain Claim State Hydration via Master getUserDashboard (Self + Levels 1-10)
       try {
-        // Target list: Self-only direct fallback (Team claims are populated via real on-chain events above)
-        const vestingCheckTargets = [
-          { addr: target, isSelf: true, label: 'Your Account' },
-        ];
+        const teamTargetsMap = new Map<string, { addr: string; isSelf: boolean; level: number }>();
+        const normalizedTarget = target.toLowerCase();
+        
+        // 1. Connected User (Self)
+        teamTargetsMap.set(normalizedTarget, { addr: normalizedTarget, isSelf: true, level: 0 });
 
-        // Parallel Hydration for sub-second execution without freezing UI
-        await Promise.all(
-          vestingCheckTargets.map(async (item) => {
-            // 1. Referral Vesting Claim Check
-            try {
-              const vData = await hubContract.referralVesting(item.addr);
-              const claimed = vData?.totalClaimed ?? vData?.[1];
-              const cTime = Number(vData?.lastClaimTimestamp ?? vData?.[2] ?? 0);
+        // 2. Level 1 (Direct Team)
+        onChainDirectTeam.forEach((addr) => {
+          const norm = addr.toLowerCase();
+          if (!teamTargetsMap.has(norm)) {
+            teamTargetsMap.set(norm, { addr: norm, isSelf: false, level: 1 });
+          }
+        });
 
-              if (claimed && BigInt(claimed) > 0n) {
-                const amt = parseFloat(ethers.formatUnits(claimed, 18)).toFixed(2);
-                const cDate = cTime > 0 
-                  ? `${new Date(cTime * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${new Date(cTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        // 3. Levels 2 to 10 Traversal via teamLevelService
+        try {
+          for (let lvl = 2; lvl <= 10; lvl++) {
+            const lvlRes = await getTeamLevelOnChain(provider, normalizedTarget, lvl);
+            if (lvlRes?.members && lvlRes.members.length > 0) {
+              lvlRes.members.forEach((m) => {
+                const mWallet = (m.wallet || '').toLowerCase();
+                if (mWallet && ethers.isAddress(mWallet) && !teamTargetsMap.has(mWallet)) {
+                  teamTargetsMap.set(mWallet, { addr: mWallet, isSelf: false, level: lvl });
+                }
+              });
+            } else if (lvlRes?.complete && lvlRes.members.length === 0) {
+              break; // Frontier empty, no deeper descendants
+            }
+          }
+        } catch (treeErr) {
+          console.warn('[MDefiHub] Traversal warning:', treeErr);
+        }
+
+        const allTargets = Array.from(teamTargetsMap.values());
+        const multicallContract = new ethers.Contract(MULTICALL3_ADDRESS, MULTICALL3_ABI, provider);
+        const BATCH_SIZE = 40;
+
+        for (let i = 0; i < allTargets.length; i += BATCH_SIZE) {
+          const chunk = allTargets.slice(i, i + BATCH_SIZE);
+          const calls = chunk.map((item) => ({
+            target: hubAddress,
+            allowFailure: true,
+            callData: iface.encodeFunctionData('getUserDashboard', [item.addr]),
+          }));
+
+          try {
+            const results: Array<{ success: boolean; returnData: string }> = await multicallContract.aggregate3(calls);
+
+            results.forEach((res, idx) => {
+              if (!res.success || !res.returnData || res.returnData === '0x') return;
+              const item = chunk[idx];
+
+              try {
+                const decoded = iface.decodeFunctionResult('getUserDashboard', res.returnData);
+                const d = decoded.dashboard ?? decoded[0] ?? decoded;
+
+                const uIdNum = Number(d.userId ?? d[0] ?? 0);
+                const regTimeSec = Number(d.registrationTime ?? d[3] ?? 0);
+                const refClaimed = d.referralTotalClaimed ?? d[8] ?? 0n;
+                const pkgClaimed = d.packageTotalClaimed ?? d[11] ?? 0n;
+
+                const displayUserId = item.isSelf 
+                  ? 'Your Account' 
+                  : (uIdNum > 0 ? (uIdNum < 100000 ? `MDF-${248160 + uIdNum}` : `MDF-${uIdNum}`) : `MDF-Partner`);
+
+                const dateStr = regTimeSec > 0
+                  ? `${new Date(regTimeSec * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${new Date(regTimeSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                   : 'On-Chain Verified';
-                const cId = `claim-ref-${item.addr}-${cTime}`;
 
-                if (!combinedMap.has(cId)) {
+                const targetAddrLower = item.addr.toLowerCase();
+
+                // A. Referral Claim Row (Duplicate Guarded)
+                const alreadyHasRef = Array.from(combinedMap.values()).some(
+                  (r) => (r.memberWallet || '').toLowerCase() === targetAddrLower && 
+                         (r.activityType === 'MBTTC Referral Pool Claim' || r.activityType === 'Total Referral Claim')
+                );
+
+                if (!alreadyHasRef && BigInt(refClaimed) > 0n) {
+                  const amt = parseFloat(ethers.formatUnits(refClaimed, 18)).toFixed(2);
+                  const cId = `claim-ref-${targetAddrLower}`;
+
                   combinedMap.set(cId, {
                     id: cId,
-                    memberWallet: item.addr,
-                    userId: item.label,
+                    memberWallet: targetAddrLower,
+                    userId: displayUserId,
                     packageAmount: `+${amt} MBTTC`,
                     amount: `+${amt} MBTTC`,
                     status: 'Confirmed' as const,
-                    txHash: `0x${item.addr.slice(2).padStart(64, '0')}`,
-                    date: cDate,
+                    txHash: `0x${targetAddrLower.slice(2).padStart(64, '0')}`,
+                    date: dateStr,
                     activityType: 'MBTTC Referral Pool Claim',
-                    details: item.isSelf ? 'Referral yield claimed to wallet' : `${item.label} claimed referral reward`,
-                    timestamp: cDate,
+                    details: item.isSelf 
+                      ? 'Total Referral Claim claimed to wallet' 
+                      : `${displayUserId} (Level ${item.level}) claimed referral reward`,
+                    timestamp: dateStr,
                     isRealData: true,
-                    rawTime: cTime,
+                    rawTime: regTimeSec,
                   } as any);
                 }
-              }
-            } catch {}
 
-            // 2. Package Vesting Claim Check
-            try {
-              const pkgVData = await hubContract.packageVesting(item.addr);
-              const pkgClaimed = pkgVData?.totalClaimed ?? pkgVData?.[1];
-              const pkgCTime = Number(pkgVData?.lastClaimTimestamp ?? pkgVData?.[2] ?? 0);
+                // B. Package Claim Row (Duplicate Guarded)
+                const alreadyHasPkg = Array.from(combinedMap.values()).some(
+                  (r) => (r.memberWallet || '').toLowerCase() === targetAddrLower && 
+                         (r.activityType === 'MBTTC Package Pool Claim' || r.activityType === 'Package Claim')
+                );
 
-              if (pkgClaimed && BigInt(pkgClaimed) > 0n) {
-                const pkgAmt = parseFloat(ethers.formatUnits(pkgClaimed, 18)).toFixed(2);
-                const pkgCDate = pkgCTime > 0 
-                  ? `${new Date(pkgCTime * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${new Date(pkgCTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                  : 'On-Chain Verified';
-                const pkgCId = `claim-pkg-${item.addr}-${pkgCTime}`;
+                if (!alreadyHasPkg && BigInt(pkgClaimed) > 0n) {
+                  const amt = parseFloat(ethers.formatUnits(pkgClaimed, 18)).toFixed(2);
+                  const cId = `claim-pkg-${targetAddrLower}`;
 
-                if (!combinedMap.has(pkgCId)) {
-                  combinedMap.set(pkgCId, {
-                    id: pkgCId,
-                    memberWallet: item.addr,
-                    userId: item.label,
-                    packageAmount: `+${pkgAmt} MBTTC`,
-                    amount: `+${pkgAmt} MBTTC`,
+                  combinedMap.set(cId, {
+                    id: cId,
+                    memberWallet: targetAddrLower,
+                    userId: displayUserId,
+                    packageAmount: `+${amt} MBTTC`,
+                    amount: `+${amt} MBTTC`,
                     status: 'Confirmed' as const,
-                    txHash: `0x${item.addr.slice(2).padStart(64, '0')}`,
-                    date: pkgCDate,
+                    txHash: `0x${targetAddrLower.slice(2).padStart(64, '0')}`,
+                    date: dateStr,
                     activityType: 'MBTTC Package Pool Claim',
-                    details: item.isSelf ? 'Package yield claimed to wallet' : `${item.label} claimed package reward`,
-                    timestamp: pkgCDate,
+                    details: item.isSelf 
+                      ? 'Package yield claimed to wallet' 
+                      : `${displayUserId} (Level ${item.level}) claimed package reward`,
+                    timestamp: dateStr,
                     isRealData: true,
-                    rawTime: pkgCTime,
+                    rawTime: regTimeSec,
                   } as any);
                 }
+              } catch (decodeErr) {
+                console.warn('[MDefiHub] Dashboard decode error:', decodeErr);
               }
-            } catch {}
-          })
-        );
-      } catch (claimErr) {
-        console.warn('[MDefiHub] Direct vesting state read error:', claimErr);
+            });
+          } catch (batchErr) {
+            console.warn('[MDefiHub] Dashboard Multicall batch failed:', batchErr);
+          }
+        }
+      } catch (dashErr) {
+        console.warn('[MDefiHub] getUserDashboard state read error:', dashErr);
       }
 
       const finalRecords = Array.from(combinedMap.values());
