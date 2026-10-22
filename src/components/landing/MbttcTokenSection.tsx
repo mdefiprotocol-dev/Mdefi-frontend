@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Coins, 
   Flame, 
@@ -13,16 +13,42 @@ import {
   Lock,
   AlertCircle
 } from 'lucide-react';
-import { MbttcCoin3D } from '../MbttcCoin3D';
-import { treasuryService } from '../../services/treasuryService';
+import { Rotating3DMbttcCoin } from '../common/Rotating3DMbttcCoin';
 import { programPhaseService } from '../../services/programPhaseService';
 import { useLanguage } from '../../context/LanguageContext';
+import { getContractProvider } from '../../services/contractProvider';
+import { ethers } from 'ethers';
 
 export const MbttcTokenSection: React.FC = () => {
   const { t } = useLanguage();
-  const treasuryState = treasuryService.getTreasuryState();
   const currentPhase = programPhaseService.getCurrentPhase();
   const isTradingLive = programPhaseService.isMbttcTradingAvailable();
+
+  const [onChainCirculating, setOnChainCirculating] = useState<number>(0);
+  const [onChainBurned, setOnChainBurned] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchTokenTelemetry = async () => {
+      try {
+        const provider = getContractProvider(true);
+        const [rawSupply, rawBurned] = await Promise.all([
+          provider.read<bigint>('mbttcToken', 'totalSupply', []).catch(() => 0n),
+          provider.read<bigint>('mdefiHub', 'totalBurnedTokens', []).catch(() => 0n),
+        ]);
+
+        if (rawSupply) {
+          setOnChainCirculating(Number(ethers.formatUnits(rawSupply, 18)));
+        }
+        if (rawBurned) {
+          setOnChainBurned(Number(ethers.formatUnits(rawBurned, 18)));
+        }
+      } catch (err) {
+        console.warn('[MbttcTokenSection] Telemetry read error:', err);
+      }
+    };
+
+    fetchTokenTelemetry();
+  }, []);
 
   const utilities = [
     {
@@ -89,7 +115,7 @@ export const MbttcTokenSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Live Treasury Rate & Status Strip */}
+        {/* Live Status Strip (Zero Fake Numbers) */}
         <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950/80 border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="web3-icon-badge web3-icon-emerald p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-400">
@@ -98,44 +124,21 @@ export const MbttcTokenSection: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-zinc-400 uppercase font-bold">{t('mbttc_treasury_status', 'Treasury Valuation Status:')}</span>
-                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${
-                  treasuryState.isPhaseActive 
-                    ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
-                    : 'bg-zinc-900 text-amber-400 border-zinc-700'
-                }`}>
-                  {treasuryState.isPhaseActive ? t('mbttc_phase_active', 'Phase 2+ Active') : t('mbttc_unlocks_p2', '🔒 Unlocks in Phase 2')}
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full border bg-zinc-900 text-amber-400 border-zinc-700">
+                  {t('mbttc_unlocks_p2', '🔒 Unlocks in Phase 2')}
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                {treasuryState.isPhaseActive && treasuryState.liveRateUsd !== null ? (
-                  <span className="text-emerald-300 font-mono font-bold">
-                    1 MBTTC = ${treasuryState.liveRateUsd.toFixed(2)} USDT ({t('treasury_calculated_rate', 'Treasury Calculated Rate')})
-                  </span>
-                ) : (
-                  <span>{t('mbttc_rate_desc', 'Rate indexing activates when S4 Node connects to Treasury IPO in Phase 2.')}</span>
-                )}
+                <span>{t('mbttc_rate_desc', 'Rate indexing activates when S4 Node connects to Treasury IPO in Phase 2.')}</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-zinc-400">{t('mbttc_trading_status', 'Trading Status:')}</span>
-            <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
-              isTradingLive
-                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
-                : 'bg-zinc-900 text-zinc-400 border-zinc-700'
-            }`}>
-              {isTradingLive ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{t('mbttc_trading_active', 'DEX Trading Active')}</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-3 h-3 text-amber-400" />
-                  <span className="text-amber-300">{t('mbttc_trading_p4', 'Trading Starts in Phase 4')}</span>
-                </>
-              )}
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full border flex items-center gap-1.5 bg-zinc-900 text-zinc-400 border-zinc-700">
+              <Lock className="w-3 h-3 text-amber-400" />
+              <span className="text-amber-300">{t('mbttc_trading_p4', 'Trading Starts in Phase 4')}</span>
             </span>
           </div>
         </div>
@@ -146,16 +149,14 @@ export const MbttcTokenSection: React.FC = () => {
 
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
-            {/* 3D Coin Display (4 cols) */}
+            {/* 3D Coin Display (4 cols) - Crystal Polish */}
             <div className="lg:col-span-4 flex flex-col items-center justify-center">
               <div className="relative py-4">
                 <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
-                <MbttcCoin3D 
-                  size="xl" 
-                  interactive={true} 
-                  autoRotate={true} 
-                  glow={true} 
-                  className="drop-shadow-[0_15px_35px_rgba(16,185,129,0.35)]"
+                <Rotating3DMbttcCoin 
+                  size={150} 
+                  accent="emerald" 
+                  className="filter drop-shadow-[0_0_35px_rgba(16,185,129,0.55)]"
                 />
               </div>
               <div className="mt-4 text-center space-y-1">
