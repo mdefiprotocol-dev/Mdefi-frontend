@@ -64,13 +64,14 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
             if (!combined.includes('register') && !combined.includes('registration')) return false;
             break;
           case 'MBTTC MINTS':
-            if (!combined.includes('mint') && !combined.includes('claim')) return false;
+            if (!combined.includes('mint') && !combined.includes('claim') && !combined.includes('airdrop')) return false;
             break;
           case 'ACTIVATE NODES':
             if (!combined.includes('package') && !combined.includes('activate') && !combined.includes('node')) return false;
             break;
           case 'DIRECT INCOME':
-            if (!combined.includes('direct') && !combined.includes('referral')) return false;
+            // Direct partner package buys (10, 25, 70, 120 USDT) par aane wali direct sponsor income
+            if (!combined.includes('direct income') && !combined.includes('direct commission') && !combined.includes('sponsor bonus')) return false;
             break;
           case 'MATRIX INCOME':
             if (!combined.includes('matrix')) return false;
@@ -237,11 +238,11 @@ export const TeamActivitiesSection: React.FC<TeamActivitiesSectionProps> = ({ tr
                   iconBg = 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]';
                   activityTitle = 'Node Activation';
                   subDetail = tx.packageName || 'Starter Pool Node Active';
-                } else if (act.includes('direct') || det.includes('referral reward')) {
+                } else if (act.includes('direct income') || act.includes('direct commission') || det.includes('direct sponsor')) {
                   IconComp = TrendingUp;
                   iconBg = 'bg-lime-950/80 text-lime-400 border-lime-500/40 shadow-[0_0_12px_rgba(132,204,22,0.25)]';
                   activityTitle = 'Direct Income';
-                  subDetail = 'Direct frontline sponsor commission';
+                  subDetail = tx.packageName ? `${tx.packageName} Package Commission` : 'Partner Package Direct Income';
                 } else if (act.includes('matrix')) {
                   IconComp = Network;
                   iconBg = 'bg-purple-950/80 text-purple-400 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.25)]';
