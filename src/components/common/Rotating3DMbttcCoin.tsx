@@ -21,7 +21,6 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
         ? 'rgba(59, 130, 246, 0.45)'
         : 'rgba(245, 158, 11, 0.45)';
 
-  // Scale proportional depth so small sizes stay crisp
   const isSmall = size <= 28;
   const zDepth = isSmall ? 2 : 4;
   const rimSlices = isSmall ? [-1, 0, 1] : [-3, -2, -1, 0, 1, 2, 3];
@@ -35,47 +34,45 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
         perspective: '1000px',
       }}
     >
+      {/* Universal 3D Keyframe Injection */}
       <style>{`
-        @keyframes mbttcCoinSpin3D {
-          0% { transform: rotateY(0deg) rotateX(6deg); }
-          50% { transform: rotateY(180deg) rotateX(-6deg); }
-          100% { transform: rotateY(360deg) rotateX(6deg); }
-        }
-        @keyframes mbttcSpecularSheen {
-          0% { transform: translateX(-180%) skewX(-25deg); opacity: 0; }
-          20% { opacity: 0.9; }
-          45% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
-          100% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
-        }
-        .mbttc-3d-spin-core {
-          animation: mbttcCoinSpin3D 5.5s linear infinite !important;
-          transform-style: preserve-3d !important;
-          will-change: transform;
-        }
-        .mbttc-sheen-sweep {
-          animation: mbttcSpecularSheen 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .mbttc-3d-spin-core,
-          .mbttc-sheen-sweep {
-            animation: none !important;
+        @keyframes mbttcAlwaysSpin {
+          0% {
+            transform: rotateY(0deg) rotateX(6deg);
           }
+          50% {
+            transform: rotateY(180deg) rotateX(-6deg);
+          }
+          100% {
+            transform: rotateY(360deg) rotateX(6deg);
+          }
+        }
+        @keyframes mbttcSheenLight {
+          0% { transform: translateX(-180%) skewX(-25deg); opacity: 0; }
+          25% { opacity: 0.85; }
+          50% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
+          100% { transform: translateX(180%) skewX(-25deg); opacity: 0; }
         }
       `}</style>
 
       {/* Dynamic Ambient Neon Core Glow */}
       <div 
-        className="absolute inset-0 rounded-full blur-[4px] pointer-events-none transition-opacity duration-300"
+        className="absolute inset-0 rounded-full blur-[6px] pointer-events-none"
         style={{ 
           backgroundColor: glowColor,
           transform: 'scale(0.92)'
         }} 
       />
 
-      {/* 3D Spin Body with True Z-Depth */}
+      {/* 3D Spin Body - Guaranteed Non-Stop 60FPS Spin */}
       <div 
-        className="relative w-full h-full flex items-center justify-center mbttc-3d-spin-core"
-        style={{ transformStyle: 'preserve-3d' }}
+        className="relative w-full h-full flex items-center justify-center"
+        style={{ 
+          transformStyle: 'preserve-3d',
+          animation: 'mbttcAlwaysSpin 5s linear infinite',
+          WebkitAnimation: 'mbttcAlwaysSpin 5s linear infinite',
+          willChange: 'transform'
+        }}
       >
         {/* Layered Cylindrical Metallic Rim */}
         {rimSlices.map((zOffset) => (
@@ -99,7 +96,7 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
           style={{
             transform: `translateZ(${zDepth}px)`,
             backfaceVisibility: 'visible',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.65)',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.7)',
           }}
         >
           <svg 
@@ -171,7 +168,10 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
           </svg>
 
           {/* Dynamic Light Reflection Sweep */}
-          <div className="absolute inset-0 pointer-events-none mbttc-sheen-sweep bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+          <div 
+            className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/55 to-transparent" 
+            style={{ animation: 'mbttcSheenLight 3s cubic-bezier(0.4, 0, 0.2, 1) infinite' }}
+          />
         </div>
 
         {/* BACK COIN FACE */}
@@ -180,7 +180,7 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
           style={{
             transform: `rotateY(180deg) translateZ(${zDepth}px)`,
             backfaceVisibility: 'visible',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.65)',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.7)',
           }}
         >
           <svg 
@@ -222,7 +222,10 @@ export const Rotating3DMbttcCoin: React.FC<Rotating3DMbttcCoinProps> = ({
           </svg>
 
           {/* Dynamic Light Reflection Sweep */}
-          <div className="absolute inset-0 pointer-events-none mbttc-sheen-sweep bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+          <div 
+            className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/55 to-transparent" 
+            style={{ animation: 'mbttcSheenLight 3s cubic-bezier(0.4, 0, 0.2, 1) infinite' }}
+          />
         </div>
       </div>
     </div>
