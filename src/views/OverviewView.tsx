@@ -25,7 +25,7 @@ import {
 } from '../types';
 import { MbttcCoin3D } from '../components/MbttcCoin3D';
 import { MdefiTradingTerminalChart } from '../components/TradingChart/MdefiTradingTerminal';
-import { CommunityActivityFeed } from '../components/CommunityActivityFeed';
+
 import { centralEventSyncService } from '../services/centralEventSyncService';
 import { CommunityRatingSection } from '../components/CommunityRatingSection';
 import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
@@ -888,12 +888,44 @@ const [liveVaultMbttc, setLiveVaultMbttc] = useState<number>(0);
         </div>
       </div>
 
-      {/* 9. COMMUNITY FEEDS & REPUTATION */}
-      <CommunityActivityFeed 
-  onNavigate={onNavigate} 
-  userActivities={activities && activities.length > 0 ? activities : centralEventSyncService.getState().activities} 
-  walletAddress={user.walletAddress || (typeof window !== 'undefined' ? (window as any).ethereum?.selectedAddress : '')} 
-/>
+      {/* 9. TEAM ACTIVITIES QUICK ACCESS PORTAL (ZERO RPC DUPLICATION) */}
+      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#05150d] via-[#072014] to-[#04120a] border border-emerald-500/30 backdrop-blur-2xl shadow-[0_0_40px_rgba(16,185,129,0.12)] relative overflow-hidden group">
+        {/* Soft Ambient Core Light */}
+        <div className="absolute top-0 right-1/4 w-72 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-xl">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="p-2.5 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+                <Users className="w-5 h-5 animate-pulse" />
+              </span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-[11px] font-mono font-bold text-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>LIVE ON-CHAIN TEAM PULSE</span>
+              </div>
+            </div>
+
+            <h3 className="text-lg sm:text-xl font-black text-white font-mono tracking-tight pt-1">
+              Live Team Activities & Ledger
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-sans">
+              Track real-time direct partner registrations, Level 1–10 package activations, and verified MBTTC mints on BNB Smart Chain.
+            </p>
+          </div>
+
+          <div className="w-full md:w-auto shrink-0 flex items-center">
+            <button
+              type="button"
+              onClick={() => onNavigate('team')}
+              className="web3-btn-primary w-full md:w-auto py-3.5 px-7 rounded-2xl bg-gradient-to-r from-[#063a23] via-[#0a5c37] to-[#0f7a4a] hover:from-[#08472b] hover:via-[#0d6e42] hover:to-[#128a54] active:scale-[0.98] border border-emerald-400/50 hover:border-emerald-300 text-white font-extrabold text-xs sm:text-sm font-mono tracking-wide shadow-[0_0_25px_rgba(16,185,129,0.35)] flex items-center justify-center gap-3 cursor-pointer transition-all"
+            >
+              <span>Explore Team Activities</span>
+              <ArrowRight className="w-4 h-4 text-emerald-300 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <CommunityRatingSection userWallet={user.walletAddress} />
     </div>
   );
