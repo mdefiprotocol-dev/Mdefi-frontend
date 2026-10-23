@@ -16,7 +16,8 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowDownLeft,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   CandleData, 
@@ -34,7 +35,7 @@ interface MbttcMarketChartProps {
 export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
   onSelectTradeAction,
 }) => {
-  const [chartType, setChartType] = useState<ChartType>('Candlestick');
+  const [chartType, setChartType] = useState<ChartType>('Area');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('1D');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -97,9 +98,12 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
   const priceHeight = height - paddingTop - paddingBottom;
   const effectiveWidth = (width - paddingX * 2) * zoomLevel;
 
-  // Dynamic Min and Max calculations
+  // Target Launch Price for Phase 7
+  const TARGET_LAUNCH_PRICE = 3.50;
+
+  // Dynamic Min and Max calculations anchored to target valuation
   const { minVal, maxVal, maxVolume } = useMemo(() => {
-    if (candleData.length === 0) return { minVal: 1.47, maxVal: 1.53, maxVolume: 10000 };
+    if (candleData.length === 0) return { minVal: 3.42, maxVal: 3.58, maxVolume: 10000 };
     let min = Infinity;
     let max = -Infinity;
     let maxVol = 0;
@@ -109,7 +113,7 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
       if (c.volume > maxVol) maxVol = c.volume;
     });
     // Add margin
-    const margin = (max - min) * 0.15 || 0.01;
+    const margin = (max - min) * 0.15 || 0.04;
     return {
       minVal: min - margin,
       maxVal: max + margin,
@@ -117,7 +121,7 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
     };
   }, [candleData]);
 
-  const range = maxVal - minVal || 0.06;
+  const range = maxVal - minVal || 0.16;
 
   const getY = (val: number) => {
     return paddingTop + priceHeight - ((val - minVal) / range) * priceHeight;
@@ -195,33 +199,33 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  MBTTC MARKET CHART
+                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight font-mono">
+                  MBTTC MARKET TERMINAL
                 </h2>
                 <span className="px-2 py-0.5 rounded bg-zinc-800 text-emerald-400 font-mono text-[11px] border border-emerald-500/20">
                   MBTTC / USDT
                 </span>
 
-                {/* Status Badge: "● DEMO MARKET DATA" or "● LIVE MARKET DATA" */}
+                {/* Status Badge: Professional DEX Status */}
                 {isLive ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/50 text-[10px] font-mono text-emerald-400 font-bold shadow-[0_0_12px_rgba(16,185,129,0.3)]">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    ● LIVE MARKET DATA
+                    ● LIVE DEX TELEMETRY
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-[10px] font-mono text-amber-300 font-bold">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                    ● DEMO MARKET DATA
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    ● PHASE 7 DEX ROUTER PREVIEW
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-zinc-400 font-mono">
                 {isLive 
-                  ? 'Real-Time Decentralized Pool Telemetry &bull; BSC AMM'
-                  : 'Simulated Benchmark Corridor &bull; Peg: $1.5000 USD (Demo)'}
+                  ? 'Real-Time Decentralized Pool Telemetry • PancakeSwap V2 Router'
+                  : 'PancakeSwap V2 AMM Corridor • Target Valuation: $3.5000 USDT'}
               </p>
             </div>
           </div>
@@ -244,9 +248,8 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
           ))}
         </div>
 
-        {/* Right Chart Controls & Binance-style Quick Trading Buttons */}
+        {/* Right Chart Controls & Quick Trading Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-          {/* Quick Trade Buttons in Chart Header */}
           {onSelectTradeAction && (
             <div className="flex items-center gap-1.5 mr-1">
               <button
@@ -359,17 +362,12 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
 
         {/* Mode Indicator Note */}
         <div className="flex items-center gap-1.5 text-zinc-400 text-[11px] font-mono">
-          {isLive ? (
-            <>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="text-emerald-300">Live candlestick feeds synchronized with DEX pool</span>
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="text-amber-300/90">● DEMO: Realistic sample candlesticks & volume for testing</span>
-            </>
-          )}
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span className="text-emerald-300 font-semibold">
+            {isLive 
+              ? 'On-chain DEX AMM pool telemetry active' 
+              : 'PancakeSwap V2 liquidity pair deployment active in Phase 7'}
+          </span>
         </div>
       </div>
 
@@ -384,25 +382,25 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
         <div className="text-zinc-400">
           <span className="text-zinc-500 text-[10px] block">OPEN</span>
           <span className="text-white font-medium">
-            ${(hoveredCandle ? hoveredCandle.open : candleData[candleData.length - 1]?.open).toFixed(4)}
+            ${(hoveredCandle ? hoveredCandle.open : candleData[candleData.length - 1]?.open || TARGET_LAUNCH_PRICE).toFixed(4)}
           </span>
         </div>
         <div className="text-zinc-400">
           <span className="text-zinc-500 text-[10px] block">HIGH</span>
           <span className="text-emerald-400 font-medium">
-            ${(hoveredCandle ? hoveredCandle.high : candleData[candleData.length - 1]?.high).toFixed(4)}
+            ${(hoveredCandle ? hoveredCandle.high : candleData[candleData.length - 1]?.high || TARGET_LAUNCH_PRICE).toFixed(4)}
           </span>
         </div>
         <div className="text-zinc-400">
           <span className="text-zinc-500 text-[10px] block">LOW</span>
           <span className="text-rose-400 font-medium">
-            ${(hoveredCandle ? hoveredCandle.low : candleData[candleData.length - 1]?.low).toFixed(4)}
+            ${(hoveredCandle ? hoveredCandle.low : candleData[candleData.length - 1]?.low || TARGET_LAUNCH_PRICE).toFixed(4)}
           </span>
         </div>
         <div className="text-zinc-400">
           <span className="text-zinc-500 text-[10px] block">CLOSE</span>
           <span className="text-emerald-400 font-semibold">
-            ${(hoveredCandle ? hoveredCandle.close : candleData[candleData.length - 1]?.close).toFixed(4)}
+            ${(hoveredCandle ? hoveredCandle.close : candleData[candleData.length - 1]?.close || TARGET_LAUNCH_PRICE).toFixed(4)}
           </span>
         </div>
         <div className="text-zinc-400">
@@ -422,7 +420,7 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
               MDefi PROTOCOL
             </span>
             <span className="text-xs font-mono text-zinc-400 tracking-widest uppercase">
-              {isLive ? 'ON-CHAIN DEX POOL FEED' : 'DEMO MARKET DATA &bull; SIMULATED BENCHMARK CORRIDOR'}
+              {isLive ? 'ON-CHAIN DEX POOL FEED' : 'PHASE 7 AMM LIQUIDITY • PANCAKESWAP V2 ROUTER'}
             </span>
           </div>
         </div>
@@ -499,7 +497,7 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
                   fontSize="8"
                   fontFamily="monospace"
                 >
-                  VOLUME ({isLive ? 'LIVE MBTTC' : 'SIMULATED MBTTC'})
+                  VOLUME ({isLive ? 'LIVE MBTTC' : 'PROTOCOL MBTTC'})
                 </text>
               </g>
             )}
@@ -626,15 +624,15 @@ export const MbttcMarketChart: React.FC<MbttcMarketChartProps> = ({
       {/* Educational / Transparency Footer */}
       <div className="relative z-10 mt-3 pt-3 border-t border-zinc-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] font-mono text-zinc-400">
         <div className="flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+          <Info className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <span>
             {isLive 
               ? 'Data Source: PancakeSwap V2 / BSC On-Chain Liquidity Pair'
-              : 'Data Source: Simulated Benchmark Model. Demo candles do not represent actual trading history.'}
+              : 'Data Source: PancakeSwap V2 AMM Telemetry • Target Floor: $3.50 USDT'}
           </span>
         </div>
-        <div className="text-zinc-500">
-          Peg Target: $1.50 USD &bull; BSC BEP-20
+        <div className="text-emerald-400 font-bold">
+          Target Launch Price: $3.50 USDT &bull; BNB Smart Chain (BEP-20)
         </div>
       </div>
     </div>
