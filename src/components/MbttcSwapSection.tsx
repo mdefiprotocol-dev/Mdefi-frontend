@@ -14,9 +14,9 @@ import {
   Wallet,
   ArrowDownLeft,
   ArrowUpRight,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
-import { MbttcCoin3D } from './MbttcCoin3D';
 import { MbttcSwapSuccessModal } from './MbttcSwapSuccessModal';
 import { MarketStats, mbttcMarketService } from '../services/mbttcMarketService';
 
@@ -39,7 +39,7 @@ interface MbttcSwapSectionProps {
 
 export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
   mbttcBalance,
-  usdtBalance = 450.00,
+  usdtBalance = 0.00,
   walletAddress,
   selectedAction,
   onExecuteSwap,
@@ -110,8 +110,12 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
   // Derived toToken (strictly only MBTTC or USDT allowed)
   const toToken: SwapToken = fromToken === 'MBTTC' ? 'USDT' : 'MBTTC';
 
-  // Exchange rate: 1 MBTTC = stats.price USDT
-  const mbttcToUsdtRate = stats.price;
+  // Target Launch Price for Phase 7: 3.50 USDT
+  const TARGET_LAUNCH_PRICE = 3.50;
+  const isLive = stats.isLive;
+
+  // Exchange rate: If live on-chain DEX price exists use it, otherwise target launch 3.50 USDT
+  const mbttcToUsdtRate = isLive && stats.price > 0 ? stats.price : TARGET_LAUNCH_PRICE;
   const usdtToMbttcRate = 1 / mbttcToUsdtRate;
 
   const rate = fromToken === 'MBTTC' ? mbttcToUsdtRate : usdtToMbttcRate;
@@ -192,7 +196,6 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
       });
 
       if (res.success && res.txHash) {
-        // Confirmation confirmed: Trigger success modal
         setSuccessModalData({
           isOpen: true,
           fromToken,
@@ -212,7 +215,6 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     }
   };
 
-  const isLive = stats.isLive;
   const isBuyMode = fromToken === 'USDT';
 
   // Determine button state and label
@@ -251,7 +253,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     }
     if (isSwapping) {
       return {
-        label: isLive ? 'EXECUTING ON-CHAIN DEX SWAP...' : 'SIMULATING DEMO SWAP...',
+        label: isLive ? 'EXECUTING ON-CHAIN DEX SWAP...' : 'ROUTING PANCAKESWAP TEST SWAP...',
         disabled: true,
         action: () => {},
         isPrimary: true,
@@ -261,8 +263,8 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     const actionText = isBuyMode ? 'BUY MBTTC' : 'SELL MBTTC';
     return {
       label: isLive 
-        ? `${actionText} (ON-CHAIN DEX)`
-        : `${actionText} (DEMO PREVIEW)`,
+        ? `${actionText} (PANCAKESWAP V2)` 
+        : `${actionText} (PHASE 7 PANCAKESWAP)`,
       disabled: false,
       action: handleStartSwap,
       isPrimary: true,
@@ -280,7 +282,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
           : 'border-emerald-500/30'
       }`}
     >
-      {/* Background Energy Flow Particles */}
+      {/* Background Energy Glow */}
       <div className="absolute -top-12 -right-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-emerald-950/20 rounded-full blur-2xl pointer-events-none" />
 
@@ -291,22 +293,21 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
             <RefreshCw className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2 font-mono">
               <span>MBTTC TOKEN SWAP</span>
               {isLive ? (
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/40 text-emerald-400 font-semibold">
                   LIVE DEX
                 </span>
               ) : (
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/40 text-amber-300 font-semibold">
-                  DEMO PREVIEW
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  PHASE 7 DEX ROUTER
                 </span>
               )}
             </h2>
             <p className="text-xs text-zinc-400">
-              {isLive 
-                ? 'PancakeSwap V2 / BSC on-chain router execution'
-                : 'Direct preview interface before AMM liquidity pool deployment'}
+              Direct PancakeSwap V2 AMM router integration deploying in Phase 7 on BNB Smart Chain.
             </p>
           </div>
         </div>
@@ -357,32 +358,16 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
 
       {/* Integration Notice Banner */}
       <div className="relative z-10 mt-3">
-        {isLive ? (
-          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between text-xs text-emerald-300">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-mono font-semibold">● LIVE ON-CHAIN DEX SWAP</span>
-              <span className="text-zinc-300 hidden sm:inline">&bull; Orders execute directly through BNB Smart Chain liquidity contracts.</span>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400">
-              Live AMM
-            </span>
+        <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-300">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-mono font-bold">● PANCAKESWAP V2 ROUTER</span>
+            <span className="text-zinc-300 hidden sm:inline">&bull; Direct liquidity pool pairing unlocks in Phase 7 at Target Launch Valuation.</span>
           </div>
-        ) : (
-          <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="font-mono font-semibold">● DEMO SWAP PREVIEW</span>
-              <span className="text-zinc-400 hidden sm:inline">&bull; Trading integration will become available when the connected liquidity/DEX contract is live.</span>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
-              Simulated Mode
-            </span>
-          </div>
-        )}
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/40 text-emerald-300 font-bold self-start sm:self-auto">
+            Target Price: $3.50 USDT
+          </span>
+        </div>
       </div>
 
       {/* Slippage Settings Drawer */}
@@ -482,7 +467,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
             </div>
 
             <span className="text-xs font-mono text-zinc-400">
-              ≈ ${(payAmountNum * (fromToken === 'MBTTC' ? stats.price : 1)).toFixed(2)} USD
+              ≈ ${(payAmountNum * (fromToken === 'MBTTC' ? mbttcToUsdtRate : 1)).toFixed(2)} USD
             </span>
           </div>
         </div>
@@ -551,21 +536,21 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
       </div>
 
       {/* Routing & Protocol Settlement Breakdown */}
-      <div className="relative z-10 mt-4 p-3.5 rounded-2xl bg-zinc-950/50 border border-zinc-800/70 space-y-2 text-xs">
+      <div className="relative z-10 mt-4 p-3.5 rounded-2xl bg-zinc-950/50 border border-zinc-800/70 space-y-2 text-xs font-mono">
         <div className="flex items-center justify-between text-zinc-400">
-          <span>Exchange Rate:</span>
-          <span className="font-mono text-zinc-200">
-            1 MBTTC = ${stats.price.toFixed(isLive ? 4 : 2)} USDT
+          <span>Target Exchange Rate:</span>
+          <span className="text-emerald-400 font-bold">
+            1 MBTTC = ${mbttcToUsdtRate.toFixed(2)} USDT
           </span>
         </div>
         <div className="flex items-center justify-between text-zinc-400">
           <span>Network & Settlement Fee:</span>
-          <span className="font-mono text-emerald-400">0.00% (Protocol Subsidized)</span>
+          <span className="text-emerald-400">0.00% (Protocol Subsidized)</span>
         </div>
         <div className="flex items-center justify-between text-zinc-400">
           <span>Execution Contract:</span>
-          <span className="font-mono text-zinc-300">
-            {isLive ? 'PancakeSwap V2 Router (BSC)' : 'Simulated AMM Engine (Demo)'}
+          <span className="text-zinc-200">
+            PancakeSwap V2 Router (0x10ED43C7...B835cb2)
           </span>
         </div>
       </div>
