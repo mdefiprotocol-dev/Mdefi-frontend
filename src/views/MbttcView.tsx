@@ -168,12 +168,100 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
     return unsubscribe;
   }, []);
 
+  // 100% On-Chain Live Connected Wallet Balance Hook
+  const [walletMbttcBalance, setWalletMbttcBalance] = useState<number>(rewards?.mbttcBalance || 0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRealWalletBalance = async () => {
+      const activeAddress = user?.walletAddress;
+      if (!activeAddress || !ethers.isAddress(activeAddress)) return;
+
+      try {
+        const rpcUrl = 'https://bsc-testnet.publicnode.com';
+        const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+        const mbttcAddress = (CONTRACT_ADDRESSES as any)?.mbttcToken;
+
+        if (mbttcAddress && ethers.isAddress(mbttcAddress)) {
+          const erc20Abi = ['function balanceOf(address) view returns (uint256)'];
+          const tokenContract = new ethers.Contract(mbttcAddress, erc20Abi, provider);
+          const rawBal = await tokenContract.balanceOf(activeAddress).catch(() => 0n);
+
+          if (isMounted && rawBal !== undefined) {
+            const formatted = parseFloat(ethers.formatUnits(rawBal.toString(), 18));
+            setWalletMbttcBalance(formatted);
+          }
+        }
+      } catch (err) {
+        console.warn('[MbttcView] Real wallet balance fetch warning:', err);
+      }
+    };
+
+    fetchRealWalletBalance();
+    const interval = setInterval(fetchRealWalletBalance, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user?.walletAddress]);
+
+  useEffect(() => {
+    if (rewards?.mbttcBalance && rewards.mbttcBalance > 0) {
+      setWalletMbttcBalance(rewards.mbttcBalance);
+    }
+  }, [rewards?.mbttcBalance]);
+
+  // Step 2: Live Treasury Vault Stats from TreasuryBondIPO Contract
+  const [treasuryVaultStats, setTreasuryVaultStats] = useState({
+    vaultUSDT: '0.00',
+    targetUSDT: '1,000,000.00',
+    progressPct: 0,
+    isLaunched: false,
+    launchPrice: '3.50',
+  });
+
+  const fetchTreasuryVaultStats = async () => {
+    try {
+      const rpcUrl = 'https://bsc-testnet.publicnode.com';
+      const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+      const ipoAddress = (CONTRACT_ADDRESSES as any)?.treasuryBondIPO || (CONTRACT_ADDRESSES as any)?.liquidityVault;
+
+      if (!ipoAddress || !ethers.isAddress(ipoAddress)) return;
+
+      const ipoAbi = [
+        'function getVaultStats() view returns (uint256 vaultUSDTBalance, uint256 livePrice, uint256 targetAmount, uint256 progressPercentage, bool isLaunched)',
+        'function getLiveTokenPrice() view returns (uint256 priceInUSDT)'
+      ];
+
+      const ipoContract = new ethers.Contract(ipoAddress, ipoAbi, provider);
+      const data = await ipoContract.getVaultStats().catch(() => null);
+
+      if (data) {
+        const vaultBal = parseFloat(ethers.formatUnits(data.vaultUSDTBalance?.toString() || '0', 18));
+        const targetBal = parseFloat(ethers.formatUnits(data.targetAmount?.toString() || '0', 18));
+        const pct = Number(data.progressPercentage || 0);
+
+        setTreasuryVaultStats({
+          vaultUSDT: vaultBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          targetUSDT: targetBal > 0 ? targetBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '1,000,000.00',
+          progressPct: pct,
+          isLaunched: Boolean(data.isLaunched),
+          launchPrice: '3.50',
+        });
+      }
+    } catch (err) {
+      console.warn('[MbttcView] Treasury vault stats warning:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTreasuryVaultStats();
+  }, []);
+
   const isLive = marketStats.isLive;
   const currentRate = isLive && marketStats.price > 0 ? marketStats.price : 3.50;
 
-  // Real connected wallet balance fallback
-  const realWalletMbttc = rewards?.mbttcBalance || 0;
-  const calculatedUsdBalance = (realWalletMbttc * currentRate).toLocaleString('en-US', {
+  const calculatedUsdBalance = (walletMbttcBalance * currentRate).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -263,7 +351,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
             <div className="flex items-baseline gap-3">
               <span className="text-4xl sm:text-5xl font-extrabold text-white font-mono tracking-tight">
-                {(rewards.mbttcBalance || 0).toLocaleString()}
+                {walletMbttcBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
               </span>
               <span className="text-2xl text-emerald-400 font-mono font-bold">
                 MBTTC
@@ -303,8 +391,17 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
         </div>
       </div>
 
-      {/* 4. MBTTC LIVE MARKET PRICE STATS */}
-      <MbttcLivePrice benchmarkRate={0.00} stats={marketStats} />
+      {/* 4. MBTTC LIVE MARKET PRICE STATS (PHASE 7 TREASURY ALIGNED) */}
+      <MbttcLivePrice 
+        benchmarkRate={3.50} 
+        stats={{
+          ...marketStats,
+          price: isLive && marketStats.price > 0 ? marketStats.price : 3.50,
+          vaultBalance: treasuryVaultStats.vaultUSDT,
+          targetVault: treasuryVaultStats.targetUSDT,
+          progress: treasuryVaultStats.progressPct,
+        } as any} 
+      />
 
       {/* 5. ADVANCED TOKEN CHART */}
       <MbttcMarketChart onSelectTradeAction={handleSelectTradeAction} />
