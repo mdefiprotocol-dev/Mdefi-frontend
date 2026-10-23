@@ -21,6 +21,8 @@ import { MbttcSwapSuccessModal } from './MbttcSwapSuccessModal';
 import { Rotating3DMbttcCoin } from './common/Rotating3DMbttcCoin';
 import { Rotating3DUsdtCoin } from './common/Rotating3DUsdtCoin';
 import { MarketStats, mbttcMarketService } from '../services/mbttcMarketService';
+import { CONTRACT_ADDRESSES } from '../config/contractConfig';
+import { ethers } from 'ethers';
 
 export type SwapToken = 'MBTTC' | 'USDT';
 
@@ -40,13 +42,75 @@ interface MbttcSwapSectionProps {
 }
 
 export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
-  mbttcBalance,
-  usdtBalance = 0.00,
+  mbttcBalance: propMbttcBalance,
+  usdtBalance: propUsdtBalance = 0.00,
   walletAddress,
   selectedAction,
   onExecuteSwap,
   onOpenWalletModal,
 }) => {
+  // 100% Live On-Chain Balances State
+  const [liveMbttcBal, setLiveMbttcBal] = useState<number>(propMbttcBalance || 0);
+  const [liveUsdtBal, setLiveUsdtBal] = useState<number>(propUsdtBalance || 0);
+
+  // Live Wallet Balance Fetcher from BSC Testnet RPC
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveBalances = async () => {
+      if (!walletAddress || !ethers.isAddress(walletAddress)) return;
+      try {
+        const rpcUrl = 'https://bsc-testnet.publicnode.com';
+        const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+        const erc20Abi = ['function balanceOf(address) view returns (uint256)'];
+
+        const mbttcAddress = (CONTRACT_ADDRESSES as any)?.mbttcToken;
+        const usdtAddress = (CONTRACT_ADDRESSES as any)?.usdtToken || (CONTRACT_ADDRESSES as any)?.usdt;
+
+        const calls: Promise<any>[] = [];
+        if (mbttcAddress && ethers.isAddress(mbttcAddress)) {
+          const mbttcContract = new ethers.Contract(mbttcAddress, erc20Abi, provider);
+          calls.push(mbttcContract.balanceOf(walletAddress).catch(() => 0n));
+        } else {
+          calls.push(Promise.resolve(0n));
+        }
+
+        if (usdtAddress && ethers.isAddress(usdtAddress)) {
+          const usdtContract = new ethers.Contract(usdtAddress, erc20Abi, provider);
+          calls.push(usdtContract.balanceOf(walletAddress).catch(() => 0n));
+        } else {
+          calls.push(Promise.resolve(0n));
+        }
+
+        const [rawMbttc, rawUsdt] = await Promise.all(calls);
+        if (isMounted) {
+          if (rawMbttc !== undefined) {
+            setLiveMbttcBal(parseFloat(ethers.formatUnits(rawMbttc.toString(), 18)));
+          }
+          if (rawUsdt !== undefined) {
+            setLiveUsdtBal(parseFloat(ethers.formatUnits(rawUsdt.toString(), 18)));
+          }
+        }
+      } catch (err) {
+        console.warn('[MbttcSwapSection] Live balance fetch error:', err);
+      }
+    };
+
+    fetchLiveBalances();
+    const timer = setInterval(fetchLiveBalances, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [walletAddress]);
+
+  // Sync with props if updated externally
+  useEffect(() => {
+    if (propMbttcBalance && propMbttcBalance > 0) setLiveMbttcBal(propMbttcBalance);
+  }, [propMbttcBalance]);
+
+  const mbttcBalance = liveMbttcBal;
+  const usdtBalance = liveUsdtBal;
+
   // Swap state
   const [fromToken, setFromToken] = useState<SwapToken>('MBTTC');
   const [payAmountStr, setPayAmountStr] = useState<string>('');
@@ -88,6 +152,9 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     setPulseHighlight(true);
     setTimeout(() => setPulseHighlight(false), 1500);
   };
+
+  // Phase 7 Cyber Notice Modal State
+  const [showPhase7Notice, setShowPhase7Notice] = useState<boolean>(false);
 
   // Direction rotation animation trigger
   const [rotateDeg, setRotateDeg] = useState<number>(0);
@@ -268,7 +335,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
         ? `${actionText} (PANCAKESWAP V2)` 
         : `${actionText} (PHASE 7 PANCAKESWAP)`,
       disabled: false,
-      action: handleStartSwap,
+      action: () => setShowPhase7Notice(true),
       isPrimary: true,
     };
   };
@@ -585,6 +652,91 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
         toAmount={successModalData.toAmount}
         txHash={successModalData.txHash}
       />
+
+      {/* ========================================================================= */}
+      {/* PHASE 7 WEB3 CYBER PROTOCOL MODAL POPUP                                  */}
+      {/* ========================================================================= */}
+      {showPhase7Notice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-[#0a1812] via-[#07130e] to-[#040906] border border-emerald-500/50 shadow-[0_0_60px_rgba(16,185,129,0.3)] overflow-hidden">
+            {/* Ambient Core Lighting */}
+            <div className="absolute top-0 right-1/4 w-60 h-60 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header with 3D Medallions */}
+            <div className="relative z-10 flex items-center justify-between pb-4 border-b border-zinc-800/80">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center -space-x-2">
+                  <Rotating3DMbttcCoin size={34} accent="emerald" />
+                  <Rotating3DUsdtCoin size={34} glow={false} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white font-mono tracking-tight uppercase">
+                    Protocol Trading Gateway
+                  </h3>
+                  <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    PancakeSwap V2 DEX Liquidity
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowPhase7Notice(false)}
+                className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-700 hover:border-emerald-500 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Official Announcement Body */}
+            <div className="relative z-10 py-6 space-y-4 font-mono">
+              <div className="p-4 rounded-2xl bg-zinc-950/80 border border-emerald-500/30 space-y-3">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-800/80">
+                  <span className="text-zinc-400">Current Protocol Phase:</span>
+                  <span className="text-emerald-400 font-bold bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                    Phase 1 — Live Minting
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-800/80">
+                  <span className="text-zinc-400">Target Launch Price:</span>
+                  <span className="text-emerald-300 font-extrabold text-sm">
+                    1 MBTTC = $3.50 USDT
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-400">AMM DEX Partner:</span>
+                  <span className="text-teal-300 font-semibold flex items-center gap-1">
+                    PancakeSwap V2 (BNB Chain)
+                  </span>
+                </div>
+              </div>
+
+              {/* Exact Official Message */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-zinc-950 border border-emerald-500/40 text-xs sm:text-sm text-zinc-200 leading-relaxed space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  <span>Official Protocol Notice</span>
+                </div>
+                <p className="font-sans text-xs sm:text-sm text-zinc-300">
+                  Phase 1 Token Minting is Live. PancakeSwap DEX Liquidity &amp; Trading activates in Phase 7 at Target Price $3.50 USDT. Please wait for official launch.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Bottom CTA */}
+            <div className="relative z-10 pt-2 flex flex-col sm:flex-row gap-2.5 font-mono">
+              <button
+                type="button"
+                onClick={() => setShowPhase7Notice(false)}
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-black font-extrabold text-xs tracking-wider uppercase transition-all shadow-[0_0_25px_rgba(16,185,129,0.4)] cursor-pointer active:scale-95 text-center"
+              >
+                Acknowledge &amp; Wait for Phase 7
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
