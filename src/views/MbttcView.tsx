@@ -75,29 +75,30 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
       const hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
       
+      // Direct call with individual property fallback
       const stats = await hubContract.getGlobalTokenStats();
 
       if (stats) {
-        // Ethers v6 struct unwrapping
-        const raw = stats.dashboard ?? stats[0] ?? stats;
-
         const fmt = (val: any) => {
-          if (!val || val === 0n || val === 0) return '0.00 MBTTC';
+          if (val === undefined || val === null) return '0.00 MBTTC';
           try {
-            const n = parseFloat(ethers.formatUnits(val.toString(), 18));
+            const strVal = typeof val === 'bigint' ? val.toString() : String(val);
+            const n = parseFloat(ethers.formatUnits(strVal, 18));
+            if (isNaN(n)) return '0.00 MBTTC';
             return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MBTTC`;
           } catch {
             return '0.00 MBTTC';
           }
         };
 
-        const regMinted = raw.totalRegistrationMinted ?? raw[0] ?? 0n;
-        const refMinted = raw.totalReferralMinted ?? raw[1] ?? 0n;
-        const pkgMinted = raw.totalPackageMinted ?? raw[2] ?? 0n;
-        const totalClaimed = raw.totalClaimedTokens ?? raw[3] ?? 0n;
-        const totalBurned = raw.totalBurnedTokens ?? raw[4] ?? 0n;
-        const pending = raw.totalPendingRewards ?? raw[5] ?? 0n;
-        const circulating = raw.circulatingSupply ?? raw[6] ?? 0n;
+        // Ethers v6 Struct: Supports both named access and tuple index fallback
+        const regMinted = stats.totalRegistrationMinted ?? stats[0] ?? 0n;
+        const refMinted = stats.totalReferralMinted ?? stats[1] ?? 0n;
+        const pkgMinted = stats.totalPackageMinted ?? stats[2] ?? 0n;
+        const totalClaimed = stats.totalClaimedTokens ?? stats[3] ?? 0n;
+        const totalBurned = stats.totalBurnedTokens ?? stats[4] ?? 0n;
+        const pending = stats.totalPendingRewards ?? stats[5] ?? 0n;
+        const circulating = stats.circulatingSupply ?? stats[6] ?? 0n;
 
         setLiveTokenStats({
           registrationMinted: fmt(regMinted),
@@ -110,7 +111,43 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
         });
       }
     } catch (err) {
-      console.warn('[MbttcView] Direct on-chain token stats error:', err);
+      console.warn('[MbttcView] Primary getGlobalTokenStats error, trying individual contract methods:', err);
+      // Secondary fallback to individual methods in case struct decoding was reverted
+      try {
+        const provider = new ethers.JsonRpcProvider('https://bsc-testnet.publicnode.com', undefined, { staticNetwork: true });
+        const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
+        if (!hubAddress) return;
+        const hub = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
+
+        const [regM, refM, pkgM, refC, pkgC, burned] = await Promise.all([
+          hub.totalRegistrationMinted().catch(() => 0n),
+          hub.totalReferralMinted().catch(() => 0n),
+          hub.totalPackageMinted().catch(() => 0n),
+          hub.totalReferralClaimed().catch(() => 0n),
+          hub.totalPackageClaimed().catch(() => 0n),
+          hub.totalBurnedTokens().catch(() => 0n),
+        ]);
+
+        const fmt = (val: bigint) => {
+          const n = parseFloat(ethers.formatUnits(val || 0n, 18));
+          return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MBTTC`;
+        };
+
+        const claimedSum = BigInt(refC || 0n) + BigInt(pkgC || 0n);
+        const mintedSum = BigInt(regM || 0n) + BigInt(refM || 0n) + BigInt(pkgM || 0n);
+
+        setLiveTokenStats({
+          registrationMinted: fmt(regM),
+          referralMinted: fmt(refM),
+          packageMinted: fmt(pkgM),
+          totalClaimed: fmt(claimedSum),
+          totalBurned: fmt(burned),
+          pendingRewards: fmt(mintedSum > claimedSum ? mintedSum - claimedSum : 0n),
+          circulatingSupply: fmt(claimedSum),
+        });
+      } catch (fallbackErr) {
+        console.warn('[MbttcView] Secondary fallback error:', fallbackErr);
+      }
     }
   };
 
