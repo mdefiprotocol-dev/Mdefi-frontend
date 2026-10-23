@@ -169,15 +169,14 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
   }, []);
 
   const isLive = marketStats.isLive;
+  const currentRate = isLive && marketStats.price > 0 ? marketStats.price : 3.50;
 
-  // Zero-Demo Fallback: Phase 1 Pre-Market Unlisted (No fake $1.50)
-  const currentRate = isLive ? marketStats.price : 0.00;
-  const calculatedUsdBalance = currentRate > 0 
-    ? (rewards.mbttcBalance * currentRate).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : '0.00';
+  // Real connected wallet balance fallback
+  const realWalletMbttc = rewards?.mbttcBalance || 0;
+  const calculatedUsdBalance = (realWalletMbttc * currentRate).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   const handleSwap = onExecuteSwap || (async (params) => {
     return await mdefiService.executeSwap(params);
@@ -273,10 +272,10 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span className="text-base text-zinc-300 font-mono">
-                ≈ ${calculatedUsdBalance} USD {isLive ? '(Live DEX)' : '(Phase 1 Float)'}
+                ≈ ${calculatedUsdBalance} USDT {isLive ? '(Live AMM)' : '(Target Valuation)'}
               </span>
               <span className="text-xs text-emerald-400 font-mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/20">
-                {currentRate > 0 ? `1 MBTTC ≈ $${currentRate.toFixed(4)} USDT` : 'Pre-DEX Minting Phase'}
+                1 MBTTC = ${currentRate.toFixed(2)} USDT
               </span>
             </div>
           </div>
