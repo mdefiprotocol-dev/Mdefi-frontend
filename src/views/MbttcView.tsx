@@ -43,7 +43,6 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
   user,
   rewards,
   tokenStats,
-  onOpenClaimModal,
   onExecuteSwap,
   onOpenWalletModal,
 }) => {
@@ -211,139 +210,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
         onOpenWalletModal={onOpenWalletModal}
       />
 
-      {/* 7. REWARD DISTRIBUTION CHANNELS */}
-      <div className="space-y-3">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 font-mono">
-          <span>Reward Distribution Channels</span>
-          <span className="text-xs text-emerald-400 font-normal">
-            (On-Chain Protocol)
-          </span>
-        </h2>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Card 1: Registration Reward */}
-          <div className="p-6 rounded-3xl bg-zinc-900/40 border border-emerald-500/20 backdrop-blur-xl flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  <h3 className="font-bold text-white text-sm">Registration Reward</h3>
-                </div>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                  Initial
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="p-2 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Earned</span>
-                  <span className="font-mono font-bold text-white">{user.registrationReward || '30'}</span>
-                </div>
-                <div className="p-2 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Claimed</span>
-                  <span className="font-mono font-bold text-zinc-300">{user.registrationReward || '30'}</span>
-                </div>
-                <div className="p-2 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Claimable</span>
-                  <span className="font-mono font-bold text-zinc-500">0</span>
-                </div>
-              </div>
-              <p className="text-[11px] text-zinc-400 mt-4 leading-relaxed">
-                One-time registration reward automatically minted to your account upon verified account creation.
-              </p>
-            </div>
-            <div className="mt-5 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Status</span>
-              <span className="text-emerald-400 font-mono font-medium">Fully Credited</span>
-            </div>
-          </div>
-
-          {/* Card 2: Referral Reward */}
-          <div className="p-6 rounded-3xl bg-zinc-900/40 border border-emerald-500/20 backdrop-blur-xl flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-400" />
-                  <h3 className="font-bold text-white text-sm">Referral Reward</h3>
-                </div>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                  Active
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Earned</span>
-                  <span className="font-mono font-bold text-white">{rewards.referralEarned || '0.00'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Claimed</span>
-                  <span className="font-mono font-bold text-zinc-300">{rewards.referralClaimed || '0.00'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
-                  <span className="text-[10px] text-emerald-400 block mb-0.5 font-semibold">Claimable</span>
-                  <span className="font-mono font-bold text-emerald-300">{rewards.referralClaimable || '0.00'}</span>
-                </div>
-              </div>
-              <p className="text-[11px] text-zinc-400 mt-4 leading-relaxed">
-                Commissions generated from your {user.directTeamCount || 0} direct frontline partners and multi-tier network nodes.
-              </p>
-            </div>
-            <div className="mt-5 pt-3 border-t border-zinc-800">
-              <button
-                type="button"
-                onClick={() => onOpenClaimModal('Referral')}
-                disabled={Number(rewards.referralClaimable || 0) <= 0}
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Claim Referral</span>
-                <span className="font-mono">({rewards.referralClaimable || '0.00'} MBTTC)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Card 3: Package Reward */}
-          <div className="p-6 rounded-3xl bg-zinc-900/40 border border-emerald-500/20 backdrop-blur-xl flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-emerald-400" />
-                  <h3 className="font-bold text-white text-sm">Package Reward</h3>
-                </div>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                  Active
-                </span>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Earned</span>
-                  <span className="font-mono font-bold text-white">{rewards.packageEarned || '0.00'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block mb-0.5">Claimed</span>
-                  <span className="font-mono font-bold text-zinc-300">{rewards.packageClaimed || '0.00'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
-                  <span className="text-[10px] text-emerald-400 block mb-0.5 font-semibold">Claimable</span>
-                  <span className="font-mono font-bold text-emerald-300">{rewards.packageClaimable || '0.00'}</span>
-                </div>
-              </div>
-              <p className="text-[11px] text-zinc-400 mt-4 leading-relaxed">
-                Daily protocol yield generated by your node packages accumulating per block validation cycle.
-              </p>
-            </div>
-            <div className="mt-5 pt-3 border-t border-zinc-800">
-              <button
-                type="button"
-                onClick={() => onOpenClaimModal('Package')}
-                disabled={Number(rewards.packageClaimable || 0) <= 0}
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Claim Package Yield</span>
-                <span className="font-mono">({rewards.packageClaimable || '0.00'} MBTTC)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       {/* 8. ON-CHAIN TOKEN DISTRIBUTION */}
       <div className="space-y-4">
