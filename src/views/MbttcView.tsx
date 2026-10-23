@@ -23,6 +23,9 @@ import { MbttcClosingNotice } from '../components/MbttcClosingNotice';
 import { MbttcTradeBar } from '../components/MbttcTradeBar';
 import { mdefiService } from '../services/mdefiService';
 import { mbttcMarketService, MarketStats } from '../services/mbttcMarketService';
+import { getContractProvider } from '../services/contractProvider';
+import { contractAdapter } from '../services/contractAdapter';
+import { ethers } from 'ethers';
 
 interface MbttcViewProps {
   user: UserProfile;
@@ -42,7 +45,7 @@ interface MbttcViewProps {
 export const MbttcView: React.FC<MbttcViewProps> = ({
   user,
   rewards,
-  tokenStats,
+  tokenStats: initialTokenStats,
   onExecuteSwap,
   onOpenWalletModal,
 }) => {
@@ -50,6 +53,54 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
     mbttcMarketService.getMarketStatsSync()
   );
   const [selectedSwapAction, setSelectedSwapAction] = useState<'BUY' | 'SELL' | null>(null);
+
+  // 100% Live On-Chain Token Distribution State (Default 0.00)
+  const [liveTokenStats, setLiveTokenStats] = useState({
+    registrationMinted: '0.00 MBTTC',
+    referralMinted: '0.00 MBTTC',
+    packageMinted: '0.00 MBTTC',
+    totalClaimed: '0.00 MBTTC',
+    totalBurned: '0.00 MBTTC',
+    pendingRewards: '0.00 MBTTC',
+    circulatingSupply: '0.00 MBTTC',
+  });
+
+  const fetchGlobalTokenStats = async () => {
+    try {
+      const provider = getContractProvider(true);
+      const stats = await provider.read<any>('mdefiHub', 'getGlobalTokenStats', []);
+      if (stats) {
+        const raw = stats[0] ?? stats;
+        const fmt = (val: any) => {
+          if (!val) return '0.00 MBTTC';
+          const n = Number(ethers.formatUnits(val.toString(), 18));
+          return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MBTTC`;
+        };
+
+        setLiveTokenStats({
+          registrationMinted: fmt(raw.totalRegistrationMinted ?? raw[0]),
+          referralMinted: fmt(raw.totalReferralMinted ?? raw[1]),
+          packageMinted: fmt(raw.totalPackageMinted ?? raw[2]),
+          totalClaimed: fmt(raw.totalClaimedTokens ?? raw[3]),
+          totalBurned: fmt(raw.totalBurnedTokens ?? raw[4]),
+          pendingRewards: fmt(raw.totalPendingRewards ?? raw[5]),
+          circulatingSupply: fmt(raw.circulatingSupply ?? raw[6]),
+        });
+      }
+    } catch (err) {
+      console.warn('[MbttcView] getGlobalTokenStats read warning:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchGlobalTokenStats();
+    const unsubAdapter = contractAdapter.onDataRefresh(() => {
+      fetchGlobalTokenStats();
+    });
+    return () => {
+      unsubAdapter();
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = mbttcMarketService.subscribe((updated) => {
@@ -212,12 +263,18 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
       
 
-      {/* 8. ON-CHAIN TOKEN DISTRIBUTION */}
+      {/* 8. ON-CHAIN TOKEN DISTRIBUTION (LIVE ON-CHAIN GETGLOBALTOKENSTATS SYNC) */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 font-mono">
-          <Coins className="w-4 h-4 text-emerald-400" />
-          <span>On-Chain Token Distribution</span>
-        </h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-base font-bold text-white flex items-center gap-2 font-mono">
+            <Coins className="w-4 h-4 text-emerald-400" />
+            <span>On-Chain Token Distribution</span>
+          </h2>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/35 text-[11px] font-mono font-bold text-emerald-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Master Hub Telemetry</span>
+          </span>
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 font-mono">
           <div className="p-4 rounded-2xl bg-zinc-950/60 border border-zinc-800/80">
@@ -225,7 +282,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               Registration Minted
             </span>
             <span className="text-xl font-bold text-white block">
-              {tokenStats.registrationMinted || '0.00 MBTTC'}
+              {liveTokenStats.registrationMinted}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Airdrop allocation</span>
           </div>
@@ -235,7 +292,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               Referral Minted
             </span>
             <span className="text-xl font-bold text-white block">
-              {tokenStats.referralMinted || '0.00 MBTTC'}
+              {liveTokenStats.referralMinted}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Community growth pool</span>
           </div>
@@ -245,7 +302,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               Package Minted
             </span>
             <span className="text-xl font-bold text-white block">
-              {tokenStats.packageMinted || '0.00 MBTTC'}
+              {liveTokenStats.packageMinted}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Node reward production</span>
           </div>
@@ -255,7 +312,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               Total Claimed
             </span>
             <span className="text-xl font-bold text-emerald-400 block">
-              {tokenStats.totalClaimed || '0.00 MBTTC'}
+              {liveTokenStats.totalClaimed}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Unlocked by participants</span>
           </div>
@@ -266,7 +323,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               <Flame className="w-3.5 h-3.5 text-amber-500" />
             </div>
             <span className="text-xl font-bold text-amber-400 block">
-              {tokenStats.totalBurned || '0.00 MBTTC'}
+              {liveTokenStats.totalBurned}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Deflationary burn</span>
           </div>
@@ -276,7 +333,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               Pending Rewards
             </span>
             <span className="text-xl font-bold text-zinc-200 block">
-              {tokenStats.pendingRewards || '0.00 MBTTC'}
+              {liveTokenStats.pendingRewards}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Accumulated in vaults</span>
           </div>
@@ -289,7 +346,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
               <span className="text-[10px] text-zinc-400 font-mono">Verified</span>
             </div>
             <span className="text-2xl font-extrabold text-white block">
-              {tokenStats.circulatingSupply || '0.00 MBTTC'}
+              {liveTokenStats.circulatingSupply}
             </span>
             <span className="text-[10px] text-zinc-400 mt-1 block">Active on-chain market float</span>
           </div>
