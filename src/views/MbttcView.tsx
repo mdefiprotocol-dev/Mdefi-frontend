@@ -23,8 +23,8 @@ import { MbttcClosingNotice } from '../components/MbttcClosingNotice';
 import { MbttcTradeBar } from '../components/MbttcTradeBar';
 import { mdefiService } from '../services/mdefiService';
 import { mbttcMarketService, MarketStats } from '../services/mbttcMarketService';
-import { getContractProvider } from '../services/contractProvider';
 import { contractAdapter } from '../services/contractAdapter';
+import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 import { ethers } from 'ethers';
 
 interface MbttcViewProps {
@@ -67,28 +67,50 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
   const fetchGlobalTokenStats = async () => {
     try {
-      const provider = getContractProvider(true);
-      const stats = await provider.read<any>('mdefiHub', 'getGlobalTokenStats', []);
+      const rpcUrl = 'https://bsc-testnet.publicnode.com';
+      const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+      const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
+
+      if (!hubAddress || !ethers.isAddress(hubAddress)) return;
+
+      const hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
+      
+      const stats = await hubContract.getGlobalTokenStats();
+
       if (stats) {
-        const raw = stats[0] ?? stats;
+        // Ethers v6 struct unwrapping
+        const raw = stats.dashboard ?? stats[0] ?? stats;
+
         const fmt = (val: any) => {
-          if (!val) return '0.00 MBTTC';
-          const n = Number(ethers.formatUnits(val.toString(), 18));
-          return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MBTTC`;
+          if (!val || val === 0n || val === 0) return '0.00 MBTTC';
+          try {
+            const n = parseFloat(ethers.formatUnits(val.toString(), 18));
+            return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MBTTC`;
+          } catch {
+            return '0.00 MBTTC';
+          }
         };
 
+        const regMinted = raw.totalRegistrationMinted ?? raw[0] ?? 0n;
+        const refMinted = raw.totalReferralMinted ?? raw[1] ?? 0n;
+        const pkgMinted = raw.totalPackageMinted ?? raw[2] ?? 0n;
+        const totalClaimed = raw.totalClaimedTokens ?? raw[3] ?? 0n;
+        const totalBurned = raw.totalBurnedTokens ?? raw[4] ?? 0n;
+        const pending = raw.totalPendingRewards ?? raw[5] ?? 0n;
+        const circulating = raw.circulatingSupply ?? raw[6] ?? 0n;
+
         setLiveTokenStats({
-          registrationMinted: fmt(raw.totalRegistrationMinted ?? raw[0]),
-          referralMinted: fmt(raw.totalReferralMinted ?? raw[1]),
-          packageMinted: fmt(raw.totalPackageMinted ?? raw[2]),
-          totalClaimed: fmt(raw.totalClaimedTokens ?? raw[3]),
-          totalBurned: fmt(raw.totalBurnedTokens ?? raw[4]),
-          pendingRewards: fmt(raw.totalPendingRewards ?? raw[5]),
-          circulatingSupply: fmt(raw.circulatingSupply ?? raw[6]),
+          registrationMinted: fmt(regMinted),
+          referralMinted: fmt(refMinted),
+          packageMinted: fmt(pkgMinted),
+          totalClaimed: fmt(totalClaimed),
+          totalBurned: fmt(totalBurned),
+          pendingRewards: fmt(pending),
+          circulatingSupply: fmt(circulating),
         });
       }
     } catch (err) {
-      console.warn('[MbttcView] getGlobalTokenStats read warning:', err);
+      console.warn('[MbttcView] Direct on-chain token stats error:', err);
     }
   };
 
