@@ -18,6 +18,8 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { MbttcSwapSuccessModal } from './MbttcSwapSuccessModal';
+import { Rotating3DMbttcCoin } from './common/Rotating3DMbttcCoin';
+import { Rotating3DUsdtCoin } from './common/Rotating3DUsdtCoin';
 import { MarketStats, mbttcMarketService } from '../services/mbttcMarketService';
 
 export type SwapToken = 'MBTTC' | 'USDT';
@@ -435,19 +437,15 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
               className="w-full bg-transparent text-2xl sm:text-3xl font-extrabold font-mono text-white placeholder-zinc-600 focus:outline-none"
             />
 
-            {/* Token Selector Pill */}
+            {/* Token Selector Pill with 3D Animated Coins */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono font-bold text-sm shadow-sm">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/90 text-white font-mono font-bold text-sm shadow-inner">
                 {fromToken === 'MBTTC' ? (
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-[10px]">
-                    ₿
-                  </div>
+                  <Rotating3DMbttcCoin size={22} accent="emerald" />
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 text-[10px]">
-                    ₮
-                  </div>
+                  <Rotating3DUsdtCoin size={22} glow={false} />
                 )}
-                <span>{fromToken}</span>
+                <span className="tracking-wide">{fromToken}</span>
               </div>
             </div>
           </div>
@@ -509,19 +507,15 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
                 : '0.00'}
             </div>
 
-            {/* Target Token Pill */}
+            {/* Target Token Pill with 3D Animated Coins */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white font-mono font-bold text-sm shadow-sm">
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-800/90 text-white font-mono font-bold text-sm shadow-inner">
                 {toToken === 'MBTTC' ? (
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-[10px]">
-                    ₿
-                  </div>
+                  <Rotating3DMbttcCoin size={22} accent="emerald" />
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 text-[10px]">
-                    ₮
-                  </div>
+                  <Rotating3DUsdtCoin size={22} glow={false} />
                 )}
-                <span>{toToken}</span>
+                <span className="tracking-wide">{toToken}</span>
               </div>
             </div>
           </div>
