@@ -21,6 +21,7 @@ import { quantumNodeStats, nexusPrimeStats } from '../data/nexusMatrixData';
 import { S4AiGuide } from '../components/S4AiGuide';
 import { AiHumanCharacter } from '../components/AiHumanCharacter';
 import { programPhaseService } from '../services/programPhaseService';
+import { Rotating3DUsdtCoin } from '../components/common/Rotating3DUsdtCoin';
 
 interface PackagesViewProps {
   packages: PackageItem[];
@@ -46,56 +47,56 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
   onShowToast,
 }) => {
   // Find package items from state or construct clean fallbacks matching canonical specifications
-  const juniorPkg = packages.find(p => p.id === 'pkg-junior') || {
+  const juniorPkg: PackageItem = (packages.find(p => p.id === 'pkg-junior') as PackageItem) || {
     id: 'pkg-junior',
     name: 'Junior Node',
-    priceUSD: 10,
+    priceUSDT: 10,
     status: 'Available',
     activationDate: 'Not Activated',
     version: 'v1.0 (S4)',
     rewardStatus: 'Standby',
-    dailyRewardEstimate: '$4.00 (40%) Direct + $12.00 (300%) Matrix',
+    dailyRewardEstimate: '4.00 (40%) Direct + 12.00 (300%) Matrix USDT',
     maxReturn: '2x2 Binary Matrix (6 Slots)',
     features: ['2x2 Fast-Cycling Matrix', 'Direct & Spillover Placement', 'Continuous Auto-Recycle at Slot #6'],
   };
 
-  const seniorPkg = packages.find(p => p.id === 'pkg-senior') || {
+  const seniorPkg: PackageItem = (packages.find(p => p.id === 'pkg-senior') as PackageItem) || {
     id: 'pkg-senior',
     name: 'Senior Node',
-    priceUSD: 25,
+    priceUSDT: 25,
     status: 'Available',
     activationDate: 'Not Activated',
     version: 'v1.0 (S4)',
     rewardStatus: 'Standby',
-    dailyRewardEstimate: '$8.00 (32%) Direct + $24.00 (300%) Matrix',
+    dailyRewardEstimate: '8.00 (32%) Direct + 24.00 (300%) Matrix USDT',
     maxReturn: '2x2 Binary Matrix (6 Slots)',
     features: ['Double Matrix Capacity', 'Unlimited Weekly Reward Every Week', 'Continuous Auto-Recycle at Slot #6'],
   };
 
-  const quantumPkg = packages.find(p => p.id === 'pkg-quantum') || {
+  const quantumPkg: PackageItem = (packages.find(p => p.id === 'pkg-quantum') as PackageItem) || {
     id: 'pkg-quantum',
     name: 'Quantum Node',
-    priceUSD: 70,
+    priceUSDT: 70,
     status: 'Available',
     activationDate: 'Not Activated',
     version: 'v1.0 (11_test_nexus)',
     rewardStatus: 'Standby',
-    dailyRewardEstimate: '$12.00 Direct + $265.20 Matrix Tier',
+    dailyRewardEstimate: '12.00 Direct + 265.20 Matrix Tier USDT',
     maxReturn: 'Concentric 4-Ring (30 Positions)',
-    features: ['Concentric Radial Matrix', '$15 Magic Cashback per 2 Directs', '10 Levels Generation Yields'],
+    features: ['Concentric Radial Matrix', '15 USDT Magic Cashback per 2 Directs', '10 Levels Generation Yields'],
   };
 
-  const nexusPrimePkg = packages.find(p => p.id === 'pkg-nexus-prime') || {
+  const nexusPrimePkg: PackageItem = (packages.find(p => p.id === 'pkg-nexus-prime') as PackageItem) || {
     id: 'pkg-nexus-prime',
     name: 'Nexus Prime Node',
-    priceUSD: 120,
+    priceUSDT: 120,
     status: 'Available',
     activationDate: 'Not Activated',
     version: 'v1.0 (11_test_nexus)',
     rewardStatus: 'Standby',
-    dailyRewardEstimate: '$15.00 Direct + $306.00 Matrix Tier',
+    dailyRewardEstimate: '15.00 Direct + 306.00 Matrix Tier USDT',
     maxReturn: 'Concentric 4-Ring (30 Positions)',
-    features: ['Prime Concentric Matrix', 'Unlimited Weekly Sellery Every Week', '11 Levels Generation Yields'],
+    features: ['Prime Concentric Matrix', 'Unlimited Weekly Reward Every Week', '11 Levels Generation Yields'],
   };
 
   const isPhase2Active = programPhaseService.isModuleUnlocked('s4');
@@ -310,13 +311,16 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                     Mode: S4 Matrix &bull; 2x2 Binary (6 Slots)
                   </span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                    $10.00
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-mono block font-bold">
-                    USDt / Package
-                  </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Rotating3DUsdtCoin size={42} glow={false} />
+                  <div className="text-right">
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                      10.00
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono block font-bold tracking-wider">
+                      USDT / PACKAGE
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -365,7 +369,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-emerald-500/30 flex items-center justify-between">
                   <span className="text-zinc-300 font-semibold">Total Per Complete Matrix:</span>
                   <span className="text-xs font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                    $12.00 USDt
+                    12.00 USDT
                   </span>
                 </div>
 
@@ -484,13 +488,16 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                     Mode: S4 Matrix &bull; 2x2 Binary (6 Slots)
                   </span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                    $25.00
-                  </span>
-                  <span className="text-[10px] text-teal-400 font-mono block font-bold">
-                    USDt / Package
-                  </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Rotating3DUsdtCoin size={42} glow={false} />
+                  <div className="text-right">
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                      25.00
+                    </span>
+                    <span className="text-[10px] text-teal-400 font-mono block font-bold tracking-wider">
+                      USDT / PACKAGE
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -538,7 +545,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-teal-500/30 flex items-center justify-between">
                   <span className="text-zinc-300 font-semibold">Total Per Complete Matrix:</span>
                   <span className="text-xs font-black text-teal-300 bg-teal-950/60 px-2 py-0.5 rounded-md border border-teal-500/30">
-                    $24.00 USDt
+                    24.00 USDT
                   </span>
                 </div>
 
@@ -665,13 +672,16 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                     Rings: 2 &bull; 4 &bull; 8 &bull; 16 Slots &bull; Cycle #{quantumNodeStats.currentMatrixNumber}
                   </span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                    $70.00
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-mono block font-bold">
-                    USDt / Package
-                  </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Rotating3DUsdtCoin size={42} glow={false} />
+                  <div className="text-right">
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                      70.00
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono block font-bold tracking-wider">
+                      USDT / PACKAGE
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -850,13 +860,16 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                     Rings: 2 &bull; 4 &bull; 8 &bull; 16 Slots &bull; Cycle #{nexusPrimeStats.currentMatrixNumber}
                   </span>
                 </div>
-                <div className="text-right shrink-0">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                    $120.00
-                  </span>
-                  <span className="text-[10px] text-cyan-400 font-mono block font-bold">
-                    USDt / Package
-                  </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <Rotating3DUsdtCoin size={42} glow={false} />
+                  <div className="text-right">
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                      120.00
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-mono block font-bold tracking-wider">
+                      USDT / PACKAGE
+                    </span>
+                  </div>
                 </div>
               </div>
 
