@@ -691,7 +691,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
                   <span className="text-zinc-400">Direct Member Reward:</span>
                   <span className="text-xs font-black text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                    $12.00
+                    12.00 USDT
                   </span>
                 </div>
 
@@ -699,7 +699,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
                   <span className="text-zinc-400">Matrix Tier Reward:</span>
                   <span className="text-xs font-black text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                    $265.20 (1120%)
+                    265.20 USDT (1120%)
                   </span>
                 </div>
 
@@ -728,31 +728,10 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                   </div>
                 </div>
 
-                {/* Recycle Auto Re-entry */}
-                <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/40 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                    <span className="text-rose-200 font-bold">Recycle Auto Re-entry:</span>
-                  </div>
-                  <span className="text-xs font-extrabold text-rose-300">
-                    {quantumNodeStats.recycleCount} Recycles Completed
-                  </span>
-                </div>
-
-                {/* Bottom Dynamic Statistics */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Cycle Counter</span>
-                    <span className="text-sm font-black text-rose-400">
-                      Cycle #{quantumNodeStats.currentMatrixNumber}
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Matrix Completion</span>
-                    <span className="text-sm font-black text-emerald-400">
-                      {quantumNodeStats.filledPositions}/30 ({quantumNodeStats.completionPercentage}%)
-                    </span>
-                  </div>
+                {/* Quantum Matrix Telemetry Status */}
+                <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-emerald-500/20 flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-zinc-400">Ledger Distribution:</span>
+                  <span className="text-emerald-400 font-bold">Concentric 4-Ring Multi-Tier</span>
                 </div>
               </div>
             </div>
@@ -879,7 +858,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
                   <span className="text-zinc-400">Direct Member Reward:</span>
                   <span className="text-xs font-black text-cyan-300 bg-cyan-950/70 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                    $15.00
+                    15.00 USDT
                   </span>
                 </div>
 
@@ -887,7 +866,7 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
                   <span className="text-zinc-400">Matrix Tier Reward:</span>
                   <span className="text-xs font-black text-cyan-300 bg-cyan-950/70 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                    $306.00 (1120%)
+                    306.00 USDT (1120%)
                   </span>
                 </div>
 
@@ -909,31 +888,10 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                   </div>
                 </div>
 
-                {/* Recycle Auto Re-entry */}
-                <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/40 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                    <span className="text-rose-200 font-bold">Recycle Auto Re-entry:</span>
-                  </div>
-                  <span className="text-xs font-extrabold text-rose-300">
-                    {nexusPrimeStats.recycleCount} Recycles Completed
-                  </span>
-                </div>
-
-                {/* Bottom Dynamic Statistics */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Cycle Counter</span>
-                    <span className="text-sm font-black text-rose-400">
-                      Cycle #{nexusPrimeStats.currentMatrixNumber}
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Matrix Completion</span>
-                    <span className="text-sm font-black text-cyan-300">
-                      {nexusPrimeStats.filledPositions}/30 ({nexusPrimeStats.completionPercentage}%)
-                    </span>
-                  </div>
+                {/* Nexus Prime Telemetry Status */}
+                <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-cyan-500/20 flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-zinc-400">Ledger Distribution:</span>
+                  <span className="text-cyan-400 font-bold">Apex Node Supreme Generation Tier</span>
                 </div>
               </div>
             </div>
