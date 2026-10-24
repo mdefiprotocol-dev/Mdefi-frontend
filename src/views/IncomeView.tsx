@@ -16,6 +16,8 @@ import { IncomeCategoryItem } from '../types/income';
 import { IncomeCosmicIcon } from '../components/income/IncomeCosmicIcon';
 import { AnimatedCounter } from '../components/income/AnimatedCounter';
 import { AnimatedDollarCoin } from '../components/common/AnimatedDollarCoin';
+import { Rotating3DMbttcCoin } from '../components/common/Rotating3DMbttcCoin';
+import { Rotating3DUsdtCoin } from '../components/common/Rotating3DUsdtCoin';
 
 interface IncomeViewProps {
   user: UserProfile;
@@ -51,7 +53,10 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
 
   // Available claimable amount for protocol actions
   const totalClaimableUsdt = useMemo(() => {
-    return (rewards.referralClaimable + rewards.packageClaimable) * (rewards.demoUsdRate || 1.5);
+    const rate = Number((rewards as any)?.mbttcRate ?? 3.50);
+    const ref = Number(rewards?.referralClaimable || 0);
+    const pkg = Number(rewards?.packageClaimable || 0);
+    return (ref + pkg) * rate;
   }, [rewards]);
 
   // Handle direct navigation to existing functions/dashboards
@@ -182,53 +187,41 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
             </div>
           </div>
 
-          {/* Right Status / Protocol Fast Stats */}
-          <div className="grid grid-cols-2 gap-3 w-full lg:w-auto min-w-[280px]">
-            <div className="p-4 rounded-2xl bg-[#080e0a]/80 border border-emerald-500/20 backdrop-blur-md">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block mb-1">
-                Ecosystem Yield
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-white font-mono">
-                12 Streams
-              </div>
-              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
-                <CheckCircle2 className="w-3 h-3" /> Fully Synced
-              </span>
-            </div>
+          {/* Dual 3D Coin Showcase Capsule: MBTTC & USDT */}
+          <div className="w-full lg:w-auto flex items-center justify-center self-center">
+            <div className="relative rounded-3xl bg-zinc-950/80 border border-emerald-500/35 px-6 sm:px-8 py-5 sm:py-6 shadow-[0_0_35px_rgba(16,185,129,0.12)] backdrop-blur-xl flex items-center justify-center gap-6 sm:gap-10">
+              {/* Radial glow backdrop */}
+              <div className="absolute inset-0 bg-emerald-500/5 rounded-3xl blur-xl pointer-events-none" />
 
-            <div className="p-4 rounded-2xl bg-[#080e0a]/80 border border-cyan-500/20 backdrop-blur-md">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 block mb-1">
-                Settlement
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-cyan-300 font-mono flex items-center gap-1.5">
-                <AnimatedDollarCoin size="sm" />
-                <span>Yields</span>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-1">
-                <Globe className="w-3 h-3" /> Universal Peg
-              </span>
-            </div>
-
-            {/* Optional Claim Portal Link if claimable rewards exist */}
-            {onOpenClaimModal && (
-              <div className="col-span-2 p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between gap-3">
-                <div className="text-xs">
-                  <div className="text-zinc-300 font-medium">Available Unclaimed Yields</div>
-                  <div className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
-                    <span>{rewards.referralClaimable + rewards.packageClaimable} MBTTC (≈</span>
-                    <AnimatedDollarCoin size="xs" />
-                    <span>{totalClaimableUsdt.toFixed(2)})</span>
-                  </div>
+              {/* MBTTC 3D Utility Coin */}
+              <div className="flex flex-col items-center gap-2 relative z-10">
+                <div className="hidden sm:block">
+                  <Rotating3DMbttcCoin size={92} accent="emerald" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onOpenClaimModal('Referral')}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs font-mono transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer"
-                >
-                  Claim Portal
-                </button>
+                <div className="block sm:hidden">
+                  <Rotating3DMbttcCoin size={72} accent="emerald" />
+                </div>
+                <span className="text-[11px] font-mono tracking-wider font-bold text-emerald-400 uppercase">
+                  MBTTC Utility
+                </span>
               </div>
-            )}
+
+              {/* Divider Line */}
+              <div className="h-16 w-px bg-zinc-800/80 relative z-10" />
+
+              {/* USDT 3D Settlement Coin */}
+              <div className="flex flex-col items-center gap-2 relative z-10">
+                <div className="hidden sm:block">
+                  <Rotating3DUsdtCoin size={92} glow={false} />
+                </div>
+                <div className="block sm:hidden">
+                  <Rotating3DUsdtCoin size={72} glow={false} />
+                </div>
+                <span className="text-[11px] font-mono tracking-wider font-bold text-teal-400 uppercase">
+                  USDT Settlement
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
