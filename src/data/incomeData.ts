@@ -3,40 +3,33 @@ import { IncomeCategoryItem } from '../types/income';
 import { centralEventSyncService } from '../services/centralEventSyncService';
 
 export function calculateEcosystemIncome(user?: UserProfile, rewards?: RewardBalances): IncomeCategoryItem[] {
-  // Lifetime earned data bound to protocol sub-engines and verified contracts
-  const s4Direct = 64.00;
-  const s4Junior = 48.00;
-  const s4Senior = 56.00;
-  const quantumDirect = 80.00;
-  const quantumMatrix = 96.00;
-  const magicBonus = 75.00;
-  const nexusDirect = 90.00;
-  const nexusGeneration = 185.00;
-  const magicPassivePool = 240.00;
+  // 100% Dynamic On-Chain Contract Pipeline (Defaults to 0.00 until contracts/services sync)
+  const userLedger = (user as any)?.incomeLedger || {};
+  const userRewards = (rewards as any) || {};
 
-  // Dynamically synchronized with central settlement totals
-  const starterSettled = centralEventSyncService.getStarterTotalSettled();
-  const premiumSettled = centralEventSyncService.getPremiumTotalSettled();
-  const salarySettled = centralEventSyncService.getSalaryTotalSettled();
-  const weeklyStarter = Math.max(1425.00, starterSettled);
-  const weeklyPremium = Math.max(3850.00, premiumSettled);
-  const weeklySalary = Math.max(150.00, salarySettled);
+  // 1. S4 Matrix Streams
+  const s4Direct = Number(userLedger.s4DirectIncome ?? userRewards.s4Direct ?? 0.00);
+  const s4Junior = Number(userLedger.s4JuniorIncome ?? userRewards.s4Junior ?? 0.00);
+  const s4Senior = Number(userLedger.s4SeniorIncome ?? userRewards.s4Senior ?? 0.00);
 
-  // Dynamic sum of streams 1 through 12
-  const totalYield = (
-    s4Direct +
-    s4Junior +
-    s4Senior +
-    quantumDirect +
-    quantumMatrix +
-    magicBonus +
-    nexusDirect +
-    nexusGeneration +
-    magicPassivePool +
-    weeklyStarter +
-    weeklyPremium +
-    weeklySalary
-  );
+  // 2. Quantum Matrix Streams
+  const quantumDirect = Number(userLedger.quantumDirectIncome ?? userRewards.quantumDirect ?? 0.00);
+  const quantumMatrix = Number(userLedger.quantumMatrixIncome ?? userRewards.quantumMatrix ?? 0.00);
+  const magicBonus = Number(userLedger.magicCashbackBonus ?? userRewards.magicBonus ?? 0.00);
+
+  // 3. Nexus Prime Streams
+  const nexusDirect = Number(userLedger.nexusDirectIncome ?? userRewards.nexusDirect ?? 0.00);
+  const nexusGeneration = Number(userLedger.nexusGenerationPool ?? userRewards.nexusGeneration ?? 0.00);
+  const magicPassivePool = Number(userLedger.magicPassivePool ?? userRewards.magicPassivePool ?? 0.00);
+
+  // 4. Central Settlement Services / Contract Vaults
+  const starterSettled = Number(centralEventSyncService?.getStarterTotalSettled?.() ?? 0.00);
+  const premiumSettled = Number(centralEventSyncService?.getPremiumTotalSettled?.() ?? 0.00);
+  const salarySettled = Number(centralEventSyncService?.getSalaryTotalSettled?.() ?? 0.00);
+
+  const weeklyStarter = Number(userLedger.weeklyStarter ?? starterSettled ?? 0.00);
+  const weeklyPremium = Number(userLedger.weeklyPremium ?? premiumSettled ?? 0.00);
+  const weeklySalary = Number(userLedger.weeklySalary ?? salarySettled ?? 0.00);
 
   const categories: IncomeCategoryItem[] = [
     {
