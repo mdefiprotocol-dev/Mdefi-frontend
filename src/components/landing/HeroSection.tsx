@@ -4,7 +4,7 @@ import {
   Sparkles, 
   Coins 
 } from 'lucide-react';
-import { MbttcCoin3D } from '../MbttcCoin3D';
+import { Rotating3DMbttcCoin } from '../common/Rotating3DMbttcCoin';
 import { programPhaseService } from '../../services/programPhaseService';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -119,14 +119,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             {/* Interactive 3D MBTTC Coin */}
             <div className="relative z-10 py-6 sm:py-8 flex flex-col items-center">
-              <div className="cursor-grab active:cursor-grabbing hover:scale-105 transition-transform duration-300">
-                <MbttcCoin3D 
-                  size="hero" 
-                  interactive={true} 
-                  autoRotate={true} 
-                  glow={true} 
-                  className="drop-shadow-[0_20px_45px_rgba(16,185,129,0.35)]"
-                />
+              <div className="cursor-grab active:cursor-grabbing hover:scale-105 transition-transform duration-300 flex items-center justify-center">
+                {/* Desktop view */}
+                <div className="hidden sm:block">
+                  <Rotating3DMbttcCoin size={220} accent="emerald" />
+                </div>
+                {/* Mobile view */}
+                <div className="block sm:hidden">
+                  <Rotating3DMbttcCoin size={150} accent="emerald" />
+                </div>
               </div>
 
               {/* Coin Meta Tag */}
