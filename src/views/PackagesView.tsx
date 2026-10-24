@@ -324,65 +324,34 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 </div>
               </div>
 
-              {/* Fixed Plan Income Breakdown */}
-              <div className="mt-5 space-y-2 font-mono text-xs">
+              {/* Clean Plan Income Breakdown */}
+              <div className="mt-5 space-y-2.5 font-mono text-xs">
                 {/* Direct Income */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
                   <span className="text-zinc-400">Direct Income:</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                      $4.00
+                    <span className="text-xs font-black text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                      4.00 USDT
                     </span>
                     <span className="text-[11px] text-emerald-400/80 font-bold">(40%)</span>
                   </div>
                 </div>
 
                 {/* Matrix Income */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
                   <span className="text-zinc-400">Matrix Income:</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                      $12.00
+                    <span className="text-xs font-black text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                      12.00 USDT
                     </span>
                     <span className="text-[11px] text-emerald-400/80 font-bold">(300%)</span>
                   </div>
                 </div>
 
-                {/* Recycle Income & Auto Re-entry */}
-                <div className="p-2.5 rounded-xl bg-gradient-to-r from-rose-950/40 via-red-950/30 to-black/60 border border-rose-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                    <span className="text-rose-200 font-bold">Recycle Income:</span>
-                    <span className="text-xs text-rose-300 font-extrabold ml-1">→ Upline 40%</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-500/50">
-                      Auto Re-entry: At Slot #6
-                    </span>
-                    <span className="text-[9px] text-rose-300/80 block mt-0.5">
-                      Automated 100% Re-entry Basis
-                    </span>
-                  </div>
-                </div>
-
-                {/* Total Per Complete Matrix */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-emerald-500/30 flex items-center justify-between">
-                  <span className="text-zinc-300 font-semibold">Total Per Complete Matrix:</span>
-                  <span className="text-xs font-black text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                    12.00 USDT
-                  </span>
-                </div>
-
-                {/* Bottom Dynamic User Statistics */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Recycle Count</span>
-                    <span className="text-xs font-extrabold text-rose-400">{juniorNodeData.recycleCount} Completed</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Matrix Capacity</span>
-                    <span className="text-xs font-extrabold text-emerald-400">{juniorNodeData.filledPositions}/6 Filled</span>
-                  </div>
+                {/* S4 Mechanism Info */}
+                <div className="p-3 rounded-2xl bg-zinc-950/50 border border-emerald-500/20 flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400">Node Architecture:</span>
+                  <span className="text-emerald-400 font-bold">2x2 Fast-Cycling Binary Matrix</span>
                 </div>
               </div>
             </div>
@@ -390,11 +359,10 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
 
           {/* Card Action Footer */}
           <div className="pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
-            <S4AiGuide 
-              packageName="Junior Node" 
-              size="sm"
-              onClick={handleLaunchJuniorTree}
-            />
+            <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Smart Contract Verified</span>
+            </span>
             {!isPhase2Active ? (
               <button
                 disabled
@@ -501,72 +469,36 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
                 </div>
               </div>
 
-              {/* Fixed Plan Income Breakdown */}
-              <div className="mt-5 space-y-2 font-mono text-xs">
+              {/* Clean Plan Income Breakdown */}
+              <div className="mt-5 space-y-2.5 font-mono text-xs">
                 {/* Direct Income */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
                   <span className="text-zinc-400">Direct Income:</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-teal-300 bg-teal-950/70 px-2 py-0.5 rounded-md border border-teal-500/30">
-                      $8.00
+                    <span className="text-xs font-black text-teal-300 bg-teal-950/80 px-2.5 py-1 rounded-lg border border-teal-500/30">
+                      8.00 USDT
                     </span>
                     <span className="text-[11px] text-teal-400/80 font-bold">(32%)</span>
                   </div>
                 </div>
 
                 {/* Matrix Income */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 flex items-center justify-between">
                   <span className="text-zinc-400">Matrix Income:</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-teal-300 bg-teal-950/70 px-2 py-0.5 rounded-md border border-teal-500/30">
-                      $24.00
+                    <span className="text-xs font-black text-teal-300 bg-teal-950/80 px-2.5 py-1 rounded-lg border border-teal-500/30">
+                      24.00 USDT
                     </span>
                     <span className="text-[11px] text-teal-400/80 font-bold">(300%)</span>
                   </div>
                 </div>
 
-                {/* Recycle Income & Auto Re-entry */}
-                <div className="p-2.5 rounded-xl bg-gradient-to-r from-rose-950/40 via-red-950/30 to-black/60 border border-rose-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                    <span className="text-rose-200 font-bold">Recycle Income</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-500/50">
-                      Auto Re-entry: At Slot #6
-                    </span>
-                    <span className="text-[9px] text-rose-300/80 block mt-0.5">
-                      Automated 100% Re-entry Basis
-                    </span>
-                  </div>
-                </div>
-
-                {/* Total Per Complete Matrix */}
-                <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-teal-500/30 flex items-center justify-between">
-                  <span className="text-zinc-300 font-semibold">Total Per Complete Matrix:</span>
-                  <span className="text-xs font-black text-teal-300 bg-teal-950/60 px-2 py-0.5 rounded-md border border-teal-500/30">
-                    24.00 USDT
-                  </span>
-                </div>
-
                 {/* Special Benefit Text: Exclusive to Senior */}
-                <div className="p-2.5 rounded-xl bg-teal-950/50 border border-teal-500/40 flex items-center gap-2">
+                <div className="p-3 rounded-2xl bg-teal-950/50 border border-teal-500/40 flex items-center gap-2">
                   <Award className="w-4 h-4 text-teal-400 shrink-0" />
                   <span className="text-xs font-extrabold text-teal-300 uppercase tracking-wide">
                     UNLIMITED WEEKLY REWARD EVERY WEEK
                   </span>
-                </div>
-
-                {/* Bottom Dynamic User Statistics */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Recycle Count</span>
-                    <span className="text-xs font-extrabold text-rose-400">{seniorNodeData.recycleCount} Completed</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-zinc-950/80 border border-zinc-800 text-center">
-                    <span className="text-[10px] text-zinc-400 block mb-0.5">Matrix Capacity</span>
-                    <span className="text-xs font-extrabold text-teal-300">{seniorNodeData.filledPositions}/6 Filled</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -574,11 +506,10 @@ export const PackagesView: React.FC<PackagesViewProps> = ({
 
           {/* Card Action Footer */}
           <div className="pt-4 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
-            <S4AiGuide 
-              packageName="Senior Node" 
-              size="sm"
-              onClick={handleLaunchSeniorTree}
-            />
+            <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+              <span>Smart Contract Verified</span>
+            </span>
             {!isPhase2Active ? (
               <button
                 disabled
