@@ -9,11 +9,7 @@ import {
   Zap,
   Lock,
   Boxes,
-  ShieldCheck,
-  ChevronUp,
-  ChevronDown,
-  Pause,
-  Play
+  ShieldCheck
 } from 'lucide-react';
 import { programPhaseService } from '../../services/programPhaseService';
 import { LaunchModuleKey } from '../../config/launchPhaseConfig';
@@ -60,7 +56,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       iconStyle: 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300',
       subColor: 'text-emerald-400',
       badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
-      glowColor: 'rgba(16,185,129,0.35)',
+      glowColor: 'rgba(16,185,129,0.3)',
       isAirdropCard: true,
     },
     {
@@ -213,48 +209,18 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
   ];
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isPausedRef = useRef(false);
 
-  const nextCard = () => {
-    setActiveIndex((prev) => (prev + 1) % modules.length);
-    setProgress(0);
-  };
-
-  const prevCard = () => {
-    setActiveIndex((prev) => (prev - 1 + modules.length) % modules.length);
-    setProgress(0);
-  };
-
-  // 10-Second Auto-Scroll Interval with Smooth Progress
+  // Ultra-Lightweight 2-Second Transition (Zero Lag, Native GPU Composited)
   useEffect(() => {
-    if (isPaused) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-      return;
-    }
+    const timer = setInterval(() => {
+      if (!isPausedRef.current) {
+        setActiveIndex((prev) => (prev + 1) % modules.length);
+      }
+    }, 2000);
 
-    const intervalTime = 10000; // 10 seconds
-    const updateFreq = 100; // update progress every 100ms
-
-    progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) return 0;
-        return prev + (updateFreq / intervalTime) * 100;
-      });
-    }, updateFreq);
-
-    timerRef.current = setInterval(() => {
-      nextCard();
-    }, intervalTime);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    };
-  }, [isPaused, activeIndex]);
+    return () => clearInterval(timer);
+  }, [modules.length]);
 
   const navigateToMbttcDetails = () => {
     const el = document.getElementById('mbttc');
@@ -269,7 +235,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
     <section id="ecosystem" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-10 relative overflow-hidden">
       <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
         
-        {/* Section Header */}
+        {/* Clean Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
@@ -283,67 +249,34 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
               {t('eco_desc', 'A unified constellation of decentralized matrix structures, community yield pools, and tokenomics governed by central phased launch controls.')}
             </p>
           </div>
-
-          {/* Controls: Up/Down Arrows, Pause Indicator, 10s Timer */}
-          <div className="flex items-center gap-3 self-start md:self-end bg-zinc-950/80 border border-zinc-800/80 p-2 rounded-2xl backdrop-blur-md">
-            <button
-              onClick={prevCard}
-              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer"
-              title="Previous Layer"
-            >
-              <ChevronUp className="w-4 h-4" />
-            </button>
-            <button
-              onClick={nextCard}
-              className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer"
-              title="Next Layer"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            <div className="h-5 w-px bg-zinc-800" />
-            <button
-              onClick={() => setIsPaused(!isPaused)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 text-xs font-mono text-zinc-400 hover:text-emerald-400 transition-all cursor-pointer"
-            >
-              {isPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5 text-amber-400" />}
-              <span>{isPaused ? 'Paused' : '10s Cycle'}</span>
-            </button>
-          </div>
         </div>
 
-        {/* 3D Magic Layer Deck (Down-to-Up Stack Mechanism) */}
+        {/* 3D Magic Layer Deck (Down-to-Up 2s Stack Transition) */}
         <div 
-          className="relative min-h-[460px] sm:min-h-[480px] lg:min-h-[420px] flex items-center justify-center pt-6 pb-12 cursor-pointer select-none"
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => setIsPaused(false)}
-          onTouchStart={() => setIsPaused(true)}
-          onTouchEnd={() => setIsPaused(false)}
+          className="relative min-h-[420px] sm:min-h-[440px] flex items-center justify-center pt-4 pb-10 cursor-pointer select-none"
+          onMouseEnter={() => { isPausedRef.current = true; }}
+          onMouseLeave={() => { isPausedRef.current = false; }}
+          onTouchStart={() => { isPausedRef.current = true; }}
+          onTouchEnd={() => { isPausedRef.current = false; }}
         >
           {modules.map((mod, index) => {
-            // Calculate distance relative to activeIndex (0 to 7)
             const count = modules.length;
             const diff = (index - activeIndex + count) % count;
             
-            // Only render top 4 layers for ultra-smooth 3D depth performance
-            if (diff > 3 && diff < count - 1) return null;
+            // Render only top 3 layers for 60FPS fluid GPU performance
+            if (diff > 2 && diff < count - 1) return null;
 
-            // Down-to-Up Stacking calculations
-            // diff === 0: Active front card
-            // diff === 1: 1st card behind (shifted down & scaled down)
-            // diff === 2: 2nd card behind
-            // diff === 3: 3rd card behind
-            // diff === count - 1: exiting card moving up
-            let translateY = diff * 22; // shifted downward
-            let scale = 1 - diff * 0.05; // smaller as it goes deeper
-            let opacity = diff === 0 ? 1 : 1 - diff * 0.25;
+            let translateY = diff * 20; // 20px offset per layer
+            let scale = 1 - diff * 0.05; // 5% scale down per depth
+            let opacity = diff === 0 ? 1 : 1 - diff * 0.35;
             let zIndex = 30 - diff;
 
             if (diff === count - 1) {
-              // Card flying up when cycle moves
-              translateY = -80;
-              scale = 0.95;
+              // Smooth upward exit
+              translateY = -60;
+              scale = 0.96;
               opacity = 0;
-              zIndex = 40;
+              zIndex = 35;
             }
 
             const Icon = mod.icon;
@@ -370,54 +303,39 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                     }
                   } else {
                     setActiveIndex(index);
-                    setProgress(0);
                   }
                 }}
-                className={`absolute w-full max-w-3xl rounded-3xl p-6 sm:p-9 bg-gradient-to-b ${mod.bgGrad} border ${mod.borderColor} backdrop-blur-2xl transition-all duration-700 ease-out shadow-2xl flex flex-col justify-between`}
+                className={`absolute w-full max-w-2xl rounded-3xl p-6 sm:p-8 bg-gradient-to-b ${mod.bgGrad} border ${mod.borderColor} backdrop-blur-xl transition-all duration-500 ease-out shadow-2xl flex flex-col justify-between will-change-transform`}
                 style={{
-                  transform: `translateY(${translateY}px) scale(${scale})`,
+                  transform: `translate3d(0, ${translateY}px, 0) scale(${scale})`,
                   opacity,
                   zIndex,
-                  boxShadow: diff === 0 ? `0 25px 50px -12px ${mod.glowColor}` : '0 10px 25px -5px rgba(0,0,0,0.5)',
-                  filter: diff > 0 ? `brightness(${1 - diff * 0.2})` : 'none',
+                  boxShadow: diff === 0 ? `0 20px 40px -10px ${mod.glowColor}` : '0 10px 20px -5px rgba(0,0,0,0.5)',
                 }}
               >
                 {/* Neon Top Bar */}
-                <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${mod.topBarGrad}`} />
-
-                {/* Hold to Read / Interaction Hint on Active Card */}
-                {diff === 0 && (
-                  <div className="absolute top-4 right-5 sm:right-8 flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 bg-zinc-950/80 px-2.5 py-1 rounded-full border border-zinc-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Hold / Touch to Pause &amp; Read</span>
-                  </div>
-                )}
+                <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${mod.topBarGrad}`} />
 
                 <div className="space-y-4">
-                  {/* Top Row: Icon + Badges */}
+                  {/* Top Row: Icon + Badge */}
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${mod.iconStyle}`}>
-                      <Icon className="w-6 h-6" />
+                    <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${mod.iconStyle}`}>
+                      <Icon className="w-5 h-5" />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${mod.badgeBg} flex items-center gap-1.5`}>
-                        {mod.isActive ? (
-                          <>
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>{statusText}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="w-3.5 h-3.5 text-zinc-400" />
-                            <span>{statusText}</span>
-                          </>
-                        )}
-                      </span>
-                      <span className="text-xs font-mono text-zinc-500 hidden sm:inline-block">
-                        Layer {index + 1} of {modules.length}
-                      </span>
-                    </div>
+                    <span className={`text-[11px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${mod.badgeBg} flex items-center gap-1.5`}>
+                      {mod.isActive ? (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{statusText}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>{statusText}</span>
+                        </>
+                      )}
+                    </span>
                   </div>
 
                   {/* Title & Subtitle */}
@@ -425,25 +343,25 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                     <h3 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                       {title}
                     </h3>
-                    <span className={`text-sm font-semibold block mt-1 ${mod.subColor}`}>
+                    <span className={`text-sm font-semibold block mt-0.5 ${mod.subColor}`}>
                       {subtitle}
                     </span>
                   </div>
 
                   {/* Description */}
-                  <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
+                  <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-xl">
                     {description}
                   </p>
                 </div>
 
                 {/* Card Action Footer */}
-                <div className="pt-6 mt-6 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>MDeFi Master Protocol Architecture</span>
+                <div className="pt-5 mt-6 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-zinc-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>MDeFi Architecture</span>
                   </span>
 
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors">
                     <span>{mod.isAirdropCard ? 'CLAIM AIRDROP' : mod.isActive ? 'EXPLORE MODULE' : 'PHASE LOCKED'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
@@ -451,36 +369,6 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
               </div>
             );
           })}
-        </div>
-
-        {/* 10-Second Auto-Scroll Progress Bar & Navigation Dots */}
-        <div className="space-y-3 max-w-md mx-auto pt-2">
-          {/* Progress Bar */}
-          <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800">
-            <div 
-              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-100 ease-linear"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          {/* Dots */}
-          <div className="flex items-center justify-center gap-2">
-            {modules.map((m, idx) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  setActiveIndex(idx);
-                  setProgress(0);
-                }}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  activeIndex === idx
-                    ? 'w-7 bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
-                    : 'w-2 bg-zinc-700 hover:bg-zinc-500'
-                }`}
-                title={m.defaultTitle}
-              />
-            ))}
-          </div>
         </div>
 
         {/* Global Join CTA Box */}
