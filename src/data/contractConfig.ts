@@ -60,7 +60,7 @@ export const MINTING_PHASES_CONFIG: PhaseRewardConfig[] = [
 ];
 
 export const ECOSYSTEM_TELEMETRY = {
-  currentUsers: 8742,
+  currentUsers: 1000,
   nextPhaseThreshold: 10000,
   hardCap: '2,000,000 MBTTC',
   activePhase: 1,
