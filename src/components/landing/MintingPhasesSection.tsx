@@ -57,7 +57,7 @@ export const MintingPhasesSection: React.FC = () => {
                 <div>
                   <span className="text-xs text-zinc-400 font-mono uppercase block">{t('minting_current_users', 'Current Users')}</span>
                   <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                    {ECOSYSTEM_TELEMETRY.currentUsers.toLocaleString()}
+                    {(1000 + (ECOSYSTEM_TELEMETRY.currentUsers > 1000 ? ECOSYSTEM_TELEMETRY.currentUsers - 1000 : ECOSYSTEM_TELEMETRY.currentUsers === 1000 ? 0 : ECOSYSTEM_TELEMETRY.currentUsers)).toLocaleString()}
                   </span>
                 </div>
                 <div className="border-l border-zinc-800 pl-4 sm:pl-6">
