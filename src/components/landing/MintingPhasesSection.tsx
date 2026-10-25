@@ -35,29 +35,32 @@ export const MintingPhasesSection: React.FC = () => {
       try {
         let count = 0;
 
-        // 1. Check centralEventSyncService memory state
+        // 1. Check central sync state / local cache
         if (typeof centralEventSyncService !== 'undefined') {
-          const state: any = centralEventSyncService.getState ? centralEventSyncService.getState() : {};
-          const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.publicEcosystemActivities?.length;
-          if (typeof candidate === 'number' && candidate > 0) {
-            count = candidate;
-          }
+          const state: any = (centralEventSyncService as any).getState ? (centralEventSyncService as any).getState() : {};
+          const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.totalRegisteredUsers;
+          if (Number(candidate) > 0) count = Number(candidate);
         }
 
-        // 2. Fetch directly from mdefiService without mock restrictions
-        if (count === 0 && typeof mdefiService !== 'undefined' && (mdefiService as any)?.getEcosystemStats) {
-          const stats: any = await (mdefiService as any).getEcosystemStats();
-          const raw = stats?.totalRegisteredUsers ?? stats?.totalUsers;
-          if (raw !== undefined && Number(raw) > 0) {
-            count = Number(raw);
-          }
+        // 2. Read directly from public provider / contract view if available
+        if (count === 0 && typeof mdefiService !== 'undefined') {
+          const rawCount = await (mdefiService as any).getTotalUsers?.() ?? (await (mdefiService as any).getEcosystemStats?.())?.totalRegisteredUsers;
+          if (Number(rawCount) > 0) count = Number(rawCount);
         }
 
-        if (isMounted && count > 0) {
-          setContractUserCount(count);
+        // 3. Shared browser session fallback
+        if (count === 0 && typeof window !== 'undefined') {
+          const cached = localStorage.getItem('mdefi_total_users') || localStorage.getItem('mdefi_ecosystem_users');
+          if (cached && Number(cached) > 0) count = Number(cached);
+        }
+
+        if (isMounted) {
+          // At minimum contract starts with 1 user (id: 1 root)
+          setContractUserCount(count > 0 ? count : 1);
         }
       } catch (err) {
         console.warn('[MintingPhasesSection] TotalUsers sync fallback:', err);
+        if (isMounted) setContractUserCount(1);
       }
     };
 
