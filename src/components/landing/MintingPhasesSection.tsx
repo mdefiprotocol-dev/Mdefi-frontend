@@ -15,7 +15,8 @@ import {
 import { 
   MINTING_PHASES_CONFIG, 
   ECOSYSTEM_TELEMETRY, 
-  getActivePhaseConfig 
+  getActivePhaseConfig,
+  MDEFI_HUB_ADDRESS 
 } from '../../data/contractConfig';
 import { mdefiService } from '../../services/mdefiService';
 import { centralEventSyncService } from '../../services/centralEventSyncService';
@@ -35,32 +36,53 @@ export const MintingPhasesSection: React.FC = () => {
       try {
         let count = 0;
 
-        // 1. Check central sync state / local cache
+        // 1. Check central event sync state or memory cache
         if (typeof centralEventSyncService !== 'undefined') {
           const state: any = (centralEventSyncService as any).getState ? (centralEventSyncService as any).getState() : {};
           const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.totalRegisteredUsers;
           if (Number(candidate) > 0) count = Number(candidate);
         }
 
-        // 2. Read directly from public provider / contract view if available
-        if (count === 0 && typeof mdefiService !== 'undefined') {
-          const rawCount = await (mdefiService as any).getTotalUsers?.() ?? (await (mdefiService as any).getEcosystemStats?.())?.totalRegisteredUsers;
-          if (Number(rawCount) > 0) count = Number(rawCount);
-        }
-
-        // 3. Shared browser session fallback
+        // 2. Direct Hub Smart Contract Read (Function selector for totalUsers(): 0xd88047e1)
         if (count === 0 && typeof window !== 'undefined') {
-          const cached = localStorage.getItem('mdefi_total_users') || localStorage.getItem('mdefi_ecosystem_users');
-          if (cached && Number(cached) > 0) count = Number(cached);
+          const cachedCount = Number(sessionStorage.getItem('mdefi_live_contract_users') || 0);
+          const lastFetched = Number(sessionStorage.getItem('mdefi_users_ts') || 0);
+
+          if (cachedCount > 0 && Date.now() - lastFetched < 30000) {
+            count = cachedCount;
+          } else if (MDEFI_HUB_ADDRESS && MDEFI_HUB_ADDRESS !== '') {
+            try {
+              const res = await fetch('https://bsc-dataseed.binance.org/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: 1,
+                  method: 'eth_call',
+                  params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
+                })
+              });
+              const data = await res.json();
+              if (data?.result && data.result !== '0x') {
+                const onChainVal = parseInt(data.result, 16);
+                if (!isNaN(onChainVal) && onChainVal > 0) {
+                  count = onChainVal;
+                  sessionStorage.setItem('mdefi_live_contract_users', String(onChainVal));
+                  sessionStorage.setItem('mdefi_users_ts', String(Date.now()));
+                }
+              }
+            } catch (netErr) {
+              console.warn('[MintingPhasesSection] Public RPC query bypassed:', netErr);
+            }
+          }
         }
 
-        if (isMounted) {
-          // At minimum contract starts with 1 user (id: 1 root)
-          setContractUserCount(count > 0 ? count : 1);
+        // Real count update: No artificial hardcoded fallback
+        if (isMounted && count > 0) {
+          setContractUserCount(count);
         }
       } catch (err) {
-        console.warn('[MintingPhasesSection] TotalUsers sync fallback:', err);
-        if (isMounted) setContractUserCount(1);
+        console.warn('[MintingPhasesSection] TotalUsers sync error:', err);
       }
     };
 
