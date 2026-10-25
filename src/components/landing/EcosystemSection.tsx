@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Network, 
   Award, 
@@ -36,7 +36,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
   const tradingStatus = programPhaseService.getModulePhaseStatus('mbttc_trading');
 
   // Exact 8-Card Sequence
-  const modules = [
+  const modules = useMemo(() => [
     {
       id: 'mbttc-airdrop',
       moduleKey: 'claim_minting' as LaunchModuleKey,
@@ -50,13 +50,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 1,
       accentColor: 'emerald',
       icon: Coins,
-      bgGrad: 'from-emerald-950/90 via-[#07130b] to-[#020b06]',
-      borderColor: 'border-emerald-500/60',
+      bgGrad: 'bg-[#09150f]',
+      borderColor: 'border-emerald-500/50',
       topBarGrad: 'from-emerald-500 via-teal-400 to-emerald-500',
-      iconStyle: 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300',
+      iconStyle: 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300',
       subColor: 'text-emerald-400',
-      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
-      glowColor: 'rgba(16,185,129,0.3)',
+      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40',
+      glowColor: 'rgba(16,185,129,0.25)',
       isAirdropCard: true,
     },
     {
@@ -72,13 +72,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 2,
       accentColor: 'emerald',
       icon: Network,
-      bgGrad: 'from-emerald-950/80 via-[#06140b] to-[#020d06]',
-      borderColor: 'border-emerald-500/40',
+      bgGrad: 'bg-[#06140c]',
+      borderColor: 'border-emerald-500/35',
       topBarGrad: 'from-emerald-500/80 via-emerald-400 to-teal-400/80',
-      iconStyle: 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300',
+      iconStyle: 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300',
       subColor: 'text-emerald-400/90',
-      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
-      glowColor: 'rgba(16,185,129,0.25)',
+      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40',
+      glowColor: 'rgba(16,185,129,0.2)',
     },
     {
       id: 'weekly-starter',
@@ -93,13 +93,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 2,
       accentColor: 'teal',
       icon: Award,
-      bgGrad: 'from-teal-950/80 via-[#051715] to-[#020e0d]',
-      borderColor: 'border-teal-500/40',
+      bgGrad: 'bg-[#051614]',
+      borderColor: 'border-teal-500/35',
       topBarGrad: 'from-teal-500/80 via-cyan-400 to-teal-400/80',
-      iconStyle: 'bg-teal-500/20 border-teal-400/40 text-teal-300',
+      iconStyle: 'bg-teal-500/15 border-teal-400/30 text-teal-300',
       subColor: 'text-teal-400/90',
-      badgeBg: 'bg-teal-950/90 text-teal-300 border-teal-500/50',
-      glowColor: 'rgba(20,184,166,0.25)',
+      badgeBg: 'bg-teal-950/90 text-teal-300 border-teal-500/40',
+      glowColor: 'rgba(20,184,166,0.2)',
     },
     {
       id: 'quantum-nexus',
@@ -114,13 +114,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 3,
       accentColor: 'cyan',
       icon: Boxes,
-      bgGrad: 'from-cyan-950/80 via-[#041721] to-[#020c13]',
-      borderColor: 'border-cyan-500/40',
+      bgGrad: 'bg-[#041620]',
+      borderColor: 'border-cyan-500/35',
       topBarGrad: 'from-cyan-500/80 via-sky-400 to-cyan-400/80',
-      iconStyle: 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300',
+      iconStyle: 'bg-cyan-500/15 border-cyan-400/30 text-cyan-300',
       subColor: 'text-cyan-400/90',
-      badgeBg: 'bg-cyan-950/90 text-cyan-300 border-cyan-500/50',
-      glowColor: 'rgba(6,182,212,0.25)',
+      badgeBg: 'bg-cyan-950/90 text-cyan-300 border-cyan-500/40',
+      glowColor: 'rgba(6,182,212,0.2)',
     },
     {
       id: 'nexus-prime',
@@ -135,13 +135,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 3,
       accentColor: 'purple',
       icon: Crown,
-      bgGrad: 'from-purple-950/80 via-[#130621] to-[#0b0213]',
-      borderColor: 'border-purple-500/40',
+      bgGrad: 'bg-[#12071f]',
+      borderColor: 'border-purple-500/35',
       topBarGrad: 'from-purple-500/80 via-fuchsia-400 to-purple-400/80',
-      iconStyle: 'bg-purple-500/20 border-purple-400/40 text-purple-300',
+      iconStyle: 'bg-purple-500/15 border-purple-400/30 text-purple-300',
       subColor: 'text-purple-400/90',
-      badgeBg: 'bg-purple-950/90 text-purple-300 border-purple-500/50',
-      glowColor: 'rgba(168,85,247,0.25)',
+      badgeBg: 'bg-purple-950/90 text-purple-300 border-purple-500/40',
+      glowColor: 'rgba(168,85,247,0.2)',
     },
     {
       id: 'weekly-premium',
@@ -156,13 +156,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 3,
       accentColor: 'blue',
       icon: Crown,
-      bgGrad: 'from-blue-950/80 via-[#051125] to-[#020814]',
-      borderColor: 'border-blue-500/40',
+      bgGrad: 'bg-[#051124]',
+      borderColor: 'border-blue-500/35',
       topBarGrad: 'from-blue-500/80 via-indigo-400 to-blue-400/80',
-      iconStyle: 'bg-blue-500/20 border-blue-400/40 text-blue-300',
+      iconStyle: 'bg-blue-500/15 border-blue-400/30 text-blue-300',
       subColor: 'text-blue-400/90',
-      badgeBg: 'bg-blue-950/90 text-blue-300 border-blue-500/50',
-      glowColor: 'rgba(59,130,246,0.25)',
+      badgeBg: 'bg-blue-950/90 text-blue-300 border-blue-500/40',
+      glowColor: 'rgba(59,130,246,0.2)',
     },
     {
       id: 'weekly-salary',
@@ -177,13 +177,13 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 3,
       accentColor: 'amber',
       icon: Zap,
-      bgGrad: 'from-amber-950/80 via-[#1b1003] to-[#0f0901]',
-      borderColor: 'border-amber-500/40',
+      bgGrad: 'bg-[#180f03]',
+      borderColor: 'border-amber-500/35',
       topBarGrad: 'from-amber-500/80 via-yellow-400 to-orange-400/80',
-      iconStyle: 'bg-amber-500/20 border-amber-400/40 text-amber-300',
+      iconStyle: 'bg-amber-500/15 border-amber-400/30 text-amber-300',
       subColor: 'text-amber-400/90',
-      badgeBg: 'bg-amber-950/90 text-amber-300 border-amber-500/50',
-      glowColor: 'rgba(245,158,11,0.25)',
+      badgeBg: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
+      glowColor: 'rgba(245,158,11,0.2)',
     },
     {
       id: 'mbttc-trading',
@@ -198,26 +198,26 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       minPhase: 4,
       accentColor: 'emerald',
       icon: Coins,
-      bgGrad: 'from-emerald-950/80 via-[#07170c] to-[#020c06]',
-      borderColor: 'border-emerald-500/40',
+      bgGrad: 'bg-[#06160c]',
+      borderColor: 'border-emerald-500/35',
       topBarGrad: 'from-emerald-500/80 via-teal-400 to-cyan-400/80',
-      iconStyle: 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300',
+      iconStyle: 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300',
       subColor: 'text-emerald-400/90',
-      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50',
-      glowColor: 'rgba(16,185,129,0.25)',
+      badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40',
+      glowColor: 'rgba(16,185,129,0.2)',
     },
-  ];
+  ], [s4Status.isUnlocked, quantumStatus.isUnlocked, nexusStatus.isUnlocked, starterStatus.isUnlocked, premiumStatus.isUnlocked, salaryStatus.isUnlocked, tradingStatus.isUnlocked]);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const isPausedRef = useRef(false);
 
-  // Ultra-Lightweight 2-Second Transition (Zero Lag, Native GPU Composited)
+  // High-performance auto transition: 3.5s interval (smooth read & zero stutter)
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isPausedRef.current) {
         setActiveIndex((prev) => (prev + 1) % modules.length);
       }
-    }, 2000);
+    }, 3500);
 
     return () => clearInterval(timer);
   }, [modules.length]);
@@ -235,7 +235,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
     <section id="ecosystem" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-10 relative overflow-hidden">
       <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
         
-        {/* Clean Section Header */}
+        {/* Clean Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
@@ -251,9 +251,9 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
           </div>
         </div>
 
-        {/* 3D Magic Layer Deck (Down-to-Up 2s Stack Transition) */}
+        {/* 3D Stack Container: Fixed Height & Zero Heavy Blurs for High FPS */}
         <div 
-          className="relative min-h-[420px] sm:min-h-[440px] flex items-center justify-center pt-4 pb-10 cursor-pointer select-none"
+          className="relative h-[380px] sm:h-[390px] w-full flex items-center justify-center select-none"
           onMouseEnter={() => { isPausedRef.current = true; }}
           onMouseLeave={() => { isPausedRef.current = false; }}
           onTouchStart={() => { isPausedRef.current = true; }}
@@ -263,20 +263,21 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
             const count = modules.length;
             const diff = (index - activeIndex + count) % count;
             
-            // Render only top 3 layers for 60FPS fluid GPU performance
-            if (diff > 2 && diff < count - 1) return null;
+            // Render only top 3 cards to keep memory footprint 0
+            if (diff > 2 && diff !== count - 1) return null;
 
-            let translateY = diff * 20; // 20px offset per layer
-            let scale = 1 - diff * 0.05; // 5% scale down per depth
-            let opacity = diff === 0 ? 1 : 1 - diff * 0.35;
-            let zIndex = 30 - diff;
+            // GPU Composited transforms
+            let translateY = diff * 18; // 18px neat vertical layer stack
+            let scale = 1 - diff * 0.04; // 4% subtle scale
+            let opacity = diff === 0 ? 1 : diff === 1 ? 0.75 : 0.45;
+            let zIndex = 25 - diff;
 
             if (diff === count - 1) {
-              // Smooth upward exit
-              translateY = -60;
-              scale = 0.96;
+              // Smooth upward float transition for outgoing card
+              translateY = -50;
+              scale = 0.98;
               opacity = 0;
-              zIndex = 35;
+              zIndex = 30;
             }
 
             const Icon = mod.icon;
@@ -305,20 +306,22 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                     setActiveIndex(index);
                   }
                 }}
-                className={`absolute w-full max-w-2xl rounded-3xl p-6 sm:p-8 bg-gradient-to-b ${mod.bgGrad} border ${mod.borderColor} backdrop-blur-xl transition-all duration-500 ease-out shadow-2xl flex flex-col justify-between will-change-transform`}
+                className={`absolute w-full max-w-2xl rounded-3xl p-6 sm:p-8 ${mod.bgGrad} border ${mod.borderColor} shadow-xl flex flex-col justify-between cursor-pointer`}
                 style={{
                   transform: `translate3d(0, ${translateY}px, 0) scale(${scale})`,
                   opacity,
                   zIndex,
-                  boxShadow: diff === 0 ? `0 20px 40px -10px ${mod.glowColor}` : '0 10px 20px -5px rgba(0,0,0,0.5)',
+                  transition: 'transform 600ms cubic-bezier(0.16, 1, 0.3, 1), opacity 500ms ease-out',
+                  willChange: 'transform, opacity',
+                  boxShadow: diff === 0 ? `0 16px 36px -10px ${mod.glowColor}` : 'none',
                 }}
               >
                 {/* Neon Top Bar */}
                 <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${mod.topBarGrad}`} />
 
-                <div className="space-y-4">
-                  {/* Top Row: Icon + Badge */}
-                  <div className="flex items-center gap-3">
+                <div className="space-y-3.5">
+                  {/* Top: Icon + Status */}
+                  <div className="flex items-center justify-between">
                     <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${mod.iconStyle}`}>
                       <Icon className="w-5 h-5" />
                     </div>
@@ -355,7 +358,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                 </div>
 
                 {/* Card Action Footer */}
-                <div className="pt-5 mt-6 border-t border-white/10 flex items-center justify-between">
+                <div className="pt-4 mt-5 border-t border-white/10 flex items-center justify-between">
                   <span className="text-[11px] font-mono text-zinc-400 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     <span>MDeFi Architecture</span>
