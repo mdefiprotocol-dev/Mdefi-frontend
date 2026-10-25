@@ -1,13 +1,14 @@
 /**
  * MDeFi Protocol & MBTTC Token Configuration
  * BNB Smart Chain (BEP-20) Specifications & Minting Phase Economics
+ * Synchronized with MDEFIEnterpriseHubUnified Smart Contract rules
  */
 
 import { CONTRACT_ADDRESSES } from '../config/contractConfig';
 
 export const MBTTC_TOKEN_ADDRESS = CONTRACT_ADDRESSES.mbttcToken;
 export const MDEFI_HUB_ADDRESS = CONTRACT_ADDRESSES.mdefiHub;
-export const USDT_TOKEN_ADDRESS = '';
+export const USDT_TOKEN_ADDRESS = (CONTRACT_ADDRESSES as any).usdtToken || '';
 export const BURN_DEAD_ADDRESS = CONTRACT_ADDRESSES.burnDead;
 
 export interface PhaseRewardConfig {
@@ -17,7 +18,7 @@ export interface PhaseRewardConfig {
   isCurrent: boolean;
   registrationReward: number; // in MBTTC
   referralReward: number;     // in MBTTC
-  quantumS4Reward: number;    // in MBTTC
+  quantumS4Reward: number;    // in MBTTC ($25 Senior Node Package)
   maxUsers: number;
   userTierDescription: string;
 }
@@ -42,8 +43,8 @@ export const MINTING_PHASES_CONFIG: PhaseRewardConfig[] = [
     registrationReward: 25,
     referralReward: 15,
     quantumS4Reward: 45,
-    maxUsers: 50000,
-    userTierDescription: 'Scaling tier (10,001 – 50,000 users)',
+    maxUsers: 25000,
+    userTierDescription: 'Scaling tier (10,001 – 25,000 users)',
   },
   {
     phase: 3,
@@ -53,8 +54,8 @@ export const MINTING_PHASES_CONFIG: PhaseRewardConfig[] = [
     registrationReward: 20,
     referralReward: 10,
     quantumS4Reward: 40,
-    maxUsers: 200000,
-    userTierDescription: 'Final distribution tier up to 2,000,000 MBTTC mint cap',
+    maxUsers: 25000,
+    userTierDescription: 'Final distribution tier up to 2,000,000 MBTTC mint cap (> 25,000 users)',
   },
 ];
 
@@ -67,6 +68,6 @@ export const ECOSYSTEM_TELEMETRY = {
 
 export function getActivePhaseConfig(userCount: number = ECOSYSTEM_TELEMETRY.currentUsers): PhaseRewardConfig {
   if (userCount <= 10000) return MINTING_PHASES_CONFIG[0];
-  if (userCount <= 50000) return MINTING_PHASES_CONFIG[1];
+  if (userCount <= 25000) return MINTING_PHASES_CONFIG[1];
   return MINTING_PHASES_CONFIG[2];
 }
