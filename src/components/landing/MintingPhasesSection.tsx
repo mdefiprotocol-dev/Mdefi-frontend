@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   GitBranch, 
   CheckCircle2, 
@@ -17,11 +17,78 @@ import {
   ECOSYSTEM_TELEMETRY, 
   getActivePhaseConfig 
 } from '../../data/contractConfig';
+import { mdefiService } from '../../services/mdefiService';
+import { centralEventSyncService } from '../../services/centralEventSyncService';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const MintingPhasesSection: React.FC = () => {
   const { t } = useLanguage();
-  const activeConfig = getActivePhaseConfig();
+  
+  // Real Contract Total Users State
+  const [contractUserCount, setContractUserCount] = useState<number>(0);
+
+  // Sync real contract totalUsers with event subscription & zero-RPC polling
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncUserCount = async () => {
+      try {
+        let count = 0;
+
+        // 1. Check centralEventSyncService memory state
+        if (typeof centralEventSyncService !== 'undefined') {
+          const state: any = centralEventSyncService.getState ? centralEventSyncService.getState() : {};
+          const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.publicEcosystemActivities?.length;
+          if (typeof candidate === 'number' && candidate > 0) {
+            count = candidate;
+          }
+        }
+
+        // 2. Fetch directly from mdefiService without mock restrictions
+        if (count === 0 && typeof mdefiService !== 'undefined' && (mdefiService as any)?.getEcosystemStats) {
+          const stats: any = await (mdefiService as any).getEcosystemStats();
+          const raw = stats?.totalRegisteredUsers ?? stats?.totalUsers;
+          if (raw !== undefined && Number(raw) > 0) {
+            count = Number(raw);
+          }
+        }
+
+        if (isMounted && count > 0) {
+          setContractUserCount(count);
+        }
+      } catch (err) {
+        console.warn('[MintingPhasesSection] TotalUsers sync fallback:', err);
+      }
+    };
+
+    syncUserCount();
+
+    // Event bus subscriber for instant zero-reload updates
+    let unsubscribe: (() => void) | undefined;
+    if (typeof centralEventSyncService !== 'undefined' && (centralEventSyncService as any).subscribe) {
+      unsubscribe = (centralEventSyncService as any).subscribe(() => {
+        syncUserCount();
+      });
+    }
+
+    const interval = setInterval(syncUserCount, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Strict Rule: 1000 Default + Real Contract totalUsers
+  const totalDisplayUsers = useMemo(() => {
+    return 1000 + (contractUserCount > 0 ? contractUserCount : 0);
+  }, [contractUserCount]);
+
+  const activeConfig = useMemo(() => {
+    return getActivePhaseConfig(totalDisplayUsers);
+  }, [totalDisplayUsers]);
+
   const phases = MINTING_PHASES_CONFIG;
 
   return (
@@ -57,7 +124,7 @@ export const MintingPhasesSection: React.FC = () => {
                 <div>
                   <span className="text-xs text-zinc-400 font-mono uppercase block">{t('minting_current_users', 'Current Users')}</span>
                   <span className="text-3xl sm:text-4xl font-extrabold font-mono text-white tracking-tight">
-                    {(1000 + (ECOSYSTEM_TELEMETRY.currentUsers > 1000 ? ECOSYSTEM_TELEMETRY.currentUsers - 1000 : ECOSYSTEM_TELEMETRY.currentUsers === 1000 ? 0 : ECOSYSTEM_TELEMETRY.currentUsers)).toLocaleString()}
+                    {totalDisplayUsers.toLocaleString()}
                   </span>
                 </div>
                 <div className="border-l border-zinc-800 pl-4 sm:pl-6">
@@ -99,7 +166,7 @@ export const MintingPhasesSection: React.FC = () => {
         {/* 3-Phase Structured Comparison Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
           {phases.map((ph) => {
-            const isCurrent = ph.isCurrent;
+            const isCurrent = ph.phase === activeConfig.phase;
             return (
               <div
                 key={ph.phase}
