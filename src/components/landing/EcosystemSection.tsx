@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Network, 
   Award, 
@@ -9,7 +9,9 @@ import {
   Zap,
   Lock,
   Boxes,
-  ShieldCheck
+  ShieldCheck,
+  Pause,
+  Play
 } from 'lucide-react';
 import { programPhaseService } from '../../services/programPhaseService';
 import { LaunchModuleKey } from '../../config/launchPhaseConfig';
@@ -35,7 +37,10 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
   const salaryStatus = programPhaseService.getModulePhaseStatus('salary');
   const tradingStatus = programPhaseService.getModulePhaseStatus('mbttc_trading');
 
-  // Exact 8-Card Sequence
+  // Interactive hold/pause state
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Exact 8-Card Protocol Sequence
   const modules: Array<{
     id: string;
     moduleKey?: LaunchModuleKey;
@@ -57,9 +62,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
     badgeBg: string;
     glowColor: string;
     isAirdropCard?: boolean;
-    staggerDelay: string;
   }> = [
-    // 1. MBTTC TOKEN AIRDROP — LIVE NOW / REGISTRATION OPEN
+    // 1. MBTTC TOKEN AIRDROP
     {
       id: 'mbttc-airdrop',
       moduleKey: 'claim_minting',
@@ -81,9 +85,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       badgeBg: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
       glowColor: 'rgba(16,185,129,0.28)',
       isAirdropCard: true,
-      staggerDelay: 'delay-75',
     },
-    // 2. S4 NODES — PHASE 2
+    // 2. S4 NODES
     {
       id: 's4-node',
       moduleKey: 's4',
@@ -104,9 +107,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-emerald-400/90',
       badgeBg: s4Status.isUnlocked ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50' : 'bg-emerald-950/50 text-emerald-400/80 border-emerald-500/30',
       glowColor: 'rgba(16,185,129,0.22)',
-      staggerDelay: 'delay-100',
     },
-    // 3. WEEKLY REWARD STARTER — PHASE 2
+    // 3. WEEKLY REWARD STARTER
     {
       id: 'weekly-starter',
       moduleKey: 'starter_reward',
@@ -127,9 +129,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-teal-400/90',
       badgeBg: starterStatus.isUnlocked ? 'bg-teal-950/90 text-teal-300 border-teal-500/50' : 'bg-teal-950/50 text-teal-400/80 border-teal-500/30',
       glowColor: 'rgba(20,184,166,0.22)',
-      staggerDelay: 'delay-150',
     },
-    // 4. QUANTUM NODES — PHASE 3
+    // 4. QUANTUM NODES
     {
       id: 'quantum-nexus',
       moduleKey: 'quantum_nexus',
@@ -150,9 +151,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-cyan-400/90',
       badgeBg: quantumStatus.isUnlocked ? 'bg-cyan-950/90 text-cyan-300 border-cyan-500/50' : 'bg-cyan-950/50 text-cyan-400/80 border-cyan-500/30',
       glowColor: 'rgba(6,182,212,0.22)',
-      staggerDelay: 'delay-200',
     },
-    // 5. NEXUS PRIME NODE — PHASE 3
+    // 5. NEXUS PRIME NODE
     {
       id: 'nexus-prime',
       moduleKey: 'nexus_prime',
@@ -173,9 +173,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-purple-400/90',
       badgeBg: nexusStatus.isUnlocked ? 'bg-purple-950/90 text-purple-300 border-purple-500/50' : 'bg-purple-950/50 text-purple-400/80 border-purple-500/30',
       glowColor: 'rgba(168,85,247,0.22)',
-      staggerDelay: 'delay-75',
     },
-    // 6. WEEKLY REWARD PREMIUM — PHASE 3
+    // 6. WEEKLY REWARD PREMIUM
     {
       id: 'weekly-premium',
       moduleKey: 'premium_reward',
@@ -196,9 +195,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-blue-400/90',
       badgeBg: premiumStatus.isUnlocked ? 'bg-blue-950/90 text-blue-300 border-blue-500/50' : 'bg-blue-950/50 text-blue-400/80 border-blue-500/30',
       glowColor: 'rgba(59,130,246,0.22)',
-      staggerDelay: 'delay-100',
     },
-    // 7. WEEKLY PASSIVE SALARY — PHASE 3
+    // 7. WEEKLY PASSIVE SALARY
     {
       id: 'weekly-salary',
       moduleKey: 'salary',
@@ -219,9 +217,8 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-amber-400/90',
       badgeBg: salaryStatus.isUnlocked ? 'bg-amber-950/90 text-amber-300 border-amber-500/50' : 'bg-amber-950/50 text-amber-400/80 border-amber-500/30',
       glowColor: 'rgba(245,158,11,0.22)',
-      staggerDelay: 'delay-150',
     },
-    // 8. MBTTC TOKEN LAUNCH Trading Live — PHASE 4
+    // 8. MBTTC TOKEN LAUNCH
     {
       id: 'mbttc-trading',
       moduleKey: 'mbttc_trading',
@@ -242,9 +239,11 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
       subColor: 'text-emerald-400/90',
       badgeBg: tradingStatus.isUnlocked ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50' : 'bg-emerald-950/50 text-emerald-400/80 border-emerald-500/30',
       glowColor: 'rgba(16,185,129,0.22)',
-      staggerDelay: 'delay-200',
     },
   ];
+
+  // Infinite loop set (duplicated to make seamless smooth marquee)
+  const marqueeModules = [...modules, ...modules];
 
   const navigateToMbttcDetails = () => {
     const el = document.getElementById('mbttc');
@@ -256,8 +255,28 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
   };
 
   return (
-    <section id="ecosystem" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-10 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
+    <section id="ecosystem" className="py-16 sm:py-24 relative overflow-hidden">
+      {/* Dynamic Keyframes for smooth infinite auto-scroll */}
+      <style>{`
+        @keyframes marqueeScroll {
+          0% {
+            transform: translateX(0%);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .magic-marquee-track {
+          display: flex;
+          width: max-content;
+          animation: marqueeScroll 45s linear infinite;
+        }
+        .magic-marquee-track.is-paused {
+          animation-play-state: paused !important;
+        }
+      `}</style>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 space-y-8 sm:space-y-10">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
@@ -273,15 +292,37 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs font-mono text-zinc-400 self-start md:self-end">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>8 Modular Contract Suites</span>
+          {/* Interactive Status Indicator */}
+          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 self-start md:self-end">
+            <span className="relative flex h-2 w-2">
+              <span className={`absolute inline-flex h-full w-full rounded-full ${isPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-ping opacity-75'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isPaused ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            </span>
+            <span className="font-mono text-[11px] font-bold">
+              {isPaused ? 'PAUSED (READING MODE)' : 'AUTO-SCROLL ACTIVE'}
+            </span>
+            <span className="text-zinc-600">•</span>
+            <span className="text-[10px] text-zinc-400 hidden sm:inline">Hold / Hover to Read</span>
           </div>
         </div>
+      </div>
 
-        {/* Responsive Grid with Staggered Fade-Up Effect */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-          {modules.map((mod) => {
+      {/* Full-width Infinite Auto-Scrolling Magic Layer */}
+      <div 
+        className="mt-8 relative w-full overflow-hidden"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
+        onMouseDown={() => setIsPaused(true)}
+        onMouseUp={() => setIsPaused(false)}
+      >
+        {/* Left & Right Edge Dark Gradient Fades */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-28 bg-gradient-to-r from-[#030705] via-[#030705]/80 to-transparent z-20 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-28 bg-gradient-to-l from-[#030705] via-[#030705]/80 to-transparent z-20 pointer-events-none" />
+
+        <div className={`magic-marquee-track py-4 gap-6 px-4 ${isPaused ? 'is-paused' : ''}`}>
+          {marqueeModules.map((mod, index) => {
             const Icon = mod.icon;
             const title = t(mod.titleKey, mod.defaultTitle);
             const subtitle = t(mod.subKey, mod.defaultSubtitle);
@@ -296,7 +337,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
 
             return (
               <div
-                key={mod.id}
+                key={`${mod.id}-${index}`}
                 onClick={() => {
                   if (mod.isAirdropCard || mod.id === 'mbttc-trading') {
                     navigateToMbttcDetails();
@@ -304,9 +345,9 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                     onSelectModule(mod.id, mod.moduleKey);
                   }
                 }}
-                className={`group relative rounded-3xl p-5 sm:p-6 bg-gradient-to-b ${mod.bgGrad} border ${mod.borderColor} transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer shadow-lg overflow-hidden flex flex-col justify-between min-h-[300px] animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both ${mod.staggerDelay}`}
+                className={`group relative rounded-3xl p-6 sm:p-7 bg-gradient-to-b ${mod.bgGrad} border ${mod.borderColor} transition-all duration-300 hover:-translate-y-2 cursor-pointer shadow-xl overflow-hidden flex flex-col justify-between w-[300px] sm:w-[350px] min-h-[320px] shrink-0 select-none backdrop-blur-xl`}
                 style={{
-                  boxShadow: `0 8px 30px -8px ${mod.glowColor}`,
+                  boxShadow: `0 10px 35px -10px ${mod.glowColor}`,
                 }}
               >
                 {/* Top Web3 Neon Accent Highlight Bar */}
@@ -318,7 +359,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                   style={{ backgroundColor: mod.glowColor }}
                 />
 
-                <div className="relative z-10 space-y-3">
+                <div className="relative z-10 space-y-3.5">
                   {/* Top Bar: Icon & Status Badge */}
                   <div className="flex items-center justify-between gap-2">
                     <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105 ${mod.iconStyle}`}>
@@ -349,7 +390,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
 
                   {/* Title & Subtitle */}
                   <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-emerald-300 transition-colors">
+                    <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight group-hover:text-emerald-300 transition-colors">
                       {title}
                     </h3>
                     <span className={`text-[11px] font-medium block mt-0.5 ${mod.subColor}`}>
@@ -364,7 +405,7 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
                 </div>
 
                 {/* Footer Action */}
-                <div className="pt-3.5 mt-4 border-t border-white/10 flex items-center justify-between text-xs relative z-10">
+                <div className="pt-4 mt-4 border-t border-white/10 flex items-center justify-between text-xs relative z-10">
                   {mod.isAirdropCard ? (
                     <button
                       type="button"
@@ -394,8 +435,10 @@ export const EcosystemSection: React.FC<EcosystemSectionProps> = ({
             );
           })}
         </div>
+      </div>
 
-        {/* Global Join CTA Box */}
+      {/* Global Join CTA Box */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 mt-10">
         <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#071b12] via-zinc-950 to-[#09151c] border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_50px_rgba(16,185,129,0.12)]">
           <div className="space-y-1 text-center md:text-left">
             <h3 className="text-xl sm:text-2xl font-black text-white">
