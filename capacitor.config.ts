@@ -6,7 +6,17 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://mdefipro.xyz',
-    cleartext: false
+    cleartext: true,
+    androidScheme: 'https',
+    allowNavigation: [
+      'mdefipro.xyz',
+      '*.mdefipro.xyz',
+      '*.walletconnect.com',
+      '*.walletconnect.org',
+      '*.binance.org',
+      'bsc-dataseed.binance.org',
+      'data-seed-prebsc-1-s1.binance.org'
+    ]
   }
 };
 
