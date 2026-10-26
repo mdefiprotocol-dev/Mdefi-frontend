@@ -1,6 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Exact Web3 Wallets Integration Queries -->
+    <queries>
+        <!-- Generic WalletConnect protocol handler -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="wc" />
+        </intent>
+
+        <!-- 1. MetaMask -->
+        <package android:name="io.metamask" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="metamask" />
+        </intent>
+
+        <!-- 2. Trust Wallet -->
+        <package android:name="com.wallet.crypto.trustapp" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="trust" />
+        </intent>
+
+        <!-- 3. TokenPocket -->
+        <package android:name="vip.mytokenpocket" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tpoutside" />
+        </intent>
+
+        <!-- 4. Bitget Wallet (BitKeep) -->
+        <package android:name="com.bitkeep.wallet" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="bitkeep" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -35,7 +76,4 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
