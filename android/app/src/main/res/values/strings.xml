@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MDeFi Network</string>
+    <string name="title_activity_main">MDeFi Network</string>
+    <string name="package_name">io.mdefi.app</string>
+    <string name="custom_url_scheme">io.mdefi.app</string>
+</resources>
