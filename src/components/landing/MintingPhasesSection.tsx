@@ -51,7 +51,6 @@ export const MintingPhasesSection: React.FC = () => {
             // Public Binance Smart Chain endpoint with fallback
             const rpcList = [
               'https://bsc-rpc.publicnode.com',
-              'https://bsc.drpc.org'
             ];
 
             for (const rpc of rpcList) {
