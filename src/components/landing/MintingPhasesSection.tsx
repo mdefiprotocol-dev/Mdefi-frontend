@@ -29,60 +29,62 @@ export const MintingPhasesSection: React.FC = () => {
   // Real Contract Total Users State
   const [contractUserCount, setContractUserCount] = useState<number>(0);
 
-  // Direct sync: Contract totalUsers() + Internal App telemetry
+  // Pure on-chain read of contract's totalUsers() without hardcoded tricks
   useEffect(() => {
     let isMounted = true;
 
-    const fetchTotalUsers = async () => {
+    const queryContractDirectly = async () => {
       try {
-        let liveUsers = 0;
+        let total = 0;
 
-        // 1. App event sync / service state
+        // 1. Try from project's central service if already synced
         if (typeof centralEventSyncService !== 'undefined') {
-          const appState: any = (centralEventSyncService as any).getState?.() || {};
-          const candidate = appState?.stats?.totalUsers ?? appState?.totalUsers ?? appState?.stats?.totalRegisteredUsers;
-          if (Number(candidate) > 0) liveUsers = Number(candidate);
+          const st: any = (centralEventSyncService as any).getState?.() || {};
+          const candidate = st?.stats?.totalUsers ?? st?.totalUsers;
+          if (Number(candidate) > 0) total = Number(candidate);
         }
 
-        // 2. Direct on-chain public read from BSC node (zero wallet required)
-        if (liveUsers === 0 && MDEFI_HUB_ADDRESS) {
+        // 2. Direct on-chain view call via official ethers Provider (No Wallet Needed)
+        if (total === 0 && MDEFI_HUB_ADDRESS) {
           try {
-            const res = await fetch('https://bsc-dataseed1.binance.org/', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'eth_call',
-                params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
-              })
-            });
-            const json = await res.json();
-            if (json?.result && json.result !== '0x') {
-              const val = parseInt(json.result, 16);
-              if (!isNaN(val) && val > 0) liveUsers = val;
+            const ProviderClass = (ethers as any).JsonRpcProvider || (ethers as any).providers?.JsonRpcProvider;
+            // Public Binance Smart Chain endpoint with fallback
+            const rpcList = [
+              'https://binance.ankr.com',
+              'https://bsc-dataseed.binance.org',
+              'https://1rpc.io/bnb'
+            ];
+
+            for (const rpc of rpcList) {
+              if (total > 0) break;
+              try {
+                const provider = new ProviderClass(rpc);
+                const hub = new ethers.Contract(
+                  MDEFI_HUB_ADDRESS,
+                  ['function totalUsers() external view returns (uint256)'],
+                  provider
+                );
+                const res = await hub.totalUsers();
+                const num = Number(res?.toString() || 0);
+                if (num > 0) {
+                  total = num;
+                  break;
+                }
+              } catch {}
             }
           } catch {}
         }
 
-        // 3. Fallback to ecosystem telemetry count if contract read is 0
-        if (liveUsers === 0) {
-          const cfgUsers = Number(ECOSYSTEM_TELEMETRY?.currentUsers || 0);
-          if (cfgUsers > 0) {
-            liveUsers = cfgUsers > 1000 ? cfgUsers - 1000 : cfgUsers;
-          }
-        }
-
-        if (isMounted && liveUsers > 0) {
-          setContractUserCount(liveUsers);
+        if (isMounted && total > 0) {
+          setContractUserCount(total);
         }
       } catch (err) {
-        console.warn('[MintingPhasesSection] User sync note:', err);
+        console.warn('[MintingPhasesSection] Sync:', err);
       }
     };
 
-    fetchTotalUsers();
-    const interval = setInterval(fetchTotalUsers, 5000);
+    queryContractDirectly();
+    const interval = setInterval(queryContractDirectly, 6000);
 
     return () => {
       isMounted = false;
@@ -90,10 +92,9 @@ export const MintingPhasesSection: React.FC = () => {
     };
   }, []);
 
-  // Strict Rule: 1,000 Default + Real Contract / Ecosystem registered users
+  // Strict Rule: Exactly 1,000 Base + Actual Smart Contract registered users
   const totalDisplayUsers = useMemo(() => {
-    const additional = contractUserCount > 0 ? contractUserCount : Number(ECOSYSTEM_TELEMETRY?.currentUsers || 0) > 1000 ? Number(ECOSYSTEM_TELEMETRY.currentUsers) - 1000 : 0;
-    return 1000 + additional;
+    return 1000 + contractUserCount;
   }, [contractUserCount]);
 
   const activeConfig = useMemo(() => {
