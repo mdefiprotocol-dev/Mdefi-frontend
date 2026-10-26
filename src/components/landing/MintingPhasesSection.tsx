@@ -29,81 +29,71 @@ export const MintingPhasesSection: React.FC = () => {
   // Real Contract Total Users State
   const [contractUserCount, setContractUserCount] = useState<number>(0);
 
-  // Sync real contract totalUsers with event subscription & zero-RPC polling
+  // Direct sync: Contract totalUsers() + Internal App telemetry
   useEffect(() => {
     let isMounted = true;
 
-    const syncUserCount = async () => {
+    const fetchTotalUsers = async () => {
       try {
-        let count = 0;
+        let liveUsers = 0;
 
-        // 1. Centralized in-memory app sync
+        // 1. App event sync / service state
         if (typeof centralEventSyncService !== 'undefined') {
-          const state: any = (centralEventSyncService as any).getState ? (centralEventSyncService as any).getState() : {};
-          const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.totalRegisteredUsers;
-          if (Number(candidate) > 0) count = Number(candidate);
+          const appState: any = (centralEventSyncService as any).getState?.() || {};
+          const candidate = appState?.stats?.totalUsers ?? appState?.totalUsers ?? appState?.stats?.totalRegisteredUsers;
+          if (Number(candidate) > 0) liveUsers = Number(candidate);
         }
 
-        // 2. Safe contract read with zero BAD_DATA decode crash
-if (count === 0 && MDEFI_HUB_ADDRESS) {
-  try {
-    // First check existing app service cache
-    if (typeof mdefiService !== 'undefined') {
-      const liveStats = await (mdefiService as any)?.getEcosystemStats?.();
-      const serviceCount = liveStats?.totalRegisteredUsers || liveStats?.totalUsers;
-      if (Number(serviceCount) > 0) count = Number(serviceCount);
-    }
-
-    // Fallback: Read directly via provider safely
-    if (count === 0) {
-      const rpcUrl = 'https://bsc-dataseed.binance.org';
-      const ProviderClass = (ethers as any).JsonRpcProvider || (ethers as any).providers?.JsonRpcProvider;
-      if (ProviderClass) {
-        const provider = new ProviderClass(rpcUrl);
-        // Low-level raw call to prevent Ethers BAD_DATA throw
-        const rawHex = await provider.call({
-          to: MDEFI_HUB_ADDRESS,
-          data: '0xd88047e1'
-        });
-        if (rawHex && rawHex !== '0x' && rawHex !== '0x0') {
-          const parsed = parseInt(rawHex, 16);
-          if (!isNaN(parsed) && parsed > 0) count = parsed;
+        // 2. Direct on-chain public read from BSC node (zero wallet required)
+        if (liveUsers === 0 && MDEFI_HUB_ADDRESS) {
+          try {
+            const res = await fetch('https://bsc-dataseed1.binance.org/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'eth_call',
+                params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
+              })
+            });
+            const json = await res.json();
+            if (json?.result && json.result !== '0x') {
+              const val = parseInt(json.result, 16);
+              if (!isNaN(val) && val > 0) liveUsers = val;
+            }
+          } catch {}
         }
-      }
-    }
-  } catch {}
-}
 
-        if (isMounted && count > 0) {
-          setContractUserCount(count);
+        // 3. Fallback to ecosystem telemetry count if contract read is 0
+        if (liveUsers === 0) {
+          const cfgUsers = Number(ECOSYSTEM_TELEMETRY?.currentUsers || 0);
+          if (cfgUsers > 0) {
+            liveUsers = cfgUsers > 1000 ? cfgUsers - 1000 : cfgUsers;
+          }
+        }
+
+        if (isMounted && liveUsers > 0) {
+          setContractUserCount(liveUsers);
         }
       } catch (err) {
-        console.warn('[MintingPhasesSection] totalUsers sync fallback:', err);
+        console.warn('[MintingPhasesSection] User sync note:', err);
       }
     };
 
-    syncUserCount();
-
-    // Event bus subscriber for instant zero-reload updates
-    let unsubscribe: (() => void) | undefined;
-    if (typeof centralEventSyncService !== 'undefined' && (centralEventSyncService as any).subscribe) {
-      unsubscribe = (centralEventSyncService as any).subscribe(() => {
-        syncUserCount();
-      });
-    }
-
-    const interval = setInterval(syncUserCount, 4000);
+    fetchTotalUsers();
+    const interval = setInterval(fetchTotalUsers, 5000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
-      if (unsubscribe) unsubscribe();
     };
   }, []);
 
-  // Strict Rule: 1000 Default + Real Contract totalUsers
+  // Strict Rule: 1,000 Default + Real Contract / Ecosystem registered users
   const totalDisplayUsers = useMemo(() => {
-    return 1000 + (contractUserCount > 0 ? contractUserCount : 0);
+    const additional = contractUserCount > 0 ? contractUserCount : Number(ECOSYSTEM_TELEMETRY?.currentUsers || 0) > 1000 ? Number(ECOSYSTEM_TELEMETRY.currentUsers) - 1000 : 0;
+    return 1000 + additional;
   }, [contractUserCount]);
 
   const activeConfig = useMemo(() => {
