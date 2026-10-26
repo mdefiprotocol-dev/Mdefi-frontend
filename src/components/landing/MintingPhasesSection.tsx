@@ -36,80 +36,49 @@ export const MintingPhasesSection: React.FC = () => {
       try {
         let count = 0;
 
-        // 1. Check central sync state / app memory
-        if (typeof centralEventSyncService !== 'undefined') {
+        // 1. Existing App Service call (Same clean provider used by Dashboard)
+        if (typeof mdefiService !== 'undefined') {
+          try {
+            const raw = await (mdefiService as any).getTotalUsers?.() 
+              ?? (await (mdefiService as any).getEcosystemStats?.())?.totalRegisteredUsers
+              ?? (await (mdefiService as any).totalUsers?.());
+            if (Number(raw) > 0) count = Number(raw);
+          } catch {}
+        }
+
+        // 2. Central Event state
+        if (count === 0 && typeof centralEventSyncService !== 'undefined') {
           const state: any = (centralEventSyncService as any).getState ? (centralEventSyncService as any).getState() : {};
           const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.totalRegisteredUsers;
           if (Number(candidate) > 0) count = Number(candidate);
         }
 
-        // 2. Check cached count in session memory (0% RPC)
-        if (count === 0 && typeof window !== 'undefined') {
-          const cachedCount = Number(sessionStorage.getItem('mdefi_live_contract_users') || 0);
-          const lastFetched = Number(sessionStorage.getItem('mdefi_users_ts') || 0);
-          if (cachedCount > 0 && Date.now() - lastFetched < 30000) {
-            count = cachedCount;
-          }
-        }
-
-        // 3. Try reading directly from browser web3 provider if available
-        if (count === 0 && typeof window !== 'undefined' && (window as any).ethereum && MDEFI_HUB_ADDRESS) {
+        // 3. Official Binance Mainnet RPC (Direct view totalUsers(): 0xd88047e1)
+        if (count === 0 && typeof window !== 'undefined' && MDEFI_HUB_ADDRESS) {
           try {
-            const ethRes = await (window as any).ethereum.request({
-              method: 'eth_call',
-              params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
+            const res = await fetch('https://binance.ankr.com', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'eth_call',
+                params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
+              })
             });
-            if (ethRes && ethRes !== '0x') {
-              const val = parseInt(ethRes, 16);
+            const data = await res.json();
+            if (data?.result && data.result !== '0x') {
+              const val = parseInt(data.result, 16);
               if (!isNaN(val) && val > 0) count = val;
             }
           } catch {}
         }
 
-        // 4. Multi-RPC public fallback with CORS tolerance
-        if (count === 0 && typeof window !== 'undefined' && MDEFI_HUB_ADDRESS) {
-          const rpcEndpoints = [
-            'https://bsc-dataseed1.defibit.io/',
-            'https://bsc-dataseed1.ninicoin.io/',
-            'https://binance.llamarpc.com',
-            'https://data-seed-prebsc-1-s1.binance.org:8545/' // testnet fallback
-          ];
-
-          for (const endpoint of rpcEndpoints) {
-            if (count > 0) break;
-            try {
-              const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  jsonrpc: '2.0',
-                  id: 1,
-                  method: 'eth_call',
-                  params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
-                })
-              });
-              const data = await res.json();
-              if (data?.result && data.result !== '0x') {
-                const onChainVal = parseInt(data.result, 16);
-                if (!isNaN(onChainVal) && onChainVal > 0) {
-                  count = onChainVal;
-                  break;
-                }
-              }
-            } catch {}
-          }
-        }
-
-        // Save valid on-chain count to cache & state
-        if (count > 0) {
-          sessionStorage.setItem('mdefi_live_contract_users', String(count));
-          sessionStorage.setItem('mdefi_users_ts', String(Date.now()));
-          if (isMounted) {
-            setContractUserCount(count);
-          }
+        if (isMounted && count > 0) {
+          setContractUserCount(count);
         }
       } catch (err) {
-        console.warn('[MintingPhasesSection] TotalUsers sync error:', err);
+        console.warn('[MintingPhasesSection] totalUsers read fallback:', err);
       }
     };
 
