@@ -12,6 +12,7 @@ import {
   Users, 
   TrendingDown 
 } from 'lucide-react';
+import { ethers } from 'ethers';
 import { 
   MINTING_PHASES_CONFIG, 
   ECOSYSTEM_TELEMETRY, 
@@ -36,49 +37,37 @@ export const MintingPhasesSection: React.FC = () => {
       try {
         let count = 0;
 
-        // 1. Existing App Service call (Same clean provider used by Dashboard)
-        if (typeof mdefiService !== 'undefined') {
-          try {
-            const raw = await (mdefiService as any).getTotalUsers?.() 
-              ?? (await (mdefiService as any).getEcosystemStats?.())?.totalRegisteredUsers
-              ?? (await (mdefiService as any).totalUsers?.());
-            if (Number(raw) > 0) count = Number(raw);
-          } catch {}
-        }
-
-        // 2. Central Event state
-        if (count === 0 && typeof centralEventSyncService !== 'undefined') {
+        // 1. Centralized in-memory app sync
+        if (typeof centralEventSyncService !== 'undefined') {
           const state: any = (centralEventSyncService as any).getState ? (centralEventSyncService as any).getState() : {};
           const candidate = state?.stats?.totalUsers ?? state?.totalUsers ?? state?.totalRegisteredUsers;
           if (Number(candidate) > 0) count = Number(candidate);
         }
 
-        // 3. Official Binance Mainnet RPC (Direct view totalUsers(): 0xd88047e1)
-        if (count === 0 && typeof window !== 'undefined' && MDEFI_HUB_ADDRESS) {
+        // 2. Direct Hub ABI view call via clean JsonRpcProvider (No wallet login required)
+        if (count === 0 && MDEFI_HUB_ADDRESS) {
           try {
-            const res = await fetch('https://binance.ankr.com', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'eth_call',
-                params: [{ to: MDEFI_HUB_ADDRESS, data: '0xd88047e1' }, 'latest']
-              })
-            });
-            const data = await res.json();
-            if (data?.result && data.result !== '0x') {
-              const val = parseInt(data.result, 16);
-              if (!isNaN(val) && val > 0) count = val;
-            }
-          } catch {}
+            const provider = (ethers as any).JsonRpcProvider 
+              ? new (ethers as any).JsonRpcProvider('https://bsc-dataseed.binance.org')
+              : new (ethers as any).providers.JsonRpcProvider('https://bsc-dataseed.binance.org');
+            const hubContract = new ethers.Contract(
+              MDEFI_HUB_ADDRESS,
+              ['function totalUsers() view returns (uint256)'],
+              provider
+            );
+            const onChainCount = await hubContract.totalUsers();
+            const parsed = Number(onChainCount?.toString() || 0);
+            if (parsed > 0) count = parsed;
+          } catch (contractErr) {
+            console.warn('[MintingPhasesSection] Contract view read error:', contractErr);
+          }
         }
 
         if (isMounted && count > 0) {
           setContractUserCount(count);
         }
       } catch (err) {
-        console.warn('[MintingPhasesSection] totalUsers read fallback:', err);
+        console.warn('[MintingPhasesSection] totalUsers sync fallback:', err);
       }
     };
 
