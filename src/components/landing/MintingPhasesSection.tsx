@@ -44,24 +44,35 @@ export const MintingPhasesSection: React.FC = () => {
           if (Number(candidate) > 0) count = Number(candidate);
         }
 
-        // 2. Direct Hub ABI view call via clean JsonRpcProvider (No wallet login required)
-        if (count === 0 && MDEFI_HUB_ADDRESS) {
-          try {
-            const provider = (ethers as any).JsonRpcProvider 
-              ? new (ethers as any).JsonRpcProvider('https://bsc-dataseed.binance.org')
-              : new (ethers as any).providers.JsonRpcProvider('https://bsc-dataseed.binance.org');
-            const hubContract = new ethers.Contract(
-              MDEFI_HUB_ADDRESS,
-              ['function totalUsers() view returns (uint256)'],
-              provider
-            );
-            const onChainCount = await hubContract.totalUsers();
-            const parsed = Number(onChainCount?.toString() || 0);
-            if (parsed > 0) count = parsed;
-          } catch (contractErr) {
-            console.warn('[MintingPhasesSection] Contract view read error:', contractErr);
-          }
+        // 2. Safe contract read with zero BAD_DATA decode crash
+if (count === 0 && MDEFI_HUB_ADDRESS) {
+  try {
+    // First check existing app service cache
+    if (typeof mdefiService !== 'undefined') {
+      const liveStats = await (mdefiService as any)?.getEcosystemStats?.();
+      const serviceCount = liveStats?.totalRegisteredUsers || liveStats?.totalUsers;
+      if (Number(serviceCount) > 0) count = Number(serviceCount);
+    }
+
+    // Fallback: Read directly via provider safely
+    if (count === 0) {
+      const rpcUrl = 'https://bsc-dataseed.binance.org';
+      const ProviderClass = (ethers as any).JsonRpcProvider || (ethers as any).providers?.JsonRpcProvider;
+      if (ProviderClass) {
+        const provider = new ProviderClass(rpcUrl);
+        // Low-level raw call to prevent Ethers BAD_DATA throw
+        const rawHex = await provider.call({
+          to: MDEFI_HUB_ADDRESS,
+          data: '0xd88047e1'
+        });
+        if (rawHex && rawHex !== '0x' && rawHex !== '0x0') {
+          const parsed = parseInt(rawHex, 16);
+          if (!isNaN(parsed) && parsed > 0) count = parsed;
         }
+      }
+    }
+  } catch {}
+}
 
         if (isMounted && count > 0) {
           setContractUserCount(count);
