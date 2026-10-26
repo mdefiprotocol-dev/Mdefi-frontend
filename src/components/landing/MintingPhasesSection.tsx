@@ -50,7 +50,8 @@ export const MintingPhasesSection: React.FC = () => {
             const ProviderClass = (ethers as any).JsonRpcProvider || (ethers as any).providers?.JsonRpcProvider;
             // Public Binance Smart Chain endpoint with fallback
             const rpcList = [
-              'https://bsc-rpc.publicnode.com',
+              'https://bsc-testnet-rpc.publicnode.com',
+              'https://data-seed-prebsc-1-s1.binance.org:8545'
             ];
 
             for (const rpc of rpcList) {
