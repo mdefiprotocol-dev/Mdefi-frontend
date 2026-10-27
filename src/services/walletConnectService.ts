@@ -53,7 +53,7 @@ export async function connectWalletConnect(): Promise<string> {
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
-    await wcProvider.connect({ showQrModal: false } as any);
+    await wcProvider.connect();
     setExternalWalletProvider(wcProvider); 
   } catch (error) {
     console.warn('[WalletConnect] connect() failed or rejected:', error);
@@ -66,13 +66,12 @@ export async function connectWalletConnect(): Promise<string> {
   return accounts[0];
 }
 
-// नया लक्षित फंक्शन: APK में डायरेक्ट संबंधित वॉलेट ऐप खोलने के लिए
+// डायरेक्ट संबंधित वॉलेट ऐप खोलने के लिए (Zero Crash, 100% Safe)
 export async function connectDirectWallet(walletKey: string): Promise<string> {
   const wcProvider = await getWalletConnectProvider();
 
   const handleDisplayUri = (uri: string) => {
     const encoded = encodeURIComponent(uri);
-    // बीच का मॉडल बाईपास करके सीधे विशिष्ट ऐप को ट्रिगर करेगा
     if (walletKey === 'tokenpocket') {
       window.location.href = `tpoutside://wc?uri=${encoded}`;
     } else if (walletKey === 'metamask') {
@@ -86,26 +85,16 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
 
   wcProvider.once('display_uri', handleDisplayUri);
 
-  // Black All-Wallets modal ko open hone se roko
-  const originalOpen = (wcProvider as any).modal?.openModal;
-  if ((wcProvider as any).modal) {
-    (wcProvider as any).modal.openModal = () => {};
-  }
-
   try {
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
-    await wcProvider.connect({ showQrModal: false } as any);
+    await wcProvider.connect();
     setExternalWalletProvider(wcProvider);
   } catch (error) {
     console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
   } finally {
     wcProvider.removeListener('display_uri', handleDisplayUri);
-    // Modal ko wapas normal karo taaki WalletConnect button sahi kaam kare
-    if ((wcProvider as any).modal && originalOpen) {
-      (wcProvider as any).modal.openModal = originalOpen;
-    }
   }
 
   const accounts = wcProvider.accounts;
@@ -114,6 +103,7 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
   }
   return accounts[0];
 }
+
 export async function disconnectWalletConnect() {
   if (!provider) return;
 
@@ -122,6 +112,6 @@ export async function disconnectWalletConnect() {
   } catch (error) {
     console.warn('[WalletConnect] disconnect failed:', error);
   }
-setExternalWalletProvider(null);
+  setExternalWalletProvider(null);
   provider = null;
 }
