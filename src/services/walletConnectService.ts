@@ -86,6 +86,12 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
 
   wcProvider.once('display_uri', handleDisplayUri);
 
+  // Black All-Wallets modal ko open hone se roko
+  const originalOpen = (wcProvider as any).modal?.openModal;
+  if ((wcProvider as any).modal) {
+    (wcProvider as any).modal.openModal = () => {};
+  }
+
   try {
     if (wcProvider.session) {
       await wcProvider.disconnect();
@@ -96,6 +102,10 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
     console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
   } finally {
     wcProvider.removeListener('display_uri', handleDisplayUri);
+    // Modal ko wapas normal karo taaki WalletConnect button sahi kaam kare
+    if ((wcProvider as any).modal && originalOpen) {
+      (wcProvider as any).modal.openModal = originalOpen;
+    }
   }
 
   const accounts = wcProvider.accounts;
