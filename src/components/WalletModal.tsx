@@ -304,6 +304,34 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     const currentHref = window.location.href;
     const cleanUrl = currentHref.replace(/^https?:\/\//, '');
 
+    // Check karo ki user APK ke andar hai ya website par
+    const isInsideApk = 
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).Capacitor) ||
+      window.location.protocol === 'capacitor:';
+
+    // 1. AGAR APK KE ANDAR HAI: WalletConnect ke zariye connect karo taaki APK par auto-return mile
+    if (isInsideApk) {
+      connectWalletConnect()
+        .then((resolvedAddress) => {
+          if (resolvedAddress && isValidEthereumAddress(resolvedAddress)) {
+            setConnectedAddress(resolvedAddress);
+            setConnectionStatus('connected');
+            setStatusMessage('Connected (Verified)');
+            try { playClaimSuccessSound(); } catch {}
+            if (onWalletConnected) onWalletConnected(resolvedAddress, walletId);
+            if (onSwitchAddress) onSwitchAddress(resolvedAddress);
+            onClose();
+          }
+        })
+        .catch((err) => {
+          setConnectionStatus('error');
+          setErrorMessage(err?.message || 'Connection failed');
+        });
+      return true;
+    }
+
+    // 2. AGAR NORMAL WEBSITE HAI: Bilkul pehle jaisa dApp browser trigger hoga (Zero change)
     if (walletId === 'metamask') {
       window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
       return true;

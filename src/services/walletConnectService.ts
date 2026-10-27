@@ -36,6 +36,10 @@ export async function getWalletConnectProvider() {
       icons: [
         typeof window !== 'undefined' ? `${window.location.origin}/favicon.ico` : 'https://www.mdefipro.xyz/favicon.ico',
       ],
+      redirect: {
+        native: 'mdefi://',
+        universal: 'https://mdefipro.xyz',
+      },
     },
   });
 
