@@ -14,7 +14,7 @@ import {
 import { UserProfile } from '../types';
 import { playClaimSuccessSound } from '../utils/successSound';
 import { formatCompactAddress } from '../utils/formatAddress';
-import { connectWalletConnect } from '../services/walletConnectService';
+import { connectWalletConnect, connectDirectWallet } from '../services/walletConnectService';
 import { setExternalWalletProvider } from '../services/contractProvider';
 import { contractAdapter } from '../services/contractAdapter';
 
@@ -490,9 +490,13 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         window.location.protocol === 'capacitor:';
 
       if (isInsideApk) {
-        // APK ke andar WalletConnect use hoga -> Auto Return to APK!
-        setStatusMessage(`Connecting to ${wallet.name}...`);
-        resolvedAddress = await connectWalletConnect();
+        // APK ke andar direct targeted app trigger hoga (All Wallets modal bypass)
+        setStatusMessage(`Opening ${wallet.name}...`);
+        if (wallet.id === 'walletconnect') {
+          resolvedAddress = await connectWalletConnect();
+        } else {
+          resolvedAddress = await connectDirectWallet(wallet.id);
+        }
 
         if (activeSessionIdRef.current !== currentSessionId) return;
         if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {

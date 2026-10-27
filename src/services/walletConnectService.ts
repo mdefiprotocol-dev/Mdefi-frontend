@@ -50,25 +50,60 @@ export async function connectWalletConnect(): Promise<string> {
   const wcProvider = await getWalletConnectProvider();
 
   try {
-    // Agar pehle se koi purana session connect reh gaya ho to fresh connection ensure karein
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
     await wcProvider.connect();
-   setExternalWalletProvider(wcProvider); 
+    setExternalWalletProvider(wcProvider); 
   } catch (error) {
     console.warn('[WalletConnect] connect() failed or rejected:', error);
   }
 
   const accounts = wcProvider.accounts;
-
   if (!accounts || accounts.length === 0) {
     throw new Error('No wallet account was returned by WalletConnect.');
   }
-
   return accounts[0];
 }
 
+// नया लक्षित फंक्शन: APK में डायरेक्ट संबंधित वॉलेट ऐप खोलने के लिए
+export async function connectDirectWallet(walletKey: string): Promise<string> {
+  const wcProvider = await getWalletConnectProvider();
+
+  const handleDisplayUri = (uri: string) => {
+    const encoded = encodeURIComponent(uri);
+    // बीच का मॉडल बाईपास करके सीधे विशिष्ट ऐप को ट्रिगर करेगा
+    if (walletKey === 'tokenpocket') {
+      window.location.href = `tpoutside://wc?uri=${encoded}`;
+    } else if (walletKey === 'metamask') {
+      window.location.href = `metamask://wc?uri=${encoded}`;
+    } else if (walletKey === 'trustwallet' || walletKey === 'trust') {
+      window.location.href = `trust://wc?uri=${encoded}`;
+    } else if (walletKey === 'bitget') {
+      window.location.href = `bitkeep://wc?uri=${encoded}`;
+    }
+  };
+
+  wcProvider.once('display_uri', handleDisplayUri);
+
+  try {
+    if (wcProvider.session) {
+      await wcProvider.disconnect();
+    }
+    await wcProvider.connect();
+    setExternalWalletProvider(wcProvider);
+  } catch (error) {
+    console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
+  } finally {
+    wcProvider.removeListener('display_uri', handleDisplayUri);
+  }
+
+  const accounts = wcProvider.accounts;
+  if (!accounts || accounts.length === 0) {
+    throw new Error('No wallet account was returned.');
+  }
+  return accounts[0];
+}
 export async function disconnectWalletConnect() {
   if (!provider) return;
 
