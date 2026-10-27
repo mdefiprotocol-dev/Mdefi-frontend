@@ -26,7 +26,7 @@ export async function getWalletConnectProvider() {
       97: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
     },
 
-    // Enable WalletConnect QR / wallet selection modal
+    // Default modal configuration
     showQrModal: true,
 
     metadata: {
@@ -53,6 +53,10 @@ export async function connectWalletConnect(): Promise<string> {
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
+    // Generic WalletConnect option ke liye normal connect
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('mdefi_active_wallet', 'walletconnect');
+    }
     await wcProvider.connect();
     setExternalWalletProvider(wcProvider); 
   } catch (error) {
@@ -66,15 +70,14 @@ export async function connectWalletConnect(): Promise<string> {
   return accounts[0];
 }
 
-// डायरेक्ट संबंधित वॉलेट ऐप खोलने के लिए (Zero Crash, 100% Safe)
+// डायरेक्ट संबंधित वॉलेट ऐप खोलने के लिए (Zero CSS Hack, Zero Crash)
 export async function connectDirectWallet(walletKey: string): Promise<string> {
   const wcProvider = await getWalletConnectProvider();
 
-  // Kala 'All Wallets' modal visually hide karne ke liye dynamic CSS rule
-  const hideStyle = document.createElement('style');
-  hideStyle.id = 'hide-wc-modal-temp';
-  hideStyle.innerHTML = 'wcm-modal, w3m-modal, #wcm-modal { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }';
-  document.head.appendChild(hideStyle);
+  // Active wallet record karein taaki claim/transaction ke waqt auto-trigger ho sake
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('mdefi_active_wallet', walletKey);
+  }
 
   const handleDisplayUri = (uri: string) => {
     const encoded = encodeURIComponent(uri);
@@ -101,11 +104,6 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
     console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
   } finally {
     wcProvider.removeListener('display_uri', handleDisplayUri);
-    // Connection finish hote hi ya WalletConnect button ke liye style wapas remove kar do
-    const injectedStyle = document.getElementById('hide-wc-modal-temp');
-    if (injectedStyle) {
-      injectedStyle.remove();
-    }
   }
 
   const accounts = wcProvider.accounts;
@@ -122,6 +120,9 @@ export async function disconnectWalletConnect() {
     await provider.disconnect();
   } catch (error) {
     console.warn('[WalletConnect] disconnect failed:', error);
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('mdefi_active_wallet');
   }
   setExternalWalletProvider(null);
   provider = null;

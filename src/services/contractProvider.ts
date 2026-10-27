@@ -323,6 +323,28 @@ export class RealContractProvider implements IContractProvider {
           ? { value: valueWei }
           : {};
 
+      // केवल APK के अंदर: ट्रांजैक्शन साइन करने के लिए वॉलेट को स्क्रीन पर सामने लाएं
+      if (typeof window !== 'undefined') {
+        const isInsideApk = 
+          Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+          Boolean((window as any).Capacitor) ||
+          window.location.search.includes('source=app') ||
+          window.location.protocol === 'capacitor:';
+
+        if (isInsideApk) {
+          const activeWallet = localStorage.getItem('mdefi_active_wallet');
+          if (activeWallet === 'tokenpocket') {
+            window.location.href = 'tpoutside://';
+          } else if (activeWallet === 'metamask') {
+            window.location.href = 'metamask://';
+          } else if (activeWallet === 'trustwallet' || activeWallet === 'trust') {
+            window.location.href = 'trust://';
+          } else if (activeWallet === 'bitget') {
+            window.location.href = 'bitkeep://';
+          }
+        }
+      }
+
       const tx = await contract[methodName](
         ...(args || []),
         overrides
