@@ -70,6 +70,12 @@ export async function connectWalletConnect(): Promise<string> {
 export async function connectDirectWallet(walletKey: string): Promise<string> {
   const wcProvider = await getWalletConnectProvider();
 
+  // Kala 'All Wallets' modal visually hide karne ke liye dynamic CSS rule
+  const hideStyle = document.createElement('style');
+  hideStyle.id = 'hide-wc-modal-temp';
+  hideStyle.innerHTML = 'wcm-modal, w3m-modal, #wcm-modal { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }';
+  document.head.appendChild(hideStyle);
+
   const handleDisplayUri = (uri: string) => {
     const encoded = encodeURIComponent(uri);
     if (walletKey === 'tokenpocket') {
@@ -95,6 +101,11 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
     console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
   } finally {
     wcProvider.removeListener('display_uri', handleDisplayUri);
+    // Connection finish hote hi ya WalletConnect button ke liye style wapas remove kar do
+    const injectedStyle = document.getElementById('hide-wc-modal-temp');
+    if (injectedStyle) {
+      injectedStyle.remove();
+    }
   }
 
   const accounts = wcProvider.accounts;
