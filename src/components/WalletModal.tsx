@@ -480,21 +480,49 @@ export const WalletModal: React.FC<WalletModalProps> = ({
     }
 
     // =========================================================
-    // MOBILE DEEP-LINK FALLBACK
+    // MOBILE / APK FALLBACK
     // =========================================================
     if (isMobileEnvironment()) {
-      setStatusMessage(`Opening ${wallet.name} App...`);
+      const isInsideApk = 
+        Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+        Boolean((window as any).Capacitor) ||
+        window.location.search.includes('source=app') ||
+        window.location.protocol === 'capacitor:';
 
+      if (isInsideApk) {
+        // APK ke andar WalletConnect use hoga -> Auto Return to APK!
+        setStatusMessage(`Connecting to ${wallet.name}...`);
+        resolvedAddress = await connectWalletConnect();
+
+        if (activeSessionIdRef.current !== currentSessionId) return;
+        if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {
+          throw new Error('Wallet connection timed out or did not return a valid address.');
+        }
+
+        setConnectedAddress(resolvedAddress);
+        setConnectionStatus('connected');
+        setStatusMessage(`Connected via ${wallet.name} (Verified)`);
+        try { playClaimSuccessSound(); } catch {}
+
+        successTimeoutRef.current = setTimeout(() => {
+          if (activeSessionIdRef.current !== currentSessionId) return;
+          if (onWalletConnected) onWalletConnected(resolvedAddress, wallet.name);
+          if (onSwitchAddress) onSwitchAddress(resolvedAddress);
+          onClose();
+        }, 100);
+        return;
+      }
+
+      // Website par: Original DApp browser link (Zero change to website)
+      setStatusMessage(`Opening ${wallet.name} App...`);
       const opened = triggerWalletDeepLink(wallet.id);
 
       if (opened) {
         successTimeoutRef.current = setTimeout(() => {
           if (activeSessionIdRef.current !== currentSessionId) return;
-
           setConnectionStatus('idle');
           setConnectingWalletId(null);
         }, 3000);
-
         return;
       }
     }

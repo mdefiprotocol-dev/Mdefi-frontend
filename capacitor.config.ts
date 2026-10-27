@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'MDeFi Network',
   webDir: 'dist',
   server: {
-    url: 'https://mdefipro.xyz',
+    url: 'https://mdefipro.xyz?source=app',
     cleartext: true,
     androidScheme: 'https',
     allowNavigation: [
