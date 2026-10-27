@@ -53,7 +53,7 @@ export async function connectWalletConnect(): Promise<string> {
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
-    await wcProvider.connect();
+    await wcProvider.connect({ showQrModal: false } as any);
     setExternalWalletProvider(wcProvider); 
   } catch (error) {
     console.warn('[WalletConnect] connect() failed or rejected:', error);
@@ -90,7 +90,7 @@ export async function connectDirectWallet(walletKey: string): Promise<string> {
     if (wcProvider.session) {
       await wcProvider.disconnect();
     }
-    await wcProvider.connect();
+    await wcProvider.connect({ showQrModal: false } as any);
     setExternalWalletProvider(wcProvider);
   } catch (error) {
     console.warn(`[WalletConnect] Direct connect failed for ${walletKey}:`, error);
