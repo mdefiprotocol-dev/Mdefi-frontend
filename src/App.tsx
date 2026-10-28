@@ -43,6 +43,7 @@ import { WeeklyRewardStarterView } from './views/WeeklyRewardStarterView';
 import { WeeklyRewardPremiumView } from './views/WeeklyRewardPremiumView';
 import { WeeklyPassiveSalaryView } from './views/WeeklyPassiveSalaryView';
 import { LandingPage } from './components/landing/LandingPage';
+import { ApkWelcomeSplash } from './components/ApkWelcomeSplash';
 import { LanguageProvider } from './context/LanguageContext';
 import { MBTTC_TOKEN_INFO } from './data/mbttcTokenInfo';
 import { PhaseLockedView } from './components/common/PhaseLockedView';
@@ -76,6 +77,16 @@ const emptyRewardBalances: RewardBalances = {
 };
 
 function MainApp() {
+  const [showApkSplash, setShowApkSplash] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).Capacitor) ||
+      window.location.search.includes('source=app') ||
+      window.location.protocol === 'capacitor:'
+    );
+  });
+
   const [appMode, setAppMode] = useState<'landing' | 'dashboard'>(() => {
     try {
       const savedMode = localStorage.getItem('mdefi_app_mode');
@@ -783,6 +794,10 @@ function MainApp() {
   if (appMode === 'landing') {
     return (
       <>
+        {showApkSplash && (
+          <ApkWelcomeSplash onEnter={() => setShowApkSplash(false)} />
+        )}
+
         <LandingPage onEnterDashboard={handleEnterDashboardFromLanding} />
         {isVerifyingOnChain && (
           <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
