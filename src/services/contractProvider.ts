@@ -323,7 +323,7 @@ export class RealContractProvider implements IContractProvider {
           ? { value: valueWei }
           : {};
 
-      // केवल APK के अंदर: ट्रांजैक्शन साइन करने के लिए वॉलेट को स्क्रीन पर सामने लाएं
+      // केवल APK के अंदर: UI में चुने गए वॉलेट को ट्रांजैक्शन साइन करने के लिए स्क्रीन पर लाएं
       if (typeof window !== 'undefined') {
         const isInsideApk = 
           Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
@@ -332,15 +332,33 @@ export class RealContractProvider implements IContractProvider {
           window.location.protocol === 'capacitor:';
 
         if (isInsideApk) {
-          const activeWallet = localStorage.getItem('mdefi_active_wallet');
-          if (activeWallet === 'tokenpocket') {
-            window.location.href = 'tpoutside://';
-          } else if (activeWallet === 'metamask') {
-            window.location.href = 'metamask://';
-          } else if (activeWallet === 'trustwallet' || activeWallet === 'trust') {
-            window.location.href = 'trust://';
-          } else if (activeWallet === 'bitget') {
-            window.location.href = 'bitkeep://';
+          const activeWallet = (localStorage.getItem('mdefi_active_wallet') || '').toLowerCase().trim();
+
+          // Hamare UI ke exact options ki official deep-link registry
+          const UI_WALLETS: Record<string, string> = {
+            metamask: 'metamask://wc',
+            trustwallet: 'trust://wc',
+            trust: 'trust://wc',
+            tokenpocket: 'tpoutside://wc',
+            bitget: 'bitkeep://wc',
+          };
+
+          const targetDeepLink = UI_WALLETS[activeWallet];
+
+          // Agar user ne specific app chuni hai toh use samne focus me layein
+          if (targetDeepLink) {
+            setTimeout(() => {
+              try {
+                const triggerAnchor = document.createElement('a');
+                triggerAnchor.href = targetDeepLink;
+                triggerAnchor.rel = 'noopener noreferrer';
+                document.body.appendChild(triggerAnchor);
+                triggerAnchor.click();
+                document.body.removeChild(triggerAnchor);
+              } catch (_) {
+                window.location.href = targetDeepLink;
+              }
+            }, 350);
           }
         }
       }
