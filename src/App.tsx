@@ -43,7 +43,7 @@ import { WeeklyRewardStarterView } from './views/WeeklyRewardStarterView';
 import { WeeklyRewardPremiumView } from './views/WeeklyRewardPremiumView';
 import { WeeklyPassiveSalaryView } from './views/WeeklyPassiveSalaryView';
 import { LandingPage } from './components/landing/LandingPage';
-import { ApkWelcomeSplash } from './components/ApkWelcomeSplash';
+import ApkWelcomeSplash from './components/ApkWelcomeSplash';
 import { LanguageProvider } from './context/LanguageContext';
 import { MBTTC_TOKEN_INFO } from './data/mbttcTokenInfo';
 import { PhaseLockedView } from './components/common/PhaseLockedView';
