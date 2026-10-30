@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Volume2, VolumeX, ShieldCheck, Zap, Lock, Sparkles, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ShieldCheck, Zap, Lock, ArrowRight } from 'lucide-react';
 import Rotating3DMbttcCoin from './common/Rotating3DMbttcCoin';
 
 /**
@@ -24,65 +24,9 @@ export interface ApkWelcomeSplashProps {
   soundEnabled?: boolean;
 }
 
-/**
- * Letter-by-letter timing mapping for "Welcome to MDeFi" (Line 1) and "Protocol & Networks" (Line 2)
- * Distributed across 4.0s to 7.8s to match the exact voice cadence.
- */
-interface TimedLetter {
-  char: string;
-  time: number;
-}
 
-interface TimedWord {
-  word: string;
-  letters: TimedLetter[];
-  isHighlight?: boolean;
-}
 
-function buildLetterTimeline(): { line1: TimedWord[]; line2: TimedWord[] } {
-  // Line 1: "Welcome to MDeFi" (4.00s - 5.70s)
-  // "Welcome": 4.00s - 4.55s
-  // "to": 4.60s - 4.95s
-  // "MDeFi": 5.00s - 5.70s
-  const line1Defs = [
-    { word: 'Welcome', start: 4.0, end: 4.55 },
-    { word: 'to', start: 4.6, end: 4.95 },
-    { word: 'MDeFi', start: 5.0, end: 5.7, isHighlight: true },
-  ];
 
-  // Line 2: "Protocol & Networks" (5.75s - 7.80s)
-  // "Protocol": 5.75s - 6.45s
-  // "&": 6.50s - 6.75s
-  // "Networks": 6.85s - 7.80s
-  const line2Defs = [
-    { word: 'Protocol', start: 5.75, end: 6.45, isHighlight: true },
-    { word: '&', start: 6.5, end: 6.78 },
-    { word: 'Networks', start: 6.85, end: 7.8, isHighlight: true },
-  ];
-
-  const mapWords = (defs: { word: string; start: number; end: number; isHighlight?: boolean }[]): TimedWord[] => {
-    return defs.map((def) => {
-      const chars = Array.from(def.word);
-      const span = (def.end - def.start) / Math.max(1, chars.length);
-      const letters: TimedLetter[] = chars.map((char, i) => ({
-        char,
-        time: def.start + i * span,
-      }));
-      return {
-        word: def.word,
-        letters,
-        isHighlight: def.isHighlight,
-      };
-    });
-  };
-
-  return {
-    line1: mapWords(line1Defs),
-    line2: mapWords(line2Defs),
-  };
-}
-
-const TIMELINE_DATA = buildLetterTimeline();
 
 /**
  * High-DPI Crystal-Clear Sci-Fi Blockchain Constellation & Embers Canvas
@@ -160,13 +104,11 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
         }
       }
 
-      // Draw floating luminous cyber-particles & embers
+      // Draw floating luminous cyber-particles & embers (Lightweight 60 FPS)
       particles.forEach((p) => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius * p.z, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${p.color}, ${p.alpha * p.z})`;
-        ctx.shadowColor = p.color.includes('251') ? '#fbbf24' : '#06b6d4';
-        ctx.shadowBlur = 6 * p.z;
         ctx.fill();
 
         if (!reducedMotion) {
@@ -206,327 +148,7 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
   );
 };
 
-/**
- * 3D Metallic-Gold MBTTC Coin with Actively Rotating Concentric Cyber-Rings & Backlight Aura
- */
-interface MbttcCoinProps {
-  reducedMotion: boolean;
-  activeFace: 'mbttc' | 'monogram';
-  onFlip: () => void;
-  isUnlocked: boolean;
-}
 
-const MajesticMbttcCoin: React.FC<MbttcCoinProps> = ({
-  reducedMotion,
-  activeFace,
-  onFlip,
-  isUnlocked,
-}) => {
-  const [tilt, setTilt] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (reducedMotion || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = (e.clientX - cx) / (rect.width / 2);
-    const dy = (e.clientY - cy) / (rect.height / 2);
-    setTilt({
-      x: Math.max(-10, Math.min(10, -dy * 10)),
-      y: Math.max(-12, Math.min(12, dx * 12)),
-    });
-  };
-
-  const handlePointerLeave = () => {
-    setTilt({ x: 0, y: 0 });
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-      onClick={onFlip}
-      role="button"
-      tabIndex={0}
-      aria-label="3D MBTTC Coin - Tap to view alternate face"
-      className="relative flex items-center justify-center cursor-pointer select-none group touch-manipulation focus:outline-none"
-      style={{
-        width: 'clamp(200px, 48vw, 255px)',
-        height: 'clamp(200px, 48vw, 255px)',
-        perspective: '1200px',
-      }}
-    >
-      {/* 1. Breathing Golden-Cyan Backlight Aura Radiating Behind the Coin */}
-      <div
-        className="absolute inset-[-14%] rounded-full pointer-events-none transition-all duration-1000"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(6, 182, 212, 0.36) 0%, rgba(245, 158, 11, 0.2) 30%, rgba(16, 185, 129, 0.16) 55%, transparent 72%)',
-          filter: 'blur(28px)',
-          transform: isUnlocked ? 'scale(1.12)' : 'scale(1)',
-          animation: reducedMotion ? 'none' : 'aura-pulse 5s ease-in-out infinite alternate',
-        }}
-      />
-
-      {/* 2. Outer Segmented Tech Cyber-Ring (Counter-Clockwise 3D Rotation with Tilt) */}
-      <div
-        className="absolute inset-[-16%] rounded-full border border-cyan-400/25 border-dashed pointer-events-none"
-        style={{
-          transformStyle: 'preserve-3d',
-          transform: 'rotateX(24deg)',
-          animation: reducedMotion ? 'none' : 'cyber-orbit-ccw 30s linear infinite',
-        }}
-      >
-        {/* Tech Corner Tick Accents */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[1.5px] bg-cyan-300 shadow-[0_0_8px_#22d3ee]" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[1.5px] bg-cyan-300 shadow-[0_0_8px_#22d3ee]" />
-        <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[1.5px] h-4 bg-cyan-300 shadow-[0_0_8px_#22d3ee]" />
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[1.5px] h-4 bg-cyan-300 shadow-[0_0_8px_#22d3ee]" />
-      </div>
-
-      {/* 3. Concentric Middle Orbital Ring with Micro Glowing Nodes (Clockwise Rotation) */}
-      <div
-        className="absolute inset-[-9%] rounded-full border border-emerald-400/30 pointer-events-none"
-        style={{
-          boxShadow: '0 0 16px rgba(16, 185, 129, 0.15), inset 0 0 12px rgba(6, 182, 212, 0.12)',
-          animation: reducedMotion ? 'none' : 'cyber-orbit-cw 22s linear infinite',
-        }}
-      >
-        {/* Micro Glowing Satellite Node 1 (Cyan with light trail) */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-        {/* Micro Glowing Satellite Node 2 (Emerald) */}
-        <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-        {/* Micro Glowing Satellite Node 3 (Amber) */}
-        <div className="absolute bottom-1/5 left-1 w-1.5 h-1.5 rounded-full bg-amber-300 shadow-[0_0_6px_#fde047]" />
-      </div>
-
-      {/* 4. Inner Fine Tech Ring (Counter-Clockwise Rotation) */}
-      <div
-        className="absolute inset-[-3%] rounded-full border border-amber-400/25 border-dotted pointer-events-none"
-        style={{
-          animation: reducedMotion ? 'none' : 'cyber-orbit-ccw 36s linear infinite',
-        }}
-      >
-        <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_8px_#fef08a]" />
-      </div>
-
-      {/* 5. Physical 3D Coin Body with Floating Hover Effect */}
-      <div
-        className="relative w-full h-full rounded-full transition-transform duration-500 ease-out"
-        style={{
-          transformStyle: 'preserve-3d',
-          transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
-          animation: reducedMotion ? 'none' : 'majestic-float 6s ease-in-out infinite',
-        }}
-      >
-        {/* Ambient Drop Shadow */}
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            boxShadow:
-              '0 25px 50px -10px rgba(0, 0, 0, 0.95), 0 0 35px rgba(245, 158, 11, 0.28), 0 0 55px rgba(6, 182, 212, 0.2)',
-          }}
-        />
-
-        {/* 3D Coin Foundation Layer */}
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background:
-              'linear-gradient(135deg, #78350f 0%, #92400e 25%, #451a03 50%, #b45309 75%, #78350f 100%)',
-            transform: 'translateZ(-12px)',
-          }}
-        />
-
-        {/* Stepped Metallic Edge */}
-        <div
-          className="absolute inset-[2px] rounded-full"
-          style={{
-            background:
-              'linear-gradient(225deg, #d97706 0%, #fbbf24 30%, #78350f 60%, #fef08a 85%, #92400e 100%)',
-            transform: 'translateZ(-6px)',
-            boxShadow: 'inset 0 0 8px rgba(0,0,0,0.6)',
-          }}
-        />
-
-        {/* Outer Coin Bevel Rim (Stepped Coin Teeth Pattern) */}
-        <div
-          className="absolute inset-0 rounded-full p-[3px] sm:p-1"
-          style={{
-            background:
-              'conic-gradient(from 45deg, #fef08a 0deg, #d97706 45deg, #451a03 90deg, #fef08a 140deg, #b45309 180deg, #fef9c3 225deg, #78350f 270deg, #fde047 315deg, #fef08a 360deg)',
-            boxShadow:
-              '0 0 16px rgba(251, 191, 36, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.85), inset 0 -3px 6px rgba(0, 0, 0, 0.85)',
-          }}
-        >
-          {/* Inner Recessed Face with Radial Gold Sheen */}
-          <div
-            className="relative w-full h-full rounded-full overflow-hidden flex flex-col items-center justify-center"
-            style={{
-              background:
-                'radial-gradient(circle at 45% 35%, #fef08a 0%, #f59e0b 28%, #d97706 52%, #92400e 74%, #451a03 100%)',
-              boxShadow:
-                'inset 0 4px 12px rgba(0, 0, 0, 0.75), inset 0 0 24px rgba(120, 53, 15, 0.95), 0 0 18px rgba(251, 191, 36, 0.28)',
-            }}
-          >
-            {/* Concentric Grooves & Beaded Rings */}
-            <svg
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              viewBox="0 0 300 300"
-              fill="none"
-            >
-              <circle
-                cx="150"
-                cy="150"
-                r="138"
-                stroke="#fef08a"
-                strokeWidth="2.2"
-                strokeDasharray="4 3"
-                strokeOpacity="0.85"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="132"
-                stroke="#78350f"
-                strokeWidth="1.5"
-                strokeOpacity="0.9"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="124"
-                stroke="#ffffff"
-                strokeWidth="3.2"
-                strokeDasharray="1.5 6.8"
-                strokeLinecap="round"
-                strokeOpacity="0.9"
-                style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="116"
-                stroke="#fef08a"
-                strokeWidth="1.2"
-                strokeOpacity="0.6"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="104"
-                stroke="#78350f"
-                strokeWidth="2.5"
-                strokeOpacity="0.8"
-              />
-              <circle
-                cx="150"
-                cy="150"
-                r="102"
-                stroke="#fef9c3"
-                strokeWidth="1"
-                strokeOpacity="0.75"
-              />
-            </svg>
-
-            {/* Specular Diagonal Sheen Sweep */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(115deg, rgba(255,255,255,0) 25%, rgba(255,255,255,0.48) 48%, rgba(255,255,255,0.75) 50%, rgba(255,255,255,0.1) 53%, rgba(255,255,255,0) 70%)',
-                mixBlendMode: 'overlay',
-                animation: reducedMotion ? 'none' : 'sheen-sweep 6s ease-in-out infinite',
-              }}
-            />
-
-            {/* Coin Center Motif */}
-            {activeFace === 'mbttc' ? (
-              <div className="relative z-10 flex flex-col items-center justify-center text-center px-4">
-                <div className="flex items-center gap-1.5 mb-1 sm:mb-1.5">
-                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 fill-amber-200 animate-pulse drop-shadow-[0_0_6px_#fef08a]" />
-                  <Sparkles className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-amber-100 fill-amber-100 drop-shadow-[0_0_8px_#ffffff]" />
-                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 fill-amber-200 animate-pulse drop-shadow-[0_0_6px_#fef08a]" />
-                </div>
-
-                <span
-                  className="font-extrabold tracking-wider text-3xl sm:text-4xl md:text-5xl select-none"
-                  style={{
-                    fontFamily: "'Cinzel', serif, system-ui",
-                    background:
-                      'linear-gradient(180deg, #ffffff 0%, #fef08a 35%, #f59e0b 70%, #78350f 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    filter:
-                      'drop-shadow(0 2px 1px rgba(0,0,0,0.9)) drop-shadow(0 -1px 1px rgba(255,255,255,0.8))',
-                  }}
-                >
-                  MBTTC
-                </span>
-
-                <span
-                  className="font-bold tracking-[0.25em] text-xs sm:text-sm mt-0.5 sm:mt-1 select-none"
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    color: '#fef08a',
-                    textShadow:
-                      '0 1px 2px rgba(0, 0, 0, 0.95), 0 -1px 1px rgba(255, 255, 255, 0.5), 0 0 10px rgba(245, 158, 11, 0.6)',
-                  }}
-                >
-                  ON-CHAIN
-                </span>
-              </div>
-            ) : (
-              <div className="relative z-10 flex flex-col items-center justify-center text-center px-4">
-                <svg
-                  className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 drop-shadow-[0_3px_3px_rgba(0,0,0,0.8)]"
-                  viewBox="0 0 100 100"
-                  fill="none"
-                >
-                  <defs>
-                    <linearGradient id="mRibbonLeftPrecision" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffffff" />
-                      <stop offset="50%" stopColor="#fef08a" />
-                      <stop offset="100%" stopColor="#d97706" />
-                    </linearGradient>
-                    <linearGradient id="mRibbonRightPrecision" x1="100%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#fef08a" />
-                      <stop offset="60%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#78350f" />
-                    </linearGradient>
-                    <linearGradient id="mRibbonCenterPrecision" x1="50%" y1="0%" x2="50%" y2="100%">
-                      <stop offset="0%" stopColor="#ffffff" />
-                      <stop offset="40%" stopColor="#fef9c3" />
-                      <stop offset="100%" stopColor="#b45309" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M20 74 L20 28 L38 52 L38 74 Z" fill="url(#mRibbonLeftPrecision)" />
-                  <path d="M80 74 L80 28 L62 52 L62 74 Z" fill="url(#mRibbonRightPrecision)" />
-                  <path d="M38 52 L50 36 L62 52 L50 68 Z" fill="url(#mRibbonCenterPrecision)" />
-                  <circle cx="20" cy="24" r="3" fill="#ffffff" filter="drop-shadow(0 0 4px #fef08a)" />
-                  <circle cx="50" cy="30" r="3.5" fill="#ffffff" filter="drop-shadow(0 0 5px #fef08a)" />
-                  <circle cx="80" cy="24" r="3" fill="#ffffff" filter="drop-shadow(0 0 4px #fef08a)" />
-                </svg>
-
-                <span
-                  className="font-bold tracking-[0.2em] text-[10px] sm:text-xs mt-1 text-amber-100"
-                  style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    textShadow: '0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(251,191,36,0.6)',
-                  }}
-                >
-                  MAGNET BITCOIN
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * Main Standalone ApkWelcomeSplash Component
@@ -536,15 +158,22 @@ export default function ApkWelcomeSplash({
   className = '',
   soundEnabled = true,
 }: ApkWelcomeSplashProps) {
-  const [playbackTime, setPlaybackTime] = useState<number>(0);
-  const [audioAllowed, setAudioAllowed] = useState<boolean>(soundEnabled);
-  const [audioNeedsInteraction, setAudioNeedsInteraction] = useState<boolean>(false);
+  // Flow states: 'loading' -> 'prompt' -> 'playing'
+  const [stage, setStage] = useState<'loading' | 'prompt' | 'playing'>('loading');
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
-  const [activeFace, setActiveFace] = useState<'mbttc' | 'monogram'>('mbttc');
+  const [isTextVisible, setIsTextVisible] = useState<boolean>(false);
   const [isEntering, setIsEntering] = useState<boolean>(false);
   const [reducedMotion, setReducedMotion] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 1. Cold Start: 2.0s loader ke baad automatic Age Modal open hoga
+  useEffect(() => {
+    const loaderTimer = setTimeout(() => {
+      setStage('prompt');
+    }, 2000);
+    return () => clearTimeout(loaderTimer);
+  }, []);
 
   // Check user OS preference for reduced motion
   useEffect(() => {
@@ -557,84 +186,45 @@ export default function ApkWelcomeSplash({
     }
   }, []);
 
-  // 8-Second Direct Instant Autoplay & Lag-Free Sync Engine
+  // Preload Audio instance cleanly once
   useEffect(() => {
-    const audio = new Audio('/assets/welcome.mp3');
+    const audioPath =
+      typeof window !== 'undefined' && window.location.protocol === 'capacitor:'
+        ? `${window.location.origin}/assets/welcome.mp3`
+        : '/assets/welcome.mp3';
+
+    const audio = new Audio(audioPath);
     audio.preload = 'auto';
-    audio.autoplay = true;
     audioRef.current = audio;
 
-    // Instant play on mount (Native APK & Modern Web)
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Fallback for browsers with strict policy on first install
-        const resumeAudio = () => {
-          audio.play().catch(() => {});
-          ['touchstart', 'click', 'keydown'].forEach(e => window.removeEventListener(e, resumeAudio));
-        };
-        ['touchstart', 'click', 'keydown'].forEach(e => window.addEventListener(e, resumeAudio, { once: true }));
-      });
-    }
-
-    const onTimeUpdate = () => {
-      setPlaybackTime(audio.currentTime);
-      if (audio.currentTime >= 7.8) {
-        setIsUnlocked(true);
-      }
-    };
-
-    const onEnded = () => {
-      setPlaybackTime(8.0);
-      setIsUnlocked(true);
-    };
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('ended', onEnded);
-
-    // Guaranteed unlock timer so app never gets stuck
-    const unlockTimer = setTimeout(() => {
-      setIsUnlocked(true);
-    }, 8000);
-
     return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('ended', onEnded);
       audio.pause();
-      clearTimeout(unlockTimer);
     };
   }, []);
 
-  // Unlock audio on first user touch if blocked by browser policy
-  const handleUserInteract = () => {
-    if (audioNeedsInteraction && audioRef.current) {
-      audioRef.current
-        .play()
-        .then(() => {
-          setAudioNeedsInteraction(false);
-          setAudioAllowed(true);
-        })
-        .catch(() => {});
-    }
-  };
+  // Sirf aur sirf [YES] button click par exact timing ke sath shuru hoga
+  const handleConfirmAge = useCallback(() => {
+    setStage('playing');
 
-  // Toggle Sound On/Off
-  const handleToggleSound = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (audioAllowed) {
-      audioRef.current?.pause();
-      setAudioAllowed(false);
-      setAudioNeedsInteraction(false);
-    } else {
-      setAudioAllowed(true);
-      if (audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => setAudioNeedsInteraction(false))
-          .catch(() => setAudioNeedsInteraction(true));
-      }
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
     }
-  };
+
+    // Exactly 3.5s par "Welcome to MDeFi" reveal
+    setTimeout(() => {
+      setIsTextVisible(true);
+    }, 3500);
+
+    // Exactly 8.0s par ENTER button unlock
+    setTimeout(() => {
+      setIsUnlocked(true);
+    }, 8000);
+  }, []);
+
+  const handleRejectAge = useCallback(() => {
+    alert('You must be 18 or older to access MDeFi Protocol.');
+  }, []);
 
   // ENTER Button Tap Handler
   const handleEnterTap = useCallback(
@@ -659,17 +249,68 @@ export default function ApkWelcomeSplash({
   );
 
   // Strict 4.0-second visibility gate for the Hero Text (Audio Cadence Sync)
-  const isHeroTextVisible = playbackTime >= 3.0;
+  
 
   return (
     <div
-      onClick={handleUserInteract}
       className={`fixed inset-0 z-[999999] w-screen h-[100dvh] max-h-[100dvh] overflow-hidden touch-none select-none bg-[#020708] text-white flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200 ${className}`}
       style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)',
       }}
     >
+      {/* =========================================================================
+          AGE VERIFICATION & COLD START MODAL (Stage 'loading' & 'prompt')
+         ========================================================================= */}
+      {stage !== 'playing' && (
+        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-black/85 backdrop-blur-md px-4 select-none">
+          {stage === 'loading' ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+              <span
+                className="text-xs font-mono tracking-widest text-cyan-300 animate-pulse"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                INITIALIZING ENVIRONMENT...
+              </span>
+            </div>
+          ) : (
+            <div className="relative w-full max-w-sm rounded-2xl border border-cyan-500/40 bg-[#02181b]/95 p-6 shadow-[0_0_35px_rgba(6,182,212,0.25)] flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-400/40 flex items-center justify-center mb-3">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+
+              <h3
+                className="text-lg font-bold text-white tracking-wide mb-1"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                AGE VERIFICATION
+              </h3>
+
+              <p className="text-xs text-slate-300 leading-relaxed mb-6 font-mono">
+                Are you 18 years of age or older to enter MDeFi Protocol?
+              </p>
+
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={handleRejectAge}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                >
+                  NO
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAge}
+                  className="flex-1 py-2.5 rounded-xl border border-emerald-400/60 bg-gradient-to-r from-emerald-500/30 to-cyan-500/30 text-xs font-bold text-emerald-200 hover:border-cyan-300 shadow-[0_0_15px_rgba(52,211,153,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  YES
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {/* =========================================================================
           SECTION 4: ULTRA-CLEAR SCI-FI & BLOCKCHAIN VOID BACKGROUND
          ========================================================================= */}
@@ -763,12 +404,12 @@ export default function ApkWelcomeSplash({
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
           {/* =========================================================================
               SECTION 2: 4-SECOND AUDIO TIMING & ULTRA-SMOOTH TEXT FADE
-              - 0.0s – 3.8s: Invisible
-              - Exactly 3.9s: Smooth cinematic neon reveal (Zero Stutter / Zero Lag)
+              - 0.0s – 3.9s: Invisible
+              - Exactly 4.0s: Smooth cinematic neon reveal (Zero Stutter / Zero Lag)
              ========================================================================= */}
           <div
-            className={`w-full text-center flex flex-col items-center justify-center mb-4 sm:mb-5 transition-all duration-1000 ease-out select-none ${
-              isHeroTextVisible
+            className={`w-full text-center flex flex-col items-center justify-center mb-8 sm:mb-10 transition-all duration-1000 ease-out select-none ${
+              isTextVisible
                 ? 'opacity-100 scale-100 translate-y-0 filter-none'
                 : 'opacity-0 scale-95 -translate-y-3 blur-md pointer-events-none'
             }`}
@@ -863,10 +504,10 @@ export default function ApkWelcomeSplash({
 
           {/* =========================================================================
               SECTION 5: GATED COMPACT "ENTER" BUTTON
-              - Balanced 18px–22px margin below the coin orbital rings
+              - Safe clearance below the coin orbital rings
               - Locked/dormant during playback -> smoothly unlocks at 8.0s
              ========================================================================= */}
-          <div className="w-full flex justify-center mt-4 sm:mt-5">
+          <div className="w-full flex justify-center mt-8 sm:mt-10">
             <button
               type="button"
               onClick={handleEnterTap}
@@ -921,7 +562,7 @@ export default function ApkWelcomeSplash({
                 {!isUnlocked ? (
                   <>
                     <Lock className="w-3 h-3 text-slate-500 animate-pulse" />
-                    <span>SYNC {Math.max(0, 8 - Math.floor(playbackTime))}S</span>
+                    <span>SYNCING PROTOCOL...</span>
                   </>
                 ) : isEntering ? (
                   <>
