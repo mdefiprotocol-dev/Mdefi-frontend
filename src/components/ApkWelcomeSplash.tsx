@@ -403,23 +403,25 @@ export default function ApkWelcomeSplash({
       <main className="relative z-10 w-full px-4 flex flex-col items-center justify-center flex-1 my-auto">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
           {/* =========================================================================
-              SECTION 2: 4-SECOND AUDIO TIMING & ULTRA-SMOOTH TEXT FADE
-              - 0.0s – 3.9s: Invisible
-              - Exactly 4.0s: Smooth cinematic neon reveal (Zero Stutter / Zero Lag)
+              SECTION 2: EXACT VERDANA HERO TEXT (Locked Against Phone System Font Scaling)
              ========================================================================= */}
           <div
-            className={`w-full text-center flex flex-col items-center justify-center mb-8 sm:mb-10 transition-all duration-1000 ease-out select-none ${
+            className={`w-full text-center flex flex-col items-center justify-center mb-10 sm:mb-12 transition-all duration-1000 ease-out select-none ${
               isTextVisible
                 ? 'opacity-100 scale-100 translate-y-0 filter-none'
                 : 'opacity-0 scale-95 -translate-y-3 blur-md pointer-events-none'
             }`}
-            style={{ willChange: 'opacity, transform, filter' }}
+            style={{
+              willChange: 'opacity, transform, filter',
+              WebkitTextSizeAdjust: '100%',
+              textSizeAdjust: '100%',
+            }}
           >
             {/* Line 1: Welcome to MDeFi */}
             <h1
               className="font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
               style={{
-                fontFamily: 'Verdana, sans-serif',
+                fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
                 background: 'linear-gradient(135deg, #ffffff 0%, #d8f5f0 55%, #34d399 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -433,7 +435,7 @@ export default function ApkWelcomeSplash({
             <h2
               className="font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
               style={{
-                fontFamily: 'Verdana, sans-serif',
+                fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
                 background: 'linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #fde047 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',

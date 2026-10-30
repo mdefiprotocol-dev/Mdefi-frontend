@@ -467,6 +467,9 @@ function MainApp() {
   };
 
   useEffect(() => {
+    // Mobile APK splash ke dauran background RPC refresh ko guard karein
+    if (showApkSplash) return;
+
     const unsubscribe = contractAdapter.onDataRefresh(async () => {
       if (!user.walletAddress) return;
       try {
@@ -480,7 +483,7 @@ function MainApp() {
     return () => {
       unsubscribe();
     };
-  }, [user.walletAddress, syncLiveOnChainUser]);
+  }, [user.walletAddress, syncLiveOnChainUser, showApkSplash]);
 
   const handleOpenClaimModal = (type: 'Registration' | 'Referral' | 'Package', liveAmount?: number) => {
     setClaimModalType(type);

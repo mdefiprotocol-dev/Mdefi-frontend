@@ -55,17 +55,34 @@ const BSC_TESTNET_RPC_URLS = [
   'https://bsc-testnet-rpc.publicnode.com',
   'https://data-seed-prebsc-1-s1.bnbchain.org:8545'
 ];
-// Single shared provider instance - browser connection pool choke nahi hoga
+
+// Single shared provider instance with strict timeout & retry lock
 let sharedRpcProvider: ethers.JsonRpcProvider | null = null;
+let sharedBackupRpcProvider: ethers.JsonRpcProvider | null = null;
+
+function createControlledProvider(url: string): ethers.JsonRpcProvider {
+  const fetchReq = new ethers.FetchRequest(url);
+  fetchReq.timeout = 8000; // 8 second hard timeout (CPU loop kill lock)
+
+  return new ethers.JsonRpcProvider(
+    fetchReq,
+    { chainId: 97, name: 'bnbt' },
+    { staticNetwork: true }
+  );
+}
+
 function getSharedRpcProvider(): ethers.JsonRpcProvider {
   if (!sharedRpcProvider) {
-    sharedRpcProvider = new ethers.JsonRpcProvider(
-      BSC_TESTNET_RPC_URLS[0],
-      { chainId: 97, name: 'bnbt' },
-      { staticNetwork: true }
-    );
+    sharedRpcProvider = createControlledProvider(BSC_TESTNET_RPC_URLS[0]);
   }
   return sharedRpcProvider;
+}
+
+function getSharedBackupRpcProvider(): ethers.JsonRpcProvider {
+  if (!sharedBackupRpcProvider) {
+    sharedBackupRpcProvider = createControlledProvider(BSC_TESTNET_RPC_URLS[1]);
+  }
+  return sharedBackupRpcProvider;
 }
 
 // no demo provider
@@ -229,13 +246,9 @@ export class RealContractProvider implements IContractProvider {
       const result = await contract[methodName](...(args || []));
       return result as T;
     } catch (err: any) {
-      // Fallback to secondary public node if primary dropped
+      // Fallback to cached secondary public node if primary dropped
       try {
-        const backupProvider = new ethers.JsonRpcProvider(
-          BSC_TESTNET_RPC_URLS[1],
-          { chainId: 97, name: 'bnbt' },
-          { staticNetwork: true }
-        );
+        const backupProvider = getSharedBackupRpcProvider();
         const backupContract = new ethers.Contract(
           contractAddress,
           abi,
