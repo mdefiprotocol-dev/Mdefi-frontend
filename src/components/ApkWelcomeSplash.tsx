@@ -43,7 +43,8 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     if (!ctx) return;
 
     let animId: number;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Mobile Performance Lock: DPR ko 1 par rakh kar GPU memory crash bachayein
+    const dpr = 1;
 
     let displayWidth = window.innerWidth;
     let displayHeight = window.innerHeight;
@@ -52,16 +53,15 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
       if (!canvas) return;
       displayWidth = window.innerWidth;
       displayHeight = window.innerHeight;
-      canvas.width = displayWidth * dpr;
-      canvas.height = displayHeight * dpr;
-      ctx.scale(dpr, dpr);
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
     };
 
     resize();
     window.addEventListener('resize', resize);
 
-    // Particle nodes distributed evenly across the screen with 3D depth layering
-    const count = Math.min(68, Math.floor((displayWidth * displayHeight) / 11000));
+    // Ultra-lightweight node count (Har low-end phone par 60 FPS chalega)
+    const count = 24;
     const particles = Array.from({ length: count }, (_, i) => {
       const isUpper = i % 2 === 0;
       return {
@@ -263,7 +263,7 @@ export default function ApkWelcomeSplash({
           AGE VERIFICATION & COLD START MODAL (Stage 'loading' & 'prompt')
          ========================================================================= */}
       {stage !== 'playing' && (
-        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-black/85 backdrop-blur-md px-4 select-none">
+        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-[#010408]/95 px-4 select-none">
           {stage === 'loading' ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
@@ -446,61 +446,67 @@ export default function ApkWelcomeSplash({
 
           {/* =========================================================================
               SECTION 3: ROTATING ORBITAL RINGS AROUND THE MBTTC COIN
+              - Rendered only after verification (stage === 'playing') to prevent cold-start lag
              ========================================================================= */}
-          <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
-            {/* 1. Breathing Golden-Cyan Backlight Aura */}
-            <div
-              className="absolute inset-[-14%] rounded-full pointer-events-none transition-all duration-1000"
-              style={{
-                background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
-                filter: 'blur(30px)',
-                animation: 'aura-pulse 5s ease-in-out infinite alternate',
-              }}
-            />
+          {stage === 'playing' ? (
+            <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
+              {/* 1. Breathing Golden-Cyan Backlight Aura */}
+              <div
+                className="absolute inset-[-14%] rounded-full pointer-events-none transition-all duration-1000"
+                style={{
+                  background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
+                  filter: 'blur(30px)',
+                  animation: 'aura-pulse 5s ease-in-out infinite alternate',
+                }}
+              />
 
-            {/* 2. Outer Segmented Tech Cyber-Ring (Counter-Clockwise) */}
-            <div
-              className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: 'rotateX(24deg)',
-                animation: 'cyber-orbit-ccw 30s linear infinite',
-              }}
-            >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-            </div>
+              {/* 2. Outer Segmented Tech Cyber-Ring (Counter-Clockwise) */}
+              <div
+                className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
+                style={{
+                  transformStyle: 'preserve-3d',
+                  transform: 'rotateX(24deg)',
+                  animation: 'cyber-orbit-ccw 30s linear infinite',
+                }}
+              >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+              </div>
 
-            {/* 3. Concentric Middle Orbital Ring with Glowing Nodes */}
-            <div
-              className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
-              style={{
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
-                animation: 'cyber-orbit-cw 22s linear infinite',
-              }}
-            >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
-              <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-              <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
-            </div>
+              {/* 3. Concentric Middle Orbital Ring with Glowing Nodes */}
+              <div
+                className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
+                style={{
+                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
+                  animation: 'cyber-orbit-cw 22s linear infinite',
+                }}
+              >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
+                <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+                <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
+              </div>
 
-            {/* 4. Inner Tech Ring */}
-            <div
-              className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
-              style={{
-                animation: 'cyber-orbit-ccw 36s linear infinite',
-              }}
-            >
-              <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
-            </div>
+              {/* 4. Inner Tech Ring */}
+              <div
+                className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
+                style={{
+                  animation: 'cyber-orbit-ccw 36s linear infinite',
+                }}
+              >
+                <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
+              </div>
 
-            {/* 5. Real 3D Rotating Coin Inside Rings */}
-            <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
-              <Rotating3DMbttcCoin size={170} />
+              {/* 5. Real 3D Rotating Coin Inside Rings */}
+              <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
+                <Rotating3DMbttcCoin size={170} />
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Placeholder to maintain vertical layout balance while modal is open */
+            <div style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }} />
+          )}
 
           {/* =========================================================================
               SECTION 5: GATED COMPACT "ENTER" BUTTON
