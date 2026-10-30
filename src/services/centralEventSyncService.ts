@@ -1050,13 +1050,25 @@ class CentralEventSyncService {
 
   public subscribe(listener: (state: SynchronizedEcosystemState) => void): () => void {
     this.listeners.add(listener);
-    listener(this.getState());
+    
+    // Immediate callback protected with microtask to prevent sync render cascade
+    queueMicrotask(() => {
+      if (this.listeners.has(listener)) {
+        try {
+          listener(this.getState());
+        } catch (err) {
+          console.error('[CentralEventSync] Initial subscription dispatch error:', err);
+        }
+      }
+    });
+
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   private notifySubscribers() {
+    if (this.listeners.size === 0) return;
     const currentState = this.getState();
     this.listeners.forEach((listener) => {
       try {
@@ -1068,13 +1080,7 @@ class CentralEventSyncService {
   }
 
   public getState(): SynchronizedEcosystemState {
-    return {
-      ...this.state,
-      teamMembers: [...this.state.teamMembers],
-      activities: [...this.state.activities],
-      publicEcosystemActivities: [...this.state.publicEcosystemActivities],
-      teamTransactions: [...this.state.teamTransactions],
-    };
+    return this.state;
   }
 
   public getStarterTotalSettled(): number {
