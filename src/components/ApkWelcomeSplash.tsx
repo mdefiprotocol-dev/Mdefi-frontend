@@ -167,6 +167,54 @@ export default function ApkWelcomeSplash({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Hardware & Performance Diagnostic Probe
+  useEffect(() => {
+    try {
+      const glCanvas = document.createElement('canvas');
+      const gl = (glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+      
+      let gpuVendor = 'Unknown';
+      let gpuRenderer = 'Unknown';
+      let maxTextureSize = 0;
+
+      if (gl) {
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          gpuVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+          gpuRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        }
+        maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      }
+
+      console.log('==== [DEVICE GPU & HARDWARE AUDIT] ====');
+      console.log('GPU Renderer:', gpuRenderer);
+      console.log('GPU Vendor:', gpuVendor);
+      console.log('Max Texture Limit:', maxTextureSize);
+      console.log('Hardware Concurrency (CPU Cores):', navigator.hardwareConcurrency || 'N/A');
+      console.log('Device Memory (RAM GB):', (navigator as any).deviceMemory || 'N/A');
+      console.log('Device Pixel Ratio (DPR):', window.devicePixelRatio);
+      console.log('=======================================');
+
+      let frameCount = 0;
+      let lastTime = performance.now();
+      const checkFPS = () => {
+        frameCount++;
+        const now = performance.now();
+        if (now - lastTime >= 1000) {
+          console.log(`[PERFORMANCE PROBE] Live WebView FPS: ${frameCount}`);
+          frameCount = 0;
+          lastTime = now;
+        }
+        if (frameCount < 120) {
+          requestAnimationFrame(checkFPS);
+        }
+      };
+      requestAnimationFrame(checkFPS);
+    } catch (e) {
+      console.warn('[Diagnostics Error]:', e);
+    }
+  }, []);
+
   // 1. Cold Start: 2.0s loader ke baad automatic Age Modal open hoga
   useEffect(() => {
     const loaderTimer = setTimeout(() => {
