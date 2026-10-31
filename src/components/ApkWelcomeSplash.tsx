@@ -85,15 +85,15 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     const render = () => {
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      // Razor-sharp connecting cyber-lines across space
-      const maxDist = 125;
+      // Ultra-efficient lines with squared distance check (Zero CPU choke)
+      const maxDistSq = 125 * 125;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < maxDist) {
-            const lineAlpha = (1 - dist / maxDist) * 0.22 * particles[i].z;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < maxDistSq) {
+            const lineAlpha = (1 - distSq / maxDistSq) * 0.18 * particles[i].z;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
@@ -417,11 +417,13 @@ export default function ApkWelcomeSplash({
               textSizeAdjust: '100%',
             }}
           >
-            {/* Line 1: Welcome to MDeFi */}
+           {/* Line 1: Welcome to MDeFi */}
             <h1
               className="font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
               style={{
-                fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
+                fontFamily: 'Verdana, "DejaVu Sans", "Bitstream Vera Sans", sans-serif',
+                fontSynthesis: 'none',
+                WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #ffffff 0%, #d8f5f0 55%, #34d399 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -435,7 +437,9 @@ export default function ApkWelcomeSplash({
             <h2
               className="font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
               style={{
-                fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
+                fontFamily: 'Verdana, "DejaVu Sans", "Bitstream Vera Sans", sans-serif',
+                fontSynthesis: 'none',
+                WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #fde047 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -452,12 +456,14 @@ export default function ApkWelcomeSplash({
              ========================================================================= */}
           {stage === 'playing' ? (
             <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
-              {/* 1. Breathing Golden-Cyan Backlight Aura */}
+              {/* 1. Breathing Golden-Cyan Backlight Aura (GPU Locked) */}
               <div
-                className="absolute inset-[-14%] rounded-full pointer-events-none transition-all duration-1000"
+                className="absolute inset-[-14%] rounded-full pointer-events-none"
                 style={{
                   background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
-                  filter: 'blur(30px)',
+                  filter: 'blur(20px)',
+                  transform: 'translateZ(0)',
+                  willChange: 'transform, opacity',
                   animation: 'aura-pulse 5s ease-in-out infinite alternate',
                 }}
               />
@@ -466,8 +472,8 @@ export default function ApkWelcomeSplash({
               <div
                 className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
                 style={{
-                  transformStyle: 'preserve-3d',
-                  transform: 'rotateX(24deg)',
+                  transform: 'translateZ(0) rotateX(24deg)',
+                  willChange: 'transform',
                   animation: 'cyber-orbit-ccw 30s linear infinite',
                 }}
               >
