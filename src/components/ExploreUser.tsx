@@ -21,6 +21,7 @@ import {
   Award,
   User as UserIcon
 } from 'lucide-react';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { CONTRACT_ADDRESSES, NETWORK_CONFIG, HUB_ABI } from '../config/contractConfig';
 import { TeamMember, UserProfile, TeamTransactionRecord } from '../types';
 import { formatCompactAddress, copyFullAddress } from '../utils/formatAddress';
@@ -864,12 +865,7 @@ export const ExploreUser: React.FC<ExploreUserProps> = ({
     }
 
     const readPromise = (async (): Promise<ExploreUserDashboardData> => {
-      let provider: ethers.Provider;
-      if (typeof window !== 'undefined' && (window as any).ethereum) {
-        provider = new ethers.BrowserProvider((window as any).ethereum);
-      } else {
-        provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl);
-      }
+      const provider = getSharedRpcProvider();
 
       const hubAddress = CONTRACT_ADDRESSES.mdefiHub;
 

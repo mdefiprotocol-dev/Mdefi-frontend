@@ -33,6 +33,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { ethers } from 'ethers';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { getContractRegistryList, NETWORK_CONFIG } from '../config/contractConfig';
 import { realContractProvider } from '../services/contractProvider';
 import { UserProfile, RewardBalances, PackageItem } from '../types';
@@ -86,6 +87,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     referralLink: user?.referralLink || '',
     referralCode: user?.referralCode || user?.userId || '',
     directTeamCount: user?.directTeamCount ?? 0,
+    totalTeamCount: user?.totalTeamCount ?? 0,
   };
 
   // Copy state feedback
@@ -130,8 +132,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       if (!safeUser.walletAddress || !safeUser.walletAddress.startsWith('0x')) return;
 
       try {
-        const rpcUrl = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
-        const rpc = new ethers.JsonRpcProvider(rpcUrl);
+        const rpc = getSharedRpcProvider();
 
         // 1. Live Wallet BNB Balance [Bug 1]
         const rawBnbWei = await rpc.getBalance(safeUser.walletAddress);

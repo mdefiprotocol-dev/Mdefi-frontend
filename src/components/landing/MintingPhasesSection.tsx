@@ -19,6 +19,7 @@ import {
   getActivePhaseConfig,
   MDEFI_HUB_ADDRESS 
 } from '../../data/contractConfig';
+import { getSharedRpcProvider } from '../../config/rpcConfig';
 import { mdefiService } from '../../services/mdefiService';
 import { centralEventSyncService } from '../../services/centralEventSyncService';
 import { useLanguage } from '../../context/LanguageContext';
@@ -44,32 +45,19 @@ export const MintingPhasesSection: React.FC = () => {
           if (Number(candidate) > 0) total = Number(candidate);
         }
 
-        // 2. Direct on-chain view call via official ethers Provider (No Wallet Needed)
+        // 2. Direct on-chain view call via Central Shared Provider
         if (total === 0 && MDEFI_HUB_ADDRESS) {
           try {
-            const ProviderClass = (ethers as any).JsonRpcProvider || (ethers as any).providers?.JsonRpcProvider;
-            // Public Binance Smart Chain endpoint with fallback
-            const rpcList = [
-              'https://bsc-testnet-rpc.publicnode.com',
-              'https://data-seed-prebsc-1-s1.binance.org:8545'
-            ];
-
-            for (const rpc of rpcList) {
-              if (total > 0) break;
-              try {
-                const provider = new ProviderClass(rpc);
-                const hub = new ethers.Contract(
-                  MDEFI_HUB_ADDRESS,
-                  ['function totalUsers() external view returns (uint256)'],
-                  provider
-                );
-                const res = await hub.totalUsers();
-                const num = Number(res?.toString() || 0);
-                if (num > 0) {
-                  total = num;
-                  break;
-                }
-              } catch {}
+            const provider = getSharedRpcProvider();
+            const hub = new ethers.Contract(
+              MDEFI_HUB_ADDRESS,
+              ['function totalUsers() external view returns (uint256)'],
+              provider
+            );
+            const res = await hub.totalUsers();
+            const num = Number(res?.toString() || 0);
+            if (num > 0) {
+              total = num;
             }
           } catch {}
         }
@@ -83,7 +71,7 @@ export const MintingPhasesSection: React.FC = () => {
     };
 
     queryContractDirectly();
-    const interval = setInterval(queryContractDirectly, 6000);
+    const interval = setInterval(queryContractDirectly, 30000);
 
     return () => {
       isMounted = false;

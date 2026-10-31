@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   ExternalLink
 } from 'lucide-react';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { MbttcSwapSuccessModal } from './MbttcSwapSuccessModal';
 import { Rotating3DMbttcCoin } from './common/Rotating3DMbttcCoin';
 import { Rotating3DUsdtCoin } from './common/Rotating3DUsdtCoin';
@@ -59,8 +60,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     const fetchLiveBalances = async () => {
       if (!walletAddress || !ethers.isAddress(walletAddress)) return;
       try {
-        const rpcUrl = 'https://bsc-testnet.publicnode.com';
-        const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+        const provider = getSharedRpcProvider();
         const erc20Abi = ['function balanceOf(address) view returns (uint256)'];
 
         const mbttcAddress = (CONTRACT_ADDRESSES as any)?.mbttcToken;
@@ -96,7 +96,7 @@ export const MbttcSwapSection: React.FC<MbttcSwapSectionProps> = ({
     };
 
     fetchLiveBalances();
-    const timer = setInterval(fetchLiveBalances, 10000);
+    const timer = setInterval(fetchLiveBalances, 20000);
     return () => {
       isMounted = false;
       clearInterval(timer);

@@ -14,6 +14,7 @@ import {
   Zap,
   CheckCircle2
 } from 'lucide-react';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { UserProfile, RewardBalances, MbttcTokenStats } from '../types';
 import { Rotating3DMbttcCoin } from '../components/common/Rotating3DMbttcCoin';
 import { MbttcLivePrice } from '../components/MbttcLivePrice';
@@ -67,8 +68,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
   const fetchGlobalTokenStats = async () => {
     try {
-      const rpcUrl = 'https://bsc-testnet.publicnode.com';
-      const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+      const provider = getSharedRpcProvider();
       const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
 
       if (!hubAddress || !ethers.isAddress(hubAddress)) return;
@@ -114,7 +114,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
       console.warn('[MbttcView] Primary getGlobalTokenStats error, trying individual contract methods:', err);
       // Secondary fallback to individual methods in case struct decoding was reverted
       try {
-        const provider = new ethers.JsonRpcProvider('https://bsc-testnet.publicnode.com', undefined, { staticNetwork: true });
+        const provider = getSharedRpcProvider();
         const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
         if (!hubAddress) return;
         const hub = new ethers.Contract(hubAddress, HUB_ABI as any, provider);
@@ -178,8 +178,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
       if (!activeAddress || !ethers.isAddress(activeAddress)) return;
 
       try {
-        const rpcUrl = 'https://bsc-testnet.publicnode.com';
-        const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+        const provider = getSharedRpcProvider();
         const mbttcAddress = (CONTRACT_ADDRESSES as any)?.mbttcToken;
 
         if (mbttcAddress && ethers.isAddress(mbttcAddress)) {
@@ -198,7 +197,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
     };
 
     fetchRealWalletBalance();
-    const interval = setInterval(fetchRealWalletBalance, 8000);
+    const interval = setInterval(fetchRealWalletBalance, 20000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -222,8 +221,7 @@ export const MbttcView: React.FC<MbttcViewProps> = ({
 
   const fetchTreasuryVaultStats = async () => {
     try {
-      const rpcUrl = 'https://bsc-testnet.publicnode.com';
-      const provider = new ethers.JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true });
+      const provider = getSharedRpcProvider();
       const ipoAddress = (CONTRACT_ADDRESSES as any)?.treasuryBondIPO || (CONTRACT_ADDRESSES as any)?.liquidityVault;
 
       if (!ipoAddress || !ethers.isAddress(ipoAddress)) return;

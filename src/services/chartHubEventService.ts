@@ -4,10 +4,11 @@
  */
 
 import { ethers } from 'ethers';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 import { ChartEcosystemEvent, HubCandleActionCategory } from '../components/TradingChart/types';
 
-const VERIFIED_FAST_RPC = 'https://bsc-testnet.publicnode.com';
+
 const processedTxMap = new Map<string, ChartEcosystemEvent>();
 const LOCAL_STORAGE_CACHE_KEY = 'mdefi_verified_hub_events_vFINAL';
 
@@ -38,7 +39,7 @@ export class ChartHubEventService {
   private hubContract: ethers.Contract | null = null;
 
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(VERIFIED_FAST_RPC, undefined, { staticNetwork: true });
+    this.provider = getSharedRpcProvider();
     const hubAddress = CONTRACT_ADDRESSES?.mdefiHub;
     if (hubAddress && ethers.isAddress(hubAddress)) {
       this.hubContract = new ethers.Contract(hubAddress, HUB_ABI as any, this.provider);

@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Briefcase
 } from 'lucide-react';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { TeamMember, UserProfile, TeamTransactionRecord } from '../types';
 import { mdefiService } from '../services/mdefiService';
 import { centralEventSyncService } from '../services/centralEventSyncService';
@@ -255,7 +256,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
     const fetchLevelData = async () => {
       try {
         setIsLevelLoading(true);
-        const provider = new ethers.JsonRpcProvider('https://bsc-testnet.publicnode.com', undefined, { staticNetwork: true });
+        const provider = getSharedRpcProvider();
         const res = await getTeamLevelOnChain(provider, cleanWallet, selectedLevel);
 
         if (!isMounted) return;

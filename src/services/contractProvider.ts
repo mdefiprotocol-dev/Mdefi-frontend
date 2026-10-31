@@ -17,6 +17,7 @@ import {
   HUB_ABI,
   MBTTC_ABI,
 } from '../config/contractConfig';
+import { getSharedRpcProvider, NETWORK_CONFIG, ACTIVE_CHAIN_ID } from '../config/rpcConfig';
 import { ethers } from 'ethers';
 
 export type TransactionLifecycleState =
@@ -50,39 +51,8 @@ export interface IContractProvider {
   waitForConfirmation(txHash: string): Promise<boolean>;
 }
 
-const BSC_TESTNET_RPC_URLS = [
-  'https://bsc-testnet-dataseed.bnbchain.org',
-  'https://bsc-testnet-rpc.publicnode.com',
-  'https://data-seed-prebsc-1-s1.bnbchain.org:8545'
-];
-
-// Single shared provider instance with strict timeout & retry lock
-let sharedRpcProvider: ethers.JsonRpcProvider | null = null;
-let sharedBackupRpcProvider: ethers.JsonRpcProvider | null = null;
-
-function createControlledProvider(url: string): ethers.JsonRpcProvider {
-  const fetchReq = new ethers.FetchRequest(url);
-  fetchReq.timeout = 8000; // 8 second hard timeout (CPU loop kill lock)
-
-  return new ethers.JsonRpcProvider(
-    fetchReq,
-    { chainId: 97, name: 'bnbt' },
-    { staticNetwork: true }
-  );
-}
-
-function getSharedRpcProvider(): ethers.JsonRpcProvider {
-  if (!sharedRpcProvider) {
-    sharedRpcProvider = createControlledProvider(BSC_TESTNET_RPC_URLS[0]);
-  }
-  return sharedRpcProvider;
-}
-
 function getSharedBackupRpcProvider(): ethers.JsonRpcProvider {
-  if (!sharedBackupRpcProvider) {
-    sharedBackupRpcProvider = createControlledProvider(BSC_TESTNET_RPC_URLS[1]);
-  }
-  return sharedBackupRpcProvider;
+  return getSharedRpcProvider();
 }
 
 // no demo provider
@@ -188,8 +158,8 @@ export class RealContractProvider implements IContractProvider {
                     symbol: 'tBNB',
                     decimals: 18,
                   },
-                  rpcUrls: BSC_TESTNET_RPC_URLS,
-                  blockExplorerUrls: ['https://testnet.bscscan.com'],
+                  rpcUrls: [...NETWORK_CONFIG[ACTIVE_CHAIN_ID].rpcUrls],
+                  blockExplorerUrls: [NETWORK_CONFIG[ACTIVE_CHAIN_ID].explorer],
                 },
               ],
             });

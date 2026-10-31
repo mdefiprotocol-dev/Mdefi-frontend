@@ -24,6 +24,7 @@ import {
   communityRecentActivities, 
   teamRecentActivities 
 } from '../data/mockData';
+import { getSharedRpcProvider } from '../config/rpcConfig';
 import { contractAdapter } from './contractAdapter';
 import { centralEventSyncService } from './centralEventSyncService';
 import { ethers } from 'ethers';
@@ -31,7 +32,7 @@ import { CONTRACT_ADDRESSES, HUB_ABI } from '../config/contractConfig';
 import { getTeamLevelOnChain } from './teamLevelService';
 
 // Reliable BSC Testnet Node that allows eth_getLogs
-const PRIMARY_FAST_RPC = 'https://bsc-testnet.publicnode.com';
+
 const BSCSCAN_API_KEY = 'B717482NP483F32JMXAMHB9J9QEE21BB8R';
 
 // Standard Multicall3 Contract for BSC Testnet (97) & Mainnet (56)
@@ -159,7 +160,7 @@ export class MDefiHubMockService implements IMDefiHubService {
   }
 
   private getReliableProvider(): ethers.Provider {
-    return new ethers.JsonRpcProvider(PRIMARY_FAST_RPC, undefined, { staticNetwork: true });
+    return getSharedRpcProvider();
   }
 
   async getUserProfile(walletAddress?: string): Promise<UserProfile> {
