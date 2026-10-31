@@ -74,7 +74,7 @@ export function getSharedRpcProvider(): ethers.JsonRpcProvider {
       fetchReq.timeout = 10000; // 10 second timeout
 
       const staticNetwork = (ethers as any).Network
-        ? (ethers as any).Network.from({ chainId: BigInt(config.chainId), name: config.name })
+        ? new (ethers as any).Network(config.name, BigInt(config.chainId))
         : networkDefinition;
 
       sharedProviderInstance = new (ethers as any).JsonRpcProvider(
