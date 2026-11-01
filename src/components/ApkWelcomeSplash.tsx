@@ -82,7 +82,19 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
       };
     });
 
-    const render = () => {
+    // Strict 60 FPS Delta-Time Lock (Eliminates 90Hz/120Hz display blinking)
+    let lastFrameTime = performance.now();
+    const frameInterval = 1000 / 60; // Exact 16.66ms per frame lock
+
+    const render = (currentTime: number) => {
+      animId = requestAnimationFrame(render);
+
+      const elapsed = currentTime - lastFrameTime;
+      if (elapsed < frameInterval) {
+        return; // Skip rendering if display is racing ahead of 60 FPS
+      }
+      lastFrameTime = currentTime - (elapsed % frameInterval);
+
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
       // Ultra-efficient lines with squared distance check (Zero CPU choke)
@@ -111,8 +123,8 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
         ctx.fillStyle = `rgba(${p.color}, ${p.alpha * p.z})`;
         ctx.fill();
 
-        if (!reducedMotion) {
-          p.x += p.vx * p.z;
+        if (!reducedMotion) 
+          {    p.x += p.vx * p.z;
           p.y += p.vy * p.z;
           p.alpha += p.pulse;
           if (p.alpha > 0.85 || p.alpha < 0.2) p.pulse = -p.pulse;
@@ -123,11 +135,9 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
           if (p.y > displayHeight + 10) p.y = -10;
         }
       });
-
-      animId = requestAnimationFrame(render);
     };
 
-    render();
+    animId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', resize);
@@ -143,6 +153,9 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
         width: '100%',
         height: '100%',
         opacity: 0.95,
+        transform: 'translateZ(0)',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden',
       }}
     />
   );
@@ -166,54 +179,6 @@ export default function ApkWelcomeSplash({
   const [reducedMotion, setReducedMotion] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Hardware & Performance Diagnostic Probe
-  useEffect(() => {
-    try {
-      const glCanvas = document.createElement('canvas');
-      const gl = (glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
-      
-      let gpuVendor = 'Unknown';
-      let gpuRenderer = 'Unknown';
-      let maxTextureSize = 0;
-
-      if (gl) {
-        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-        if (debugInfo) {
-          gpuVendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-          gpuRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-        }
-        maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-      }
-
-      console.log('==== [DEVICE GPU & HARDWARE AUDIT] ====');
-      console.log('GPU Renderer:', gpuRenderer);
-      console.log('GPU Vendor:', gpuVendor);
-      console.log('Max Texture Limit:', maxTextureSize);
-      console.log('Hardware Concurrency (CPU Cores):', navigator.hardwareConcurrency || 'N/A');
-      console.log('Device Memory (RAM GB):', (navigator as any).deviceMemory || 'N/A');
-      console.log('Device Pixel Ratio (DPR):', window.devicePixelRatio);
-      console.log('=======================================');
-
-      let frameCount = 0;
-      let lastTime = performance.now();
-      const checkFPS = () => {
-        frameCount++;
-        const now = performance.now();
-        if (now - lastTime >= 1000) {
-          console.log(`[PERFORMANCE PROBE] Live WebView FPS: ${frameCount}`);
-          frameCount = 0;
-          lastTime = now;
-        }
-        if (frameCount < 120) {
-          requestAnimationFrame(checkFPS);
-        }
-      };
-      requestAnimationFrame(checkFPS);
-    } catch (e) {
-      console.warn('[Diagnostics Error]:', e);
-    }
-  }, []);
 
   // 1. Cold Start: 2.0s loader ke baad automatic Age Modal open hoga
   useEffect(() => {
@@ -254,10 +219,15 @@ export default function ApkWelcomeSplash({
   const handleConfirmAge = useCallback(() => {
     setStage('playing');
 
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    }
+    try {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {});
+        }
+      }
+    } catch (_) {}
 
     // Exactly 3.5s par "Welcome to MDeFi" reveal
     setTimeout(() => {
@@ -376,9 +346,9 @@ export default function ApkWelcomeSplash({
         className="absolute -top-20 left-1/2 -translate-x-1/2 w-[110vw] max-w-[800px] h-[55vh] rounded-full pointer-events-none z-0 opacity-70"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.6) 0%, rgba(16, 185, 129, 0.25) 45%, transparent 75%)',
-          filter: 'blur(50px)',
-          animation: reducedMotion ? 'none' : 'refraction-sway 10s ease-in-out infinite alternate',
+            'radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.5) 0%, rgba(16, 185, 129, 0.2) 45%, transparent 75%)',
+          transform: 'translateZ(0)',
+          willChange: 'transform',
         }}
       />
 
@@ -467,9 +437,9 @@ export default function ApkWelcomeSplash({
           >
            {/* Line 1: Welcome to MDeFi */}
             <h1
-              className="font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
+              className="locked-verdana font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
               style={{
-                fontFamily: 'Verdana, "DejaVu Sans", "Bitstream Vera Sans", sans-serif',
+                fontFamily: "'Verdana', sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #ffffff 0%, #d8f5f0 55%, #34d399 100%)',
@@ -483,9 +453,9 @@ export default function ApkWelcomeSplash({
 
             {/* Line 2: Protocol & Networks */}
             <h2
-              className="font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
+              className="locked-verdana font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
               style={{
-                fontFamily: 'Verdana, "DejaVu Sans", "Bitstream Vera Sans", sans-serif',
+                fontFamily: "'Verdana', sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #fde047 100%)',
@@ -665,6 +635,13 @@ export default function ApkWelcomeSplash({
 
       {/* Hardware-Accelerated Sci-Fi Animations */}
       <style>{`
+        @import url('https://fonts.cdnfonts.com/css/verdana');
+
+        .locked-verdana {
+          font-family: 'Verdana', sans-serif !important;
+          font-style: normal !important;
+        }
+
         @keyframes cyber-orbit-cw {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
