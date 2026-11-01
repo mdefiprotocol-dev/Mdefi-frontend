@@ -10,24 +10,19 @@ import Rotating3DMbttcCoin from './common/Rotating3DMbttcCoin';
 /**
  * Single audio asset for the splash sequence (8-second narration).
  * 0.0s – 3.9s: Ambient sci-fi intro music & whoosh (Hero text 100% hidden)
- * 4.0s – 7.8s: Voiceover "Welcome to MDeFi Protocol & Networks" (Letter-by-letter kinetic sync)
+ * 4.0s – 7.8s: Voiceover "Welcome to MDeFi Protocol & Networks"
  * 8.0s: Audio ends -> Compact ENTER button unlocks
  */
 export const AUDIO_SRC = '/assets/welcome.mp3';
 
 export interface ApkWelcomeSplashProps {
-  /** Optional callback invoked when the user taps the ENTER button */
   onEnter?: () => void;
-  /** Optional custom class name for the root container */
   className?: string;
-  /** Default audio enabled state */
   soundEnabled?: boolean;
 }
 
 /**
- * High-DPI Crystal-Clear Sci-Fi Blockchain Constellation & Embers Canvas
- * Fills the upper, middle, and lower areas with glowing nodes, dynamic lines, and floating embers.
- * Eliminates flat black void patches entirely.
+ * Lightweight Sci-Fi Blockchain Constellation Canvas
  */
 const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,22 +48,22 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     resize();
     window.addEventListener('resize', resize);
 
-    const count = 24;
+    const count = 22;
     const particles = Array.from({ length: count }, (_, i) => {
       const isUpper = i % 2 === 0;
       return {
         x: Math.random() * displayWidth,
         y: isUpper ? Math.random() * (displayHeight * 0.55) : Math.random() * displayHeight,
         z: Math.random() * 0.9 + 0.35,
-        vx: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.28),
-        vy: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.28),
-        radius: Math.random() * 1.5 + 0.8,
+        vx: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.25),
+        vy: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.25),
+        radius: Math.random() * 1.4 + 0.8,
         color:
           Math.random() > 0.6
-            ? '6, 182, 212' // Cyan
+            ? '6, 182, 212'
             : Math.random() > 0.3
-            ? '16, 185, 129' // Emerald
-            : '251, 191, 36', // Golden amber ember
+            ? '16, 185, 129'
+            : '251, 191, 36',
         alpha: Math.random() * 0.5 + 0.25,
         pulse: Math.random() * 0.012 + 0.006,
       };
@@ -81,26 +76,24 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
       animId = requestAnimationFrame(render);
 
       const elapsed = currentTime - lastFrameTime;
-      if (elapsed < frameInterval) {
-        return;
-      }
+      if (elapsed < frameInterval) return;
       lastFrameTime = currentTime - (elapsed % frameInterval);
 
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      const maxDistSq = 125 * 125;
+      const maxDistSq = 120 * 120;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const distSq = dx * dx + dy * dy;
           if (distSq < maxDistSq) {
-            const lineAlpha = (1 - distSq / maxDistSq) * 0.18 * particles[i].z;
+            const lineAlpha = (1 - distSq / maxDistSq) * 0.16 * particles[i].z;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.strokeStyle = `rgba(6, 182, 212, ${lineAlpha})`;
-            ctx.lineWidth = 0.65;
+            ctx.lineWidth = 0.6;
             ctx.stroke();
           }
         }
@@ -150,9 +143,6 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
   );
 };
 
-/**
- * Main Standalone ApkWelcomeSplash Component
- */
 export default function ApkWelcomeSplash({
   onEnter,
   className = '',
@@ -166,6 +156,7 @@ export default function ApkWelcomeSplash({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 1. Strict 2.0s Cold Start -> Age Modal Open
   useEffect(() => {
     const loaderTimer = setTimeout(() => {
       setStage('prompt');
@@ -173,6 +164,7 @@ export default function ApkWelcomeSplash({
     return () => clearTimeout(loaderTimer);
   }, []);
 
+  // 2. Reduced Motion Check
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -183,6 +175,7 @@ export default function ApkWelcomeSplash({
     }
   }, []);
 
+  // 3. Audio Initializer (No Main Thread Blocking)
   useEffect(() => {
     try {
       const audioPath =
@@ -192,7 +185,7 @@ export default function ApkWelcomeSplash({
 
       const audio = new Audio();
       audio.src = audioPath;
-      audio.preload = 'auto';
+      audio.preload = 'none'; // Background thread block nahi karega
       audio.onerror = () => {};
       audioRef.current = audio;
     } catch (_) {}
@@ -204,27 +197,30 @@ export default function ApkWelcomeSplash({
     };
   }, []);
 
+  // 4. Exact Click Timing Handler (Guaranteed Execution at 3.5s & 8.0s)
   const handleConfirmAge = useCallback(() => {
     setStage('playing');
 
-    try {
-      if (audioRef.current) {
+    if (soundEnabled && audioRef.current) {
+      try {
         audioRef.current.currentTime = 0;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {});
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
+    // Exactly 3.5s: "Welcome to MDeFi" reveal
     setTimeout(() => {
       setIsTextVisible(true);
     }, 3500);
 
+    // Exactly 8.0s: ENTER button unlock
     setTimeout(() => {
       setIsUnlocked(true);
     }, 8000);
-  }, []);
+  }, [soundEnabled]);
 
   const handleRejectAge = useCallback(() => {
     alert('You must be 18 or older to access MDeFi Protocol.');
@@ -389,7 +385,7 @@ export default function ApkWelcomeSplash({
       {/* MAIN CONTENT */}
       <main className="relative z-10 w-full px-4 flex flex-col items-center justify-center flex-1 my-auto">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
-          {/* HERO TEXT: PURE GPU ACCELERATED FADE (ZERO JANK/LAG) */}
+          {/* HERO TEXT: HARD LOCKED VERDANA */}
           <div
             className={`w-full text-center flex flex-col items-center justify-center mb-10 sm:mb-12 transition-opacity duration-700 ease-out select-none ${
               isTextVisible
@@ -435,63 +431,59 @@ export default function ApkWelcomeSplash({
           </div>
 
           {/* 3D COIN & ORBITAL RINGS */}
-          {stage === 'playing' ? (
-            <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
-              <div
-                className="absolute inset-[-14%] rounded-full pointer-events-none"
-                style={{
-                  background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
-                  filter: 'blur(20px)',
-                  transform: 'translateZ(0)',
-                  willChange: 'transform, opacity',
-                  animation: 'aura-pulse 5s ease-in-out infinite alternate',
-                }}
-              />
+          <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
+            <div
+              className="absolute inset-[-14%] rounded-full pointer-events-none"
+              style={{
+                background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
+                filter: 'blur(20px)',
+                transform: 'translateZ(0)',
+                willChange: 'transform, opacity',
+                animation: 'aura-pulse 5s ease-in-out infinite alternate',
+              }}
+            />
 
-              <div
-                className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
-                style={{
-                  transform: 'translateZ(0) rotateX(24deg)',
-                  willChange: 'transform',
-                  animation: 'cyber-orbit-ccw 30s linear infinite',
-                }}
-              >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-                <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              </div>
-
-              <div
-                className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
-                style={{
-                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
-                  animation: 'cyber-orbit-cw 22s linear infinite',
-                }}
-              >
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
-                <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-                <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
-              </div>
-
-              <div
-                className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
-                style={{
-                  animation: 'cyber-orbit-ccw 36s linear infinite',
-                }}
-              >
-                <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
-              </div>
-
-              <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
-                <Rotating3DMbttcCoin size={170} />
-              </div>
+            <div
+              className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
+              style={{
+                transform: 'translateZ(0) rotateX(24deg)',
+                willChange: 'transform',
+                animation: 'cyber-orbit-ccw 30s linear infinite',
+              }}
+            >
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+              <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+              <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
             </div>
-          ) : (
-            <div style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }} />
-          )}
 
-          {/* GATED ENTER BUTTON: FLICKER-FREE STABLE GLOW */}
+            <div
+              className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
+              style={{
+                boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
+                animation: 'cyber-orbit-cw 22s linear infinite',
+              }}
+            >
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
+              <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+              <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
+            </div>
+
+            <div
+              className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
+              style={{
+                animation: 'cyber-orbit-ccw 36s linear infinite',
+              }}
+            >
+              <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
+            </div>
+
+            <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
+              <Rotating3DMbttcCoin size={170} />
+            </div>
+          </div>
+
+          {/* GATED ENTER BUTTON */}
           <div className="w-full flex justify-center mt-8 sm:mt-10">
             <button
               type="button"
@@ -515,7 +507,6 @@ export default function ApkWelcomeSplash({
                   : '0 0 20px rgba(52, 211, 153, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.2)',
               }}
             >
-              {/* STABLE SINGLE HARDWARE ACCELERATED SHEEN */}
               {isUnlocked && (
                 <span
                   className="absolute inset-0 rounded-full pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity overflow-hidden"
