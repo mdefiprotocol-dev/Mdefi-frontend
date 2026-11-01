@@ -24,10 +24,6 @@ export interface ApkWelcomeSplashProps {
   soundEnabled?: boolean;
 }
 
-
-
-
-
 /**
  * High-DPI Crystal-Clear Sci-Fi Blockchain Constellation & Embers Canvas
  * Fills the upper, middle, and lower areas with glowing nodes, dynamic lines, and floating embers.
@@ -43,9 +39,6 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     if (!ctx) return;
 
     let animId: number;
-    // Mobile Performance Lock: DPR ko 1 par rakh kar GPU memory crash bachayein
-    const dpr = 1;
-
     let displayWidth = window.innerWidth;
     let displayHeight = window.innerHeight;
 
@@ -60,7 +53,6 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     resize();
     window.addEventListener('resize', resize);
 
-    // Ultra-lightweight node count (Har low-end phone par 60 FPS chalega)
     const count = 24;
     const particles = Array.from({ length: count }, (_, i) => {
       const isUpper = i % 2 === 0;
@@ -82,22 +74,20 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
       };
     });
 
-    // Strict 60 FPS Delta-Time Lock (Eliminates 90Hz/120Hz display blinking)
     let lastFrameTime = performance.now();
-    const frameInterval = 1000 / 60; // Exact 16.66ms per frame lock
+    const frameInterval = 1000 / 60;
 
     const render = (currentTime: number) => {
       animId = requestAnimationFrame(render);
 
       const elapsed = currentTime - lastFrameTime;
       if (elapsed < frameInterval) {
-        return; // Skip rendering if display is racing ahead of 60 FPS
+        return;
       }
       lastFrameTime = currentTime - (elapsed % frameInterval);
 
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      // Ultra-efficient lines with squared distance check (Zero CPU choke)
       const maxDistSq = 125 * 125;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
@@ -116,15 +106,14 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
         }
       }
 
-      // Draw floating luminous cyber-particles & embers (Lightweight 60 FPS)
       particles.forEach((p) => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius * p.z, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${p.color}, ${p.alpha * p.z})`;
         ctx.fill();
 
-        if (!reducedMotion) 
-          {    p.x += p.vx * p.z;
+        if (!reducedMotion) {
+          p.x += p.vx * p.z;
           p.y += p.vy * p.z;
           p.alpha += p.pulse;
           if (p.alpha > 0.85 || p.alpha < 0.2) p.pulse = -p.pulse;
@@ -161,8 +150,6 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
   );
 };
 
-
-
 /**
  * Main Standalone ApkWelcomeSplash Component
  */
@@ -171,7 +158,6 @@ export default function ApkWelcomeSplash({
   className = '',
   soundEnabled = true,
 }: ApkWelcomeSplashProps) {
-  // Flow states: 'loading' -> 'prompt' -> 'playing'
   const [stage, setStage] = useState<'loading' | 'prompt' | 'playing'>('loading');
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [isTextVisible, setIsTextVisible] = useState<boolean>(false);
@@ -180,7 +166,6 @@ export default function ApkWelcomeSplash({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 1. Cold Start: 2.0s loader ke baad automatic Age Modal open hoga
   useEffect(() => {
     const loaderTimer = setTimeout(() => {
       setStage('prompt');
@@ -188,7 +173,6 @@ export default function ApkWelcomeSplash({
     return () => clearTimeout(loaderTimer);
   }, []);
 
-  // Check user OS preference for reduced motion
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -199,23 +183,27 @@ export default function ApkWelcomeSplash({
     }
   }, []);
 
-  // Preload Audio instance cleanly once
   useEffect(() => {
-    const audioPath =
-      typeof window !== 'undefined' && window.location.protocol === 'capacitor:'
-        ? `${window.location.origin}/assets/welcome.mp3`
-        : '/assets/welcome.mp3';
+    try {
+      const audioPath =
+        typeof window !== 'undefined' && window.location.protocol === 'capacitor:'
+          ? `${window.location.origin}/assets/welcome.mp3`
+          : '/assets/welcome.mp3';
 
-    const audio = new Audio(audioPath);
-    audio.preload = 'auto';
-    audioRef.current = audio;
+      const audio = new Audio();
+      audio.src = audioPath;
+      audio.preload = 'auto';
+      audio.onerror = () => {};
+      audioRef.current = audio;
+    } catch (_) {}
 
     return () => {
-      audio.pause();
+      try {
+        audioRef.current?.pause();
+      } catch (_) {}
     };
   }, []);
 
-  // Sirf aur sirf [YES] button click par exact timing ke sath shuru hoga
   const handleConfirmAge = useCallback(() => {
     setStage('playing');
 
@@ -229,12 +217,10 @@ export default function ApkWelcomeSplash({
       }
     } catch (_) {}
 
-    // Exactly 3.5s par "Welcome to MDeFi" reveal
     setTimeout(() => {
       setIsTextVisible(true);
     }, 3500);
 
-    // Exactly 8.0s par ENTER button unlock
     setTimeout(() => {
       setIsUnlocked(true);
     }, 8000);
@@ -244,7 +230,6 @@ export default function ApkWelcomeSplash({
     alert('You must be 18 or older to access MDeFi Protocol.');
   }, []);
 
-  // ENTER Button Tap Handler
   const handleEnterTap = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -266,9 +251,6 @@ export default function ApkWelcomeSplash({
     [isUnlocked, isEntering, onEnter]
   );
 
-  // Strict 4.0-second visibility gate for the Hero Text (Audio Cadence Sync)
-  
-
   return (
     <div
       className={`fixed inset-0 z-[999999] w-screen h-[100dvh] max-h-[100dvh] overflow-hidden touch-none select-none bg-[#020708] text-white flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200 ${className}`}
@@ -277,9 +259,7 @@ export default function ApkWelcomeSplash({
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)',
       }}
     >
-      {/* =========================================================================
-          AGE VERIFICATION & COLD START MODAL (Stage 'loading' & 'prompt')
-         ========================================================================= */}
+      {/* AGE VERIFICATION MODAL */}
       {stage !== 'playing' && (
         <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-[#010408]/95 px-4 select-none">
           {stage === 'loading' ? (
@@ -329,10 +309,8 @@ export default function ApkWelcomeSplash({
           )}
         </div>
       )}
-      {/* =========================================================================
-          SECTION 4: ULTRA-CLEAR SCI-FI & BLOCKCHAIN VOID BACKGROUND
-         ========================================================================= */}
-      {/* 1. True Obsidian Deep-Space Foundation (Flat Green Completely Gone) */}
+
+      {/* BACKGROUND */}
       <div
         className="absolute inset-0 pointer-events-none z-0 bg-[#010408]"
         style={{
@@ -341,7 +319,6 @@ export default function ApkWelcomeSplash({
         }}
       />
 
-      {/* 2. Top-Center High-Tech Sci-Fi Refraction Lights */}
       <div
         className="absolute -top-20 left-1/2 -translate-x-1/2 w-[110vw] max-w-[800px] h-[55vh] rounded-full pointer-events-none z-0 opacity-70"
         style={{
@@ -352,7 +329,6 @@ export default function ApkWelcomeSplash({
         }}
       />
 
-      {/* 3. Concentric High-Tech 3D Ambient Ring in Background */}
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] rounded-full pointer-events-none z-0 border border-cyan-500/20"
         style={{
@@ -360,7 +336,6 @@ export default function ApkWelcomeSplash({
         }}
       />
 
-      {/* 4. Vivid 3D Cyber-Grid Horizon Matrix */}
       <div
         className="absolute -bottom-2 left-0 right-0 h-60 pointer-events-none z-0 overflow-hidden opacity-75"
         style={{ perspective: '380px' }}
@@ -368,7 +343,8 @@ export default function ApkWelcomeSplash({
         <div
           className="w-full h-[240%] origin-bottom"
           style={{
-            transform: 'rotateX(75deg)',
+            transform: 'rotateX(75deg) translateZ(0)',
+            willChange: 'transform',
             backgroundImage:
               'linear-gradient(to right, rgba(6, 182, 212, 0.65) 1.5px, transparent 1.5px), linear-gradient(to bottom, rgba(16, 185, 129, 0.5) 1.5px, transparent 1.5px)',
             backgroundSize: '36px 36px',
@@ -387,12 +363,9 @@ export default function ApkWelcomeSplash({
         />
       </div>
 
-      {/* 5. High-DPI Floating Constellation Lines & Luminous Dust Canvas */}
       <SciFiConstellationCanvas reducedMotion={reducedMotion} />
 
-      {/* =========================================================================
-          TOP MINIMAL STATUS BAR (Clean Sci-Fi Look - No Buttons)
-         ========================================================================= */}
+      {/* TOP STATUS BAR */}
       <header className="relative z-20 w-full px-5 sm:px-8 flex items-center justify-between">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/25 bg-[#02181b]/70 backdrop-blur-md shadow-[0_0_12px_rgba(6,182,212,0.12)]">
           <span className="relative flex h-2 w-2">
@@ -413,68 +386,57 @@ export default function ApkWelcomeSplash({
         </div>
       </header>
 
-      {/* =========================================================================
-          SECTION 1: BALANCED VERTICAL ALIGNMENT & SCREEN COMPOSITION
-          - Unified Centerpiece: Hero Text -> 18px gap -> Coin -> 20px gap -> ENTER
-          - Zero excessive gaps, cohesive centered framing on 100dvh
-         ========================================================================= */}
+      {/* MAIN CONTENT */}
       <main className="relative z-10 w-full px-4 flex flex-col items-center justify-center flex-1 my-auto">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
-          {/* =========================================================================
-              SECTION 2: EXACT VERDANA HERO TEXT (Locked Against Phone System Font Scaling)
-             ========================================================================= */}
+          {/* HERO TEXT: PURE GPU ACCELERATED FADE (ZERO JANK/LAG) */}
           <div
-            className={`w-full text-center flex flex-col items-center justify-center mb-10 sm:mb-12 transition-all duration-1000 ease-out select-none ${
+            className={`w-full text-center flex flex-col items-center justify-center mb-10 sm:mb-12 transition-opacity duration-700 ease-out select-none ${
               isTextVisible
-                ? 'opacity-100 scale-100 translate-y-0 filter-none'
-                : 'opacity-0 scale-95 -translate-y-3 blur-md pointer-events-none'
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-1 pointer-events-none'
             }`}
             style={{
-              willChange: 'opacity, transform, filter',
+              transform: 'translateZ(0)',
+              willChange: 'opacity, transform',
               WebkitTextSizeAdjust: '100%',
               textSizeAdjust: '100%',
             }}
           >
-           {/* Line 1: Welcome to MDeFi */}
             <h1
               className="locked-verdana font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
               style={{
-                fontFamily: "'Verdana', sans-serif",
+                fontFamily: "Verdana, Geneva, 'DejaVu Sans', sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #ffffff 0%, #d8f5f0 55%, #34d399 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                filter: 'drop-shadow(0 0 16px rgba(52, 211, 153, 0.55))',
+                textShadow: '0 0 20px rgba(52, 211, 153, 0.45)',
               }}
             >
               Welcome to <span style={{ background: 'linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #fde047 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>MDeFi</span>
             </h1>
 
-            {/* Line 2: Protocol & Networks */}
             <h2
               className="locked-verdana font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
               style={{
-                fontFamily: "'Verdana', sans-serif",
+                fontFamily: "Verdana, Geneva, 'DejaVu Sans', sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #fde047 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                filter: 'drop-shadow(0 0 16px rgba(34, 211, 238, 0.55))',
+                textShadow: '0 0 20px rgba(34, 211, 238, 0.45)',
               }}
             >
               Protocol & Networks
             </h2>
           </div>
 
-          {/* =========================================================================
-              SECTION 3: ROTATING ORBITAL RINGS AROUND THE MBTTC COIN
-              - Rendered only after verification (stage === 'playing') to prevent cold-start lag
-             ========================================================================= */}
+          {/* 3D COIN & ORBITAL RINGS */}
           {stage === 'playing' ? (
             <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
-              {/* 1. Breathing Golden-Cyan Backlight Aura (GPU Locked) */}
               <div
                 className="absolute inset-[-14%] rounded-full pointer-events-none"
                 style={{
@@ -486,7 +448,6 @@ export default function ApkWelcomeSplash({
                 }}
               />
 
-              {/* 2. Outer Segmented Tech Cyber-Ring (Counter-Clockwise) */}
               <div
                 className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
                 style={{
@@ -501,7 +462,6 @@ export default function ApkWelcomeSplash({
                 <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
               </div>
 
-              {/* 3. Concentric Middle Orbital Ring with Glowing Nodes */}
               <div
                 className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
                 style={{
@@ -514,7 +474,6 @@ export default function ApkWelcomeSplash({
                 <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
               </div>
 
-              {/* 4. Inner Tech Ring */}
               <div
                 className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
                 style={{
@@ -524,21 +483,15 @@ export default function ApkWelcomeSplash({
                 <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
               </div>
 
-              {/* 5. Real 3D Rotating Coin Inside Rings */}
               <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
                 <Rotating3DMbttcCoin size={170} />
               </div>
             </div>
           ) : (
-            /* Placeholder to maintain vertical layout balance while modal is open */
             <div style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }} />
           )}
 
-          {/* =========================================================================
-              SECTION 5: GATED COMPACT "ENTER" BUTTON
-              - Safe clearance below the coin orbital rings
-              - Locked/dormant during playback -> smoothly unlocks at 8.0s
-             ========================================================================= */}
+          {/* GATED ENTER BUTTON: FLICKER-FREE STABLE GLOW */}
           <div className="w-full flex justify-center mt-8 sm:mt-10">
             <button
               type="button"
@@ -553,31 +506,28 @@ export default function ApkWelcomeSplash({
                   : 'opacity-100 cursor-pointer hover:scale-[1.03] active:scale-[0.96] border-emerald-400/70 hover:border-cyan-300 bg-gradient-to-r from-[#032024]/80 via-[#063339]/85 to-[#032024]/80'
               }`}
               style={{
-                willChange: 'transform, opacity, box-shadow',
+                transform: 'translateZ(0)',
+                willChange: 'transform, opacity',
                 boxShadow: !isUnlocked
                   ? 'none'
                   : isEntering
                   ? '0 0 28px rgba(52, 211, 153, 0.8), inset 0 0 12px rgba(52, 211, 153, 0.4)'
-                  : '0 0 18px rgba(52, 211, 153, 0.35), 0 0 26px rgba(6, 182, 212, 0.2), inset 0 0 10px rgba(52, 211, 153, 0.2)',
-                animation:
-                  isUnlocked && !reducedMotion
-                    ? 'compact-enter-glow 3s ease-in-out infinite'
-                    : 'none',
+                  : '0 0 20px rgba(52, 211, 153, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.2)',
               }}
             >
-              {/* Animated Hairline Emerald-to-Cyan Gradient Border Sweep */}
+              {/* STABLE SINGLE HARDWARE ACCELERATED SHEEN */}
               {isUnlocked && (
                 <span
-                  className="absolute inset-0 rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity overflow-hidden"
+                  className="absolute inset-0 rounded-full pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity overflow-hidden"
                   style={{
+                    transform: 'translateZ(0)',
                     background:
-                      'linear-gradient(90deg, transparent 0%, rgba(52, 211, 153, 0.6) 50%, transparent 100%)',
-                    animation: reducedMotion ? 'none' : 'sheen-sweep 2.8s ease-in-out infinite',
+                      'linear-gradient(90deg, transparent 0%, rgba(52, 211, 153, 0.5) 50%, transparent 100%)',
+                    animation: reducedMotion ? 'none' : 'sheen-sweep 3s ease-in-out infinite',
                   }}
                 />
               )}
 
-              {/* Compact Button Content */}
               <div
                 className={`relative z-10 flex items-center justify-center gap-1.5 font-bold uppercase transition-colors ${
                   !isUnlocked
@@ -613,9 +563,7 @@ export default function ApkWelcomeSplash({
         </div>
       </main>
 
-      {/* =========================================================================
-          FOOTER STATUS & SAFE-AREA DOCK
-         ========================================================================= */}
+      {/* FOOTER */}
       <footer className="relative z-20 w-full px-5 sm:px-8 flex items-center justify-between text-slate-400">
         <div className="flex items-center gap-1.5 text-emerald-400/80">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -633,12 +581,10 @@ export default function ApkWelcomeSplash({
         </div>
       </footer>
 
-      {/* Hardware-Accelerated Sci-Fi Animations */}
+      {/* HARDWARE-ACCELERATED STYLES */}
       <style>{`
-        @import url('https://fonts.cdnfonts.com/css/verdana');
-
         .locked-verdana {
-          font-family: 'Verdana', sans-serif !important;
+          font-family: Verdana, Geneva, 'DejaVu Sans', sans-serif !important;
           font-style: normal !important;
         }
 
@@ -659,18 +605,6 @@ export default function ApkWelcomeSplash({
           40% { opacity: 0.85; }
           60% { opacity: 0.85; }
           100% { transform: translateX(250%) rotate(25deg); opacity: 0; }
-        }
-        @keyframes compact-enter-glow {
-          0%, 100% {
-            box-shadow: 0 0 16px rgba(52, 211, 153, 0.35), 0 0 22px rgba(6, 182, 212, 0.15), inset 0 0 8px rgba(52, 211, 153, 0.18);
-          }
-          50% {
-            box-shadow: 0 0 26px rgba(52, 211, 153, 0.6), 0 0 34px rgba(6, 182, 212, 0.35), inset 0 0 14px rgba(52, 211, 153, 0.28);
-          }
-        }
-        @keyframes refraction-sway {
-          0% { transform: translate(-50%, 0%) scale(1); opacity: 0.4; }
-          100% { transform: translate(-50%, 4%) scale(1.06); opacity: 0.55; }
         }
         @keyframes aura-pulse {
           0% { transform: scale(1); opacity: 0.75; }
