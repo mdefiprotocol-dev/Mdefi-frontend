@@ -16,7 +16,8 @@ export interface ApkWelcomeSplashProps {
 }
 
 /**
- * Lightweight Sci-Fi Blockchain Constellation Canvas (Mali-GPU Safe)
+ * Ultra-Lightweight Sci-Fi Constellation Canvas
+ * Zero GPU Memory Overhead, Stays Active Smoothly
  */
 const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,16 +43,16 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     resize();
     window.addEventListener('resize', resize, { passive: true });
 
-    const count = 22;
+    const count = 18;
     const particles = Array.from({ length: count }, (_, i) => {
       const isUpper = i % 2 === 0;
       return {
         x: Math.random() * displayWidth,
         y: isUpper ? Math.random() * (displayHeight * 0.55) : Math.random() * displayHeight,
         z: Math.random() * 0.9 + 0.35,
-        vx: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.25),
-        vy: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.25),
-        radius: Math.random() * 1.4 + 0.8,
+        vx: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.22),
+        vy: (Math.random() - 0.5) * (reducedMotion ? 0 : 0.22),
+        radius: Math.random() * 1.3 + 0.7,
         color:
           Math.random() > 0.6
             ? '6, 182, 212'
@@ -75,19 +76,19 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
 
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      const maxDistSq = 120 * 120;
+      const maxDistSq = 110 * 110;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const distSq = dx * dx + dy * dy;
           if (distSq < maxDistSq) {
-            const lineAlpha = (1 - distSq / maxDistSq) * 0.16 * particles[i].z;
+            const lineAlpha = (1 - distSq / maxDistSq) * 0.15 * particles[i].z;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.strokeStyle = `rgba(6, 182, 212, ${lineAlpha})`;
-            ctx.lineWidth = 0.6;
+            ctx.lineWidth = 0.55;
             ctx.stroke();
           }
         }
@@ -150,15 +151,15 @@ export default function ApkWelcomeSplash({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 1. Strict 2.0s Cold Start -> Age Modal Open
+  // 1. 5.0s Strict Initialization Time
   useEffect(() => {
     const loaderTimer = setTimeout(() => {
       setStage('prompt');
-    }, 2000);
+    }, 5000);
     return () => clearTimeout(loaderTimer);
   }, []);
 
-  // 2. Reduced Motion Check
+  // 2. Reduced Motion Detector
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -169,19 +170,20 @@ export default function ApkWelcomeSplash({
     }
   }, []);
 
-  // 3. Audio Cleanup on Unmount
+  // 3. Audio Cleanup
   useEffect(() => {
     return () => {
       try {
         if (audioRef.current) {
           audioRef.current.pause();
+          audioRef.current.src = '';
           audioRef.current = null;
         }
       } catch (_) {}
     };
   }, []);
 
-  // 4. Exact Click Timing Handler
+  // 4. Safe Click Handler with Script Error Protection
   const handleConfirmAge = useCallback(() => {
     setStage('playing');
 
@@ -192,16 +194,18 @@ export default function ApkWelcomeSplash({
             ? `${window.location.origin}/assets/welcome.mp3`
             : '/assets/welcome.mp3';
 
-        const audio = new Audio(audioPath);
+        const audio = new Audio();
+        audio.src = audioPath;
         audioRef.current = audio;
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {});
-        }
+
+        // Script error protection for WebView
+        audio.play().catch(() => {
+          // Suppressed cleanly
+        });
       } catch (_) {}
     }
 
-    // Exactly 3.5s: "Welcome to MDeFi" reveal
+    // Exactly 3.5s: "Welcome to MDeFi" smooth reveal
     setTimeout(() => {
       setIsTextVisible(true);
     }, 3500);
@@ -245,9 +249,11 @@ export default function ApkWelcomeSplash({
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)',
       }}
     >
-      {/* AGE VERIFICATION MODAL */}
+      {/* =========================================================================
+          AGE VERIFICATION & COLD START MODAL (Perfect Box Center - No Side Cut)
+         ========================================================================= */}
       {stage !== 'playing' && (
-        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-[#010408]/95 px-4 select-none">
+        <div className="fixed inset-0 z-[1000000] flex items-center justify-center bg-[#010408]/95 px-6 select-none">
           {stage === 'loading' ? (
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
@@ -259,7 +265,7 @@ export default function ApkWelcomeSplash({
               </span>
             </div>
           ) : (
-            <div className="relative w-full max-w-sm rounded-2xl border border-cyan-500/40 bg-[#02181b]/95 p-6 shadow-[0_0_35px_rgba(6,182,212,0.25)] flex flex-col items-center text-center">
+            <div className="relative w-full max-w-[340px] rounded-2xl border border-cyan-500/40 bg-[#02181b]/95 p-6 shadow-[0_0_35px_rgba(6,182,212,0.25)] flex flex-col items-center text-center">
               <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-400/40 flex items-center justify-center mb-3">
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
               </div>
@@ -376,7 +382,7 @@ export default function ApkWelcomeSplash({
       {/* MAIN CONTENT */}
       <main className="relative z-10 w-full px-4 flex flex-col items-center justify-center flex-1 my-auto">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center">
-          {/* HERO TEXT: HARD LOCKED VERDANA */}
+          {/* HERO TEXT: HARD LOCKED SOLID VERDANA FONT */}
           <div
             className={`w-full text-center flex flex-col items-center justify-center mb-10 sm:mb-12 transition-opacity duration-700 ease-out select-none ${
               isTextVisible
@@ -391,9 +397,9 @@ export default function ApkWelcomeSplash({
             }}
           >
             <h1
-              className="locked-verdana font-extrabold tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
+              className="locked-verdana font-black tracking-wide text-2xl sm:text-3xl md:text-4xl leading-tight mb-1"
               style={{
-                fontFamily: "Verdana, Geneva, 'DejaVu Sans', sans-serif",
+                fontFamily: "Verdana, Geneva, 'Segoe UI', Tahoma, sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #ffffff 0%, #d8f5f0 55%, #34d399 100%)',
@@ -406,9 +412,9 @@ export default function ApkWelcomeSplash({
             </h1>
 
             <h2
-              className="locked-verdana font-extrabold tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
+              className="locked-verdana font-black tracking-wide text-xl sm:text-2xl md:text-3xl leading-tight"
               style={{
-                fontFamily: "Verdana, Geneva, 'DejaVu Sans', sans-serif",
+                fontFamily: "Verdana, Geneva, 'Segoe UI', Tahoma, sans-serif",
                 fontSynthesis: 'none',
                 WebkitFontSmoothing: 'antialiased',
                 background: 'linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #fde047 100%)',
@@ -421,58 +427,62 @@ export default function ApkWelcomeSplash({
             </h2>
           </div>
 
-          {/* 3D COIN & ORBITAL RINGS */}
-          <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
-            <div
-              className="absolute inset-[-14%] rounded-full pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
-                filter: 'blur(20px)',
-                transform: 'translateZ(0)',
-                willChange: 'transform, opacity',
-                animation: 'aura-pulse 5s ease-in-out infinite alternate',
-              }}
-            />
+          {/* 3D COIN & ORBITAL RINGS: Lazy mount only after YES to prevent Modal Lag */}
+          {stage === 'playing' ? (
+            <div className="flex flex-col items-center justify-center relative" style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }}>
+              <div
+                className="absolute inset-[-14%] rounded-full pointer-events-none"
+                style={{
+                  background: 'radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(245, 158, 11, 0.28) 30%, rgba(16, 185, 129, 0.2) 55%, transparent 72%)',
+                  filter: 'blur(20px)',
+                  transform: 'translateZ(0)',
+                  willChange: 'transform, opacity',
+                  animation: 'aura-pulse 5s ease-in-out infinite alternate',
+                }}
+              />
 
-            <div
-              className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
-              style={{
-                transform: 'translateZ(0) rotateX(24deg)',
-                willChange: 'transform',
-                animation: 'cyber-orbit-ccw 30s linear infinite',
-              }}
-            >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-              <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
-            </div>
+              <div
+                className="absolute inset-[-16%] rounded-full border border-cyan-400/40 border-dashed pointer-events-none"
+                style={{
+                  transform: 'translateZ(0) rotateX(24deg)',
+                  willChange: 'transform',
+                  animation: 'cyber-orbit-ccw 30s linear infinite',
+                }}
+              >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+                <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[2px] h-4 bg-cyan-300 shadow-[0_0_10px_#22d3ee]" />
+              </div>
 
-            <div
-              className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
-              style={{
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
-                animation: 'cyber-orbit-cw 22s linear infinite',
-              }}
-            >
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
-              <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-              <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
-            </div>
+              <div
+                className="absolute inset-[-9%] rounded-full border border-emerald-400/45 pointer-events-none"
+                style={{
+                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.25), inset 0 0 14px rgba(6, 182, 212, 0.2)',
+                  animation: 'cyber-orbit-cw 22s linear infinite',
+                }}
+              >
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_#22d3ee]" />
+                <div className="absolute bottom-1/4 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+                <div className="absolute bottom-1/5 left-1 w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_#fde047]" />
+              </div>
 
-            <div
-              className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
-              style={{
-                animation: 'cyber-orbit-ccw 36s linear infinite',
-              }}
-            >
-              <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
-            </div>
+              <div
+                className="absolute inset-[-3%] rounded-full border border-amber-400/35 border-dotted pointer-events-none"
+                style={{
+                  animation: 'cyber-orbit-ccw 36s linear infinite',
+                }}
+              >
+                <div className="absolute top-1/3 right-0 translate-x-1/2 w-2 h-2 rounded-full bg-amber-200 shadow-[0_0_10px_#fef08a]" />
+              </div>
 
-            <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
-              <Rotating3DMbttcCoin size={170} />
+              <div className="relative z-10 flex items-center justify-center drop-shadow-[0_0_35px_rgba(245,158,11,0.65)]" style={{ animation: 'majestic-float 6s ease-in-out infinite' }}>
+                <Rotating3DMbttcCoin size={170} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ width: 'clamp(200px, 48vw, 255px)', height: 'clamp(200px, 48vw, 255px)' }} />
+          )}
 
           {/* GATED ENTER BUTTON */}
           <div className="w-full flex justify-center mt-8 sm:mt-10">
@@ -566,8 +576,9 @@ export default function ApkWelcomeSplash({
       {/* HARDWARE-ACCELERATED STYLES */}
       <style>{`
         .locked-verdana {
-          font-family: Verdana, Geneva, 'DejaVu Sans', sans-serif !important;
+          font-family: Verdana, Geneva, 'Segoe UI', Tahoma, sans-serif !important;
           font-style: normal !important;
+          letter-spacing: -0.02em !important;
         }
 
         @keyframes cyber-orbit-cw {
