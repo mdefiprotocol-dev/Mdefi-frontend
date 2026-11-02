@@ -7,12 +7,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShieldCheck, Zap, Lock, ArrowRight } from 'lucide-react';
 import Rotating3DMbttcCoin from './common/Rotating3DMbttcCoin';
 
-/**
- * Single audio asset for the splash sequence (8-second narration).
- * 0.0s – 3.9s: Ambient sci-fi intro music & whoosh (Hero text 100% hidden)
- * 4.0s – 7.8s: Voiceover "Welcome to MDeFi Protocol & Networks"
- * 8.0s: Audio ends -> Compact ENTER button unlocks
- */
 export const AUDIO_SRC = '/assets/welcome.mp3';
 
 export interface ApkWelcomeSplashProps {
@@ -22,7 +16,7 @@ export interface ApkWelcomeSplashProps {
 }
 
 /**
- * Lightweight Sci-Fi Blockchain Constellation Canvas
+ * Lightweight Sci-Fi Blockchain Constellation Canvas (Mali-GPU Safe)
  */
 const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reducedMotion }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,7 +24,7 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     let animId: number;
@@ -46,7 +40,7 @@ const SciFiConstellationCanvas: React.FC<{ reducedMotion: boolean }> = ({ reduce
     };
 
     resize();
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', resize, { passive: true });
 
     const count = 22;
     const particles = Array.from({ length: count }, (_, i) => {
@@ -175,36 +169,32 @@ export default function ApkWelcomeSplash({
     }
   }, []);
 
-  // 3. Audio Initializer (No Main Thread Blocking)
+  // 3. Audio Cleanup on Unmount
   useEffect(() => {
-    try {
-      const audioPath =
-        typeof window !== 'undefined' && window.location.protocol === 'capacitor:'
-          ? `${window.location.origin}/assets/welcome.mp3`
-          : '/assets/welcome.mp3';
-
-      const audio = new Audio();
-      audio.src = audioPath;
-      audio.preload = 'none'; // Background thread block nahi karega
-      audio.onerror = () => {};
-      audioRef.current = audio;
-    } catch (_) {}
-
     return () => {
       try {
-        audioRef.current?.pause();
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
       } catch (_) {}
     };
   }, []);
 
-  // 4. Exact Click Timing Handler (Guaranteed Execution at 3.5s & 8.0s)
+  // 4. Exact Click Timing Handler
   const handleConfirmAge = useCallback(() => {
     setStage('playing');
 
-    if (soundEnabled && audioRef.current) {
+    if (soundEnabled) {
       try {
-        audioRef.current.currentTime = 0;
-        const playPromise = audioRef.current.play();
+        const audioPath =
+          typeof window !== 'undefined' && window.location.protocol === 'capacitor:'
+            ? `${window.location.origin}/assets/welcome.mp3`
+            : '/assets/welcome.mp3';
+
+        const audio = new Audio(audioPath);
+        audioRef.current = audio;
+        const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {});
         }
@@ -319,7 +309,7 @@ export default function ApkWelcomeSplash({
         className="absolute -top-20 left-1/2 -translate-x-1/2 w-[110vw] max-w-[800px] h-[55vh] rounded-full pointer-events-none z-0 opacity-70"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.5) 0%, rgba(16, 185, 129, 0.2) 45%, transparent 75%)',
+            'radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.45) 0%, rgba(16, 185, 129, 0.18) 45%, transparent 75%)',
           transform: 'translateZ(0)',
           willChange: 'transform',
         }}
@@ -334,13 +324,14 @@ export default function ApkWelcomeSplash({
 
       <div
         className="absolute -bottom-2 left-0 right-0 h-60 pointer-events-none z-0 overflow-hidden opacity-75"
-        style={{ perspective: '380px' }}
+        style={{ perspective: '380px', transform: 'translateZ(0)', contain: 'strict' }}
       >
         <div
           className="w-full h-[240%] origin-bottom"
           style={{
             transform: 'rotateX(75deg) translateZ(0)',
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
             backgroundImage:
               'linear-gradient(to right, rgba(6, 182, 212, 0.65) 1.5px, transparent 1.5px), linear-gradient(to bottom, rgba(16, 185, 129, 0.5) 1.5px, transparent 1.5px)',
             backgroundSize: '36px 36px',
