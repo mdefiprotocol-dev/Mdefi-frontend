@@ -208,7 +208,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
   };
 
-  // APK Download state
+  // APK Download state (Direct Trigger from /public/mdefipro.apk)
   const [isDownloadingApk, setIsDownloadingApk] = useState(false);
   const [apkDownloadSuccess, setApkDownloadSuccess] = useState(false);
 
@@ -216,14 +216,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setIsDownloadingApk(true);
     setApkDownloadSuccess(false);
 
+    try {
+      const link = document.createElement('a');
+      link.href = '/mdefipro.apk';
+      link.setAttribute('download', 'mdefipro.apk');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (_) {}
+
     setTimeout(() => {
       setIsDownloadingApk(false);
       setApkDownloadSuccess(true);
       if (onShowToast) {
-        onShowToast('MDeFi Official APK v2.4.0 download initiated', 'success');
+        onShowToast('MDeFi Official APK download initiated!', 'success');
       }
       setTimeout(() => setApkDownloadSuccess(false), 4000);
-    }, 1000);
+    }, 800);
   };
 
   useEffect(() => {
@@ -926,7 +935,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {t('profile_mobile_desc', 'Experience seamless S4 Matrix, Quantum Nexus, and MBTTC telemetry directly on your Android device. Includes hardware-accelerated Web3 wallet bridging and instant push alerts.')}
             </p>
             <div className="flex items-center gap-4 pt-1 font-mono text-[11px] text-zinc-400 flex-wrap">
-              <span>{t('profile_file_size', 'File Size:')} <strong className="text-zinc-200">18.4 MB</strong></span>
+              <span>{t('profile_file_size', 'File Size:')} <strong className="text-zinc-200">6.5 MB</strong></span>
               <span>•</span>
               <span>{t('profile_requires', 'Requires:')} <strong className="text-zinc-200">Android 8.0+</strong></span>
               <span>•</span>
