@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { smartRpcSwitch, DedicatedServiceNode } from '../services/smartRpcEngine';
 
 /**
  * ============================================================================
@@ -17,12 +18,18 @@ export interface ChainConfig {
   explorer: string;
 }
 
+// स्विच से 3 मुख्य डेडिकेटेड सर्विसेज (Alchemy, QuickNode, Reown) लोड की गईं
+const dedicatedNodes: string[] = smartRpcSwitch
+  .getDedicatedNodes(ACTIVE_CHAIN_ID)
+  .map((node: DedicatedServiceNode) => node.url);
+
 export const NETWORK_CONFIG: Record<97 | 56, ChainConfig> = {
   97: {
     chainId: 97,
     name: 'bnbt',
     displayName: 'BNB Smart Chain Testnet',
     rpcUrls: [
+      ...dedicatedNodes, // Priority 1: Dedicated Private Nodes
       'https://data-seed-prebsc-1-s1.binance.org:8545/',
       'https://bsc-testnet-rpc.publicnode.com',
       'https://data-seed-prebsc-2-s1.binance.org:8545/'
@@ -35,6 +42,7 @@ export const NETWORK_CONFIG: Record<97 | 56, ChainConfig> = {
     name: 'bnb',
     displayName: 'BNB Smart Chain Mainnet',
     rpcUrls: [
+      ...dedicatedNodes, // Priority 1: Dedicated Private Nodes
       'https://bsc-dataseed.binance.org/',
       'https://bsc-dataseed1.defibit.io/',
       'https://bsc-dataseed1.ninicoin.io/'
@@ -47,6 +55,26 @@ export const NETWORK_CONFIG: Record<97 | 56, ChainConfig> = {
 // Single shared provider reference poore project ke liye
 let sharedProviderInstance: ethers.JsonRpcProvider | null = null;
 let currentRpcIndex = 0;
+
+/**
+ * Auto-Failover Intercepting Provider
+ * Driver level par -32005, 429 aur timeouts ko pakad kar turant switch karta hai
+ */
+class ResilientJsonRpcProvider extends ethers.JsonRpcProvider {
+  override async _send(payload: ethers.JsonRpcPayload | ethers.JsonRpcPayload[]): Promise<any> {
+    try {
+      return await super._send(payload);
+    } catch (error: any) {
+      if (smartRpcSwitch.isQuotaOrRateLimitError(error)) {
+        console.warn('[rpcConfig] Driver caught rate limit / timeout, auto-switching...', error?.message || error);
+        rotateToNextRpcUrl();
+        const nextProvider = getSharedRpcProvider();
+        return await nextProvider._send(payload);
+      }
+      throw error;
+    }
+  }
+}
 
 /**
  * Universal Shared RPC Provider (Anti-Loop, Anti-Freeze Singleton)
@@ -71,17 +99,17 @@ export function getSharedRpcProvider(): ethers.JsonRpcProvider {
     // Ethers v6 standard initialization with static network lock
     if ((ethers as any).FetchRequest) {
       const fetchReq = new (ethers as any).FetchRequest(targetUrl);
-      fetchReq.timeout = 10000; // 10 second timeout
+      fetchReq.timeout = 4000; // 4 second safe timeout for mobile
 
-      const staticNetwork = (ethers as any).Network
-        ? new (ethers as any).Network(config.name, BigInt(config.chainId))
-        : networkDefinition;
+    const staticNetwork = (ethers as any).Network
+      ? (ethers as any).Network.from({ chainId: BigInt(config.chainId), name: config.name })
+      : networkDefinition;
 
-      sharedProviderInstance = new (ethers as any).JsonRpcProvider(
-        fetchReq,
-        staticNetwork,
-        { staticNetwork: true }
-      );
+    sharedProviderInstance = new ResilientJsonRpcProvider(
+      fetchReq,
+      staticNetwork,
+      { staticNetwork: true }
+    );
     } 
     // Ethers v5 compatibility fallback
     else if ((ethers as any).providers && (ethers as any).providers.JsonRpcProvider) {
@@ -145,7 +173,10 @@ export function getActiveRpcUrl(): string {
  */
 export function rotateToNextRpcUrl(): string {
   const config = NETWORK_CONFIG[ACTIVE_CHAIN_ID];
-  currentRpcIndex = (currentRpcIndex + 1) % config.rpcUrls.length;
+  const result = smartRpcSwitch.selectHealthyUrl(config.rpcUrls, currentRpcIndex);
+  currentRpcIndex = result.newIndex;
+
+  console.log(`[rpcConfig] Switched active RPC to: [${currentRpcIndex}] ${result.url}`);
   resetSharedRpcProvider();
   return getActiveRpcUrl();
 }
