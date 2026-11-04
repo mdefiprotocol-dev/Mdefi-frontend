@@ -48,6 +48,12 @@ import { LanguageProvider } from './context/LanguageContext';
 import { MBTTC_TOKEN_INFO } from './data/mbttcTokenInfo';
 import { PhaseLockedView } from './components/common/PhaseLockedView';
 import { programPhaseService } from './services/programPhaseService';
+import { AppUpdateModal } from './components/AppUpdateModal';
+
+// Current App Version (APK build version)
+const CURRENT_APP_VERSION = '1.0.0';
+// Production version manifest endpoint with cache-busting
+const REMOTE_VERSION_URL = 'https://www.mdefipro.xyz/version.json';
 
 const emptyUserProfile: UserProfile = {
   walletAddress: '',
@@ -99,6 +105,58 @@ function MainApp() {
 
   const [currentPage, setCurrentPage] = useState<NavPage>('overview');
   const [s4PackageFocus, setS4PackageFocus] = useState<'junior' | 'senior'>('junior');
+
+  // In-App Update State
+  const [updateInfo, setUpdateInfo] = useState<{
+    available: boolean;
+    latestVersion: string;
+    downloadUrl: string;
+    releaseNotes: string;
+  }>({
+    available: false,
+    latestVersion: CURRENT_APP_VERSION,
+    downloadUrl: '',
+    releaseNotes: '',
+  });
+
+  // Guarded In-App Auto-Update Checker for Android Capacitor APK
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isNative = Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+      Boolean((window as any).Capacitor) ||
+      window.location.protocol === 'capacitor:' ||
+      window.location.search.includes('source=app');
+
+    if (!isNative) return; // Website version will not trigger update modal
+
+    let isMounted = true;
+    const checkForUpdates = async () => {
+      try {
+        const res = await fetch(`${REMOTE_VERSION_URL}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (isMounted && data?.version && data.version !== CURRENT_APP_VERSION) {
+          setUpdateInfo({
+            available: true,
+            latestVersion: data.version,
+            downloadUrl: data.downloadUrl || 'https://www.mdefipro.xyz/mdefipro.apk',
+            releaseNotes: data.releaseNotes || 'A new update with system improvements is available.',
+          });
+        }
+      } catch (err) {
+        console.warn('[App] In-app update check skipped:', err);
+      }
+    };
+
+    checkForUpdates();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [user, setUser] = useState<UserProfile>(() => {
     try {
@@ -1077,6 +1135,14 @@ function MainApp() {
           onClose={() => setRewardPopup(null)}
         />
       )}
+
+      <AppUpdateModal
+        isOpen={updateInfo.available}
+        latestVersion={updateInfo.latestVersion}
+        downloadUrl={updateInfo.downloadUrl}
+        releaseNotes={updateInfo.releaseNotes}
+        onClose={() => setUpdateInfo((prev) => ({ ...prev, available: false }))}
+      />
     </div>
   );
 }
