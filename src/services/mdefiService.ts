@@ -44,10 +44,13 @@ const MULTICALL3_ABI = [
 // Network-scoped verification cache so we verify bytecode once per network
 const verifiedMulticallByChain = new Map<string, boolean>();
 
-// Constants for bounded incremental scanning to guard free public node limits
-const MAX_SCAN_SPAN_BLOCKS = 2000;
+// Production Safe Bounds: 400 blocks chunk size prevents -32005 limits permanently
+const MAX_SCAN_SPAN_BLOCKS = 400;
 const REORG_SAFETY_BLOCKS = 5;
-const COLD_START_SCAN_WINDOW = 2500;
+const COLD_START_SCAN_WINDOW = 800;
+
+// Claim VIP Lock: Jab claim chal raha ho, tab background scanning pause rahegi
+let isClaimTransactionActive = false;
 
 // Module-level cache to guard against rapid duplicate calls (Zero-syntax risk)
 let lastTeamFetchTime = 0;
@@ -291,8 +294,14 @@ export class MDefiHubMockService implements IMDefiHubService {
 
         let currentFrom = fromTargetBlock;
 
-        // Process in bounded chunks of MAX_SCAN_SPAN_BLOCKS to prevent 429 and response truncation
+        // Process in bounded chunks of 400 blocks with mobile thread pacing
         while (currentFrom < latestBlock) {
+          // VIP Guard: Agar user claim button daba chuka hai, to background scanner pause hoga
+          if (isClaimTransactionActive) {
+            console.log('[MDefiHub] Background scan paused for active claim transaction');
+            break;
+          }
+
           const currentTo = Math.min(currentFrom + MAX_SCAN_SPAN_BLOCKS, latestBlock);
           
           try {
@@ -309,9 +318,11 @@ export class MDefiHubMockService implements IMDefiHubService {
             // ATOMIC COMMIT: Commit cursor only after this specific chunk has been fetched
             sessionStorage.setItem(cursorKey, String(currentTo));
             currentFrom = currentTo + 1;
+
+            // Micro pacing: 40ms delay between chunks to keep mobile WebView smooth
+            await new Promise((resolve) => setTimeout(resolve, 40));
           } catch (chunkErr: any) {
             console.warn(`[MDefiHub] Chunk scan failed (${currentFrom}-${currentTo}), preserving cursor:`, chunkErr?.message || chunkErr);
-            // Break loop gracefully so already processed chunks are kept and cursor resumes here on next run
             break;
           }
         }
@@ -807,10 +818,21 @@ export class MDefiHubMockService implements IMDefiHubService {
   ): Promise<{ success: boolean; txHash: string; claimedAmount: number; message?: string }> {
     const targetWallet = this.getEffectiveWallet(walletAddress);
 
-    const result = await contractAdapter.executeClaim({
-      rewardType: type,
-      walletAddress: targetWallet,
-    });
+    // Turn on VIP Lock so background scanning doesn't choke RPC during sign
+    isClaimTransactionActive = true;
+
+    let result: any;
+    try {
+      result = await contractAdapter.executeClaim({
+        rewardType: type,
+        walletAddress: targetWallet,
+      });
+    } finally {
+      // Re-enable background scans after transaction settles
+      setTimeout(() => {
+        isClaimTransactionActive = false;
+      }, 5000);
+    }
 
     if (!result.success) {
       return {
