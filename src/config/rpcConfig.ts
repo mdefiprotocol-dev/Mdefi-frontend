@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { ethers, Network } from 'ethers';
 import { smartRpcSwitch, DedicatedServiceNode } from '../services/smartRpcEngine';
 
 /**
@@ -90,72 +90,21 @@ export function getSharedRpcProvider(): ethers.JsonRpcProvider {
   const config = NETWORK_CONFIG[ACTIVE_CHAIN_ID];
   const targetUrl = config.rpcUrls[currentRpcIndex] || config.rpcUrls[0];
 
-  const networkDefinition = {
-    chainId: config.chainId,
-    name: config.name
-  };
+  const verifiedNetwork = Network.from({
+    name: config.name,
+    chainId: config.chainId
+  });
 
-  try {
-    // Ethers v6 standard initialization with static network lock
-    if ((ethers as any).FetchRequest) {
-      const fetchReq = new (ethers as any).FetchRequest(targetUrl);
-      fetchReq.timeout = 4000; // 4 second safe timeout for mobile
+  const fetchReq = new ethers.FetchRequest(targetUrl);
+  fetchReq.timeout = 5000;
 
-    const staticNetwork = (ethers as any).Network
-      ? (ethers as any).Network.from({ chainId: BigInt(config.chainId), name: config.name })
-      : networkDefinition;
+  sharedProviderInstance = new ResilientJsonRpcProvider(
+    fetchReq,
+    verifiedNetwork,
+    { staticNetwork: verifiedNetwork, batchMaxCount: 1 }
+  );
 
-    sharedProviderInstance = new ResilientJsonRpcProvider(
-      fetchReq,
-      staticNetwork,
-      { staticNetwork: true }
-    );
-    } 
-    // Ethers v5 compatibility fallback
-    else if ((ethers as any).providers && (ethers as any).providers.JsonRpcProvider) {
-      sharedProviderInstance = new (ethers as any).providers.JsonRpcProvider(
-        {
-          url: targetUrl,
-          timeout: 10000
-        },
-        networkDefinition
-      ) as any;
-    } 
-    // Universal Safe Fallback
-    else {
-      sharedProviderInstance = new (ethers as any).JsonRpcProvider(
-        targetUrl,
-        networkDefinition,
-        { staticNetwork: true }
-      );
-    }
-
-    // Mobile thread protection: Background polling ko 12s par lock rakhte hain
-    if (sharedProviderInstance && typeof (sharedProviderInstance as any).pollingInterval === 'number') {
-      (sharedProviderInstance as any).pollingInterval = 12000;
-    }
-
-  } catch (error) {
-    console.warn('[rpcConfig] Primary init failed, using strict static fallback:', error);
-    try {
-      sharedProviderInstance = new (ethers as any).JsonRpcProvider(
-        targetUrl,
-        networkDefinition,
-        { staticNetwork: true }
-      ) as any;
-    } catch (criticalErr) {
-      console.error('[rpcConfig] Critical RPC init failure:', criticalErr);
-    }
-  }
-
-  // Guaranteed Singleton Fallback (Har haal mein staticNetwork locked rahega)
-  if (!sharedProviderInstance) {
-    sharedProviderInstance = new (ethers as any).JsonRpcProvider(
-      targetUrl,
-      networkDefinition,
-      { staticNetwork: true }
-    ) as ethers.JsonRpcProvider;
-  }
+  sharedProviderInstance.pollingInterval = 12000;
 
   return sharedProviderInstance;
 }
