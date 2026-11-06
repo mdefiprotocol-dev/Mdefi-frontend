@@ -337,7 +337,14 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-extrabold text-base sm:text-xl tracking-tight text-white group-hover:text-emerald-300 transition-colors shrink-0">
                 MDeFi
               </span>
-              <span className="inline-flex items-center text-[9px] sm:text-[10px] font-mono uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-400 font-semibold tracking-wider shrink-0 select-none whitespace-nowrap shadow-[0_0_8px_rgba(16,185,129,0.15)]">
+              <span 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.reload();
+                }}
+                title="Tap to hard refresh dashboard"
+                className="inline-flex items-center text-[9px] sm:text-[10px] font-mono uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-400 font-semibold tracking-wider shrink-0 select-none whitespace-nowrap shadow-[0_0_8px_rgba(16,185,129,0.15)] cursor-pointer hover:bg-emerald-900/60 active:scale-90 transition-all"
+              >
                 {t('brand_protocol', 'Protocol')}
               </span>
             </div>
