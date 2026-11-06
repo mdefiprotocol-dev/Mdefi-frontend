@@ -125,7 +125,15 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleToggleConnect = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsConnectedState(!isConnectedState);
+    if (isConnectedState) {
+      // Wallet disconnect logic
+      setIsConnectedState(false);
+    } else {
+      // Reconnect click par wallet popup kholna aur dropdown close karna
+      setShowWalletDropdown(false);
+      onOpenWalletModal();
+      setIsConnectedState(true);
+    }
   };
 
   // Deduplicate activities strictly for the currently connected user's wallet
